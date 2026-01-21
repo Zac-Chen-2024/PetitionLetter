@@ -118,15 +118,23 @@ Return at most {max_highlights} highlights, prioritizing the most important ones
     request_body = {
         "model": model,
         "messages": [
-            {"role": "system", "content": "You are a precise document analyzer. Return ONLY valid JSON."},
+            {"role": "system", "content": "You are a precise document analyzer. Return ONLY valid JSON. Do not explain your reasoning."},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.1,
-        "max_tokens": 4000,  # 禁用思考模式后不需要太多 tokens
+        "max_tokens": 4000,
     }
 
-    # 本地模型可能不完全支持 response_format，但 vLLM 和 Ollama 支持
-    if llm_provider == "ollama" or llm_provider != "local" or "qwen" in model.lower() or "deepseek" in model.lower():
+    # Ollama 特殊参数：禁用思考模式
+    if llm_provider == "ollama":
+        request_body["options"] = {
+            "num_ctx": 16000,  # 增加上下文长度
+        }
+        # 强制 JSON 输出模式
+        request_body["format"] = "json"
+
+    # 本地模型可能不完全支持 response_format
+    if llm_provider != "ollama":
         request_body["response_format"] = {"type": "json_object"}
 
     async with httpx.AsyncClient(timeout=180.0) as client:  # 3 分钟超时
@@ -142,27 +150,88 @@ Return at most {max_highlights} highlights, prioritizing the most important ones
         data = response.json()
         message = data["choices"][0]["message"]
         content = message.get("content", "")
+        reasoning = message.get("reasoning", "")
 
-        # Qwen3 思考模式：如果 content 为空，尝试从 reasoning 字段获取
-        if not content and "reasoning" in message:
-            # 从 reasoning 中提取 JSON（通常在思考结束后会有 JSON 输出）
-            reasoning = message.get("reasoning", "")
-            # 尝试找到 JSON 部分
-            import re
-            json_match = re.search(r'\{[\s\S]*"highlights"[\s\S]*\}', reasoning)
-            if json_match:
-                content = json_match.group()
-            else:
-                raise ValueError(f"Qwen3 reasoning mode returned no valid JSON. Reasoning: {reasoning[:500]}")
+        # 调试日志
+        print(f"[Highlight-Debug] content length: {len(content)}, reasoning length: {len(reasoning)}")
+        if content:
+            print(f"[Highlight-Debug] content preview: {content[:200]}")
+        if reasoning:
+            print(f"[Highlight-Debug] reasoning preview: {reasoning[:200]}")
 
-        if not content:
-            raise ValueError("LLM returned empty content")
+        # 尝试从 content 或 reasoning 中提取 JSON
+        json_source = content or reasoning
 
-        try:
-            result = json.loads(content)
-            return result.get("highlights", [])
-        except json.JSONDecodeError:
-            raise ValueError(f"Failed to parse LLM response as JSON: {content[:200]}")
+        if not json_source:
+            raise ValueError("LLM returned empty content and reasoning")
+
+        # 尝试多种方式解析 JSON
+        import re
+
+        def extract_json(text: str) -> dict:
+            """从文本中提取 JSON 对象"""
+            # 方法1: 直接解析（如果整个文本就是 JSON）
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                pass
+
+            # 方法2: 查找 ```json ... ``` 代码块
+            json_block = re.search(r'```json\s*([\s\S]*?)\s*```', text)
+            if json_block:
+                try:
+                    return json.loads(json_block.group(1))
+                except json.JSONDecodeError:
+                    pass
+
+            # 方法3: 查找完整的 highlights JSON 结构（使用递归匹配）
+            # 从后往前找，因为 Qwen3 思考模式通常在最后输出 JSON
+            json_patterns = [
+                r'\{\s*"highlights"\s*:\s*\[[\s\S]*?\]\s*\}',  # 简单匹配
+                r'\{[^{}]*"highlights"[^{}]*\[[^\[\]]*\][^{}]*\}',  # 更严格匹配
+            ]
+            for pattern in json_patterns:
+                matches = list(re.finditer(pattern, text))
+                if matches:
+                    # 从最后一个匹配开始尝试
+                    for match in reversed(matches):
+                        try:
+                            return json.loads(match.group())
+                        except json.JSONDecodeError:
+                            continue
+
+            # 方法4: 查找任意大括号包围的内容，从后往前尝试
+            # 找到所有可能的 JSON 起始位置
+            brace_positions = [i for i, c in enumerate(text) if c == '{']
+            for start in reversed(brace_positions):
+                # 尝试找到匹配的闭合括号
+                depth = 0
+                for i in range(start, len(text)):
+                    if text[i] == '{':
+                        depth += 1
+                    elif text[i] == '}':
+                        depth -= 1
+                        if depth == 0:
+                            candidate = text[start:i+1]
+                            try:
+                                result = json.loads(candidate)
+                                if isinstance(result, dict) and 'highlights' in result:
+                                    return result
+                            except json.JSONDecodeError:
+                                pass
+                            break
+
+            # 方法5: 如果还是没找到，返回空的 highlights
+            # 这样至少不会报错，只是没有高亮
+            return {"highlights": []}
+
+        result = extract_json(json_source)
+        if result is None:
+            # 记录详细错误信息便于调试
+            preview = json_source[:500] if len(json_source) > 500 else json_source
+            raise ValueError(f"Failed to extract JSON from LLM response. Preview: {preview}")
+
+        return result.get("highlights", [])
 
 
 def match_highlights_to_bbox(

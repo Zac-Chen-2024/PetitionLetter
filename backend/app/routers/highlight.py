@@ -686,11 +686,16 @@ async def trigger_batch_highlight(
     db: Session = Depends(get_db)
 ):
     """批量触发项目中所有已完成 OCR 文档的高亮分析"""
-    # 查找所有已完成 OCR 且未进行高亮分析的文档
+    # 查找所有已完成 OCR 且需要高亮分析的文档
+    from sqlalchemy import or_
     documents = db.query(Document).filter(
         Document.project_id == project_id,
         Document.ocr_status == OCRStatus.COMPLETED.value,
-        Document.highlight_status.is_(None)  # 未开始高亮
+        or_(
+            Document.highlight_status.is_(None),  # 未开始
+            Document.highlight_status == HighlightStatus.PENDING.value,  # 等待中
+            Document.highlight_status == HighlightStatus.FAILED.value,  # 失败重试
+        )
     ).all()
 
     # 过滤有 text_blocks 的文档

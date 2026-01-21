@@ -61,6 +61,15 @@ except ImportError:
     PDF_SUPPORT = False
 
 
+# L1 分析进度追踪（内存中）
+# 结构: { project_id: { status, total, completed, current_doc, errors, results } }
+_l1_analysis_progress: Dict[str, Dict[str, Any]] = {}
+
+# 关系分析进度追踪（内存中）
+# 结构: { project_id: { status, result, error } }
+_relationship_progress: Dict[str, Dict[str, Any]] = {}
+
+
 # ============== 数据模型 ==============
 
 class DocumentResponse(BaseModel):
@@ -1711,9 +1720,53 @@ async def save_manual_relationship(project_id: str, data: ManualRelationshipRequ
     }
 
 
+async def _run_relationship_analysis_background(project_id: str, prompt: str):
+    """后台运行关系分析任务"""
+    global _relationship_progress
+
+    _relationship_progress[project_id] = {
+        "status": "processing",
+        "result": None,
+        "error": None
+    }
+
+    try:
+        result = await call_llm(prompt)
+
+        # 保存到本地文件
+        storage.save_relationship(project_id, result)
+
+        _relationship_progress[project_id] = {
+            "status": "completed",
+            "result": result,
+            "error": None
+        }
+    except Exception as e:
+        _relationship_progress[project_id] = {
+            "status": "failed",
+            "result": None,
+            "error": str(e)
+        }
+
+
 @router.post("/relationship/{project_id}")
 async def analyze_relationships(project_id: str, beneficiary_name: Optional[str] = None, db: Session = Depends(get_db)):
-    """Stage 3: LLM2 分析实体关系 - 使用 L-1 专项分析的所有 quotes 数据"""
+    """Stage 3: LLM2 分析实体关系 - 使用 L-1 专项分析的所有 quotes 数据
+
+    现在返回 202 并在后台执行分析，使用 /relationship/stream/{project_id} 监控进度
+    """
+    global _relationship_progress
+
+    # 检查是否已有分析在进行中
+    if project_id in _relationship_progress:
+        current_status = _relationship_progress[project_id].get("status")
+        if current_status == "processing":
+            return {
+                "success": True,
+                "message": "Relationship analysis already in progress",
+                "project_id": project_id,
+                "status": "processing"
+            }
 
     # 从 L-1 专项分析加载所有 quotes（使用 load_l1_analysis 而不是 summary）
     l1_analyses = storage.load_l1_analysis(project_id)
@@ -1808,12 +1861,71 @@ Return JSON:
 }}
 """
 
-    result = await call_llm(prompt)
+    # 启动后台任务
+    asyncio.create_task(_run_relationship_analysis_background(project_id, prompt))
 
-    # 保存到本地文件
-    storage.save_relationship(project_id, result)
+    return {
+        "success": True,
+        "message": "Started relationship analysis",
+        "project_id": project_id,
+        "documents_count": len(docs_data)
+    }
 
-    return {"success": True, "project_id": project_id, "graph": result}
+
+@router.get("/relationship/stream/{project_id}")
+async def stream_relationship_progress(project_id: str):
+    """SSE 端点：实时推送关系分析进度
+
+    返回 Server-Sent Events 流：
+    - event: progress - 进度更新
+    - event: complete - 分析完成
+    """
+    global _relationship_progress
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        while True:
+            # 获取当前进度
+            progress_data = _relationship_progress.get(project_id)
+
+            if not progress_data:
+                # 没有分析任务，发送空状态并结束
+                yield f"event: complete\ndata: {json.dumps({'project_id': project_id, 'status': 'idle'})}\n\n"
+                break
+
+            status = progress_data.get("status", "unknown")
+            result = progress_data.get("result")
+            error = progress_data.get("error")
+
+            progress = {
+                "project_id": project_id,
+                "status": status,
+                "error": error
+            }
+
+            # 检查是否完成
+            if status == "completed":
+                progress["result"] = result
+                yield f"event: complete\ndata: {json.dumps(progress)}\n\n"
+                break
+            elif status == "failed":
+                yield f"event: complete\ndata: {json.dumps(progress)}\n\n"
+                break
+
+            # 发送进度更新（处理中）
+            yield f"event: progress\ndata: {json.dumps(progress)}\n\n"
+
+            # 等待 1 秒后再次检查
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 # ============== Stage 4: LLM3 Writing ==============
@@ -1988,15 +2100,102 @@ class ManualAnalysisRequest(BaseModel):
     quotes: List[Dict[str, Any]]
 
 
+async def _run_l1_analysis_background(project_id: str, doc_list: List[Dict[str, Any]]):
+    """后台运行 L1 分析任务"""
+    global _l1_analysis_progress, current_model
+
+    total = len(doc_list)
+    _l1_analysis_progress[project_id] = {
+        "status": "processing",
+        "total": total,
+        "completed": 0,
+        "current_doc": None,
+        "errors": [],
+        "results": [],
+        "model_used": current_model
+    }
+
+    all_results = []
+    errors = []
+
+    for idx, doc_info in enumerate(doc_list):
+        try:
+            # 更新当前处理的文档
+            _l1_analysis_progress[project_id]["current_doc"] = {
+                "document_id": doc_info["document_id"],
+                "file_name": doc_info["file_name"],
+                "exhibit_id": doc_info["exhibit_id"]
+            }
+
+            # 生成 L-1 专项提示词（整文档模式）
+            prompt = get_l1_analysis_prompt(doc_info)
+
+            # 调用 LLM (带重试)
+            llm_result = await call_llm(prompt, model_override=current_model, max_retries=3)
+
+            # 解析结果
+            parsed_quotes = parse_analysis_result(llm_result, doc_info)
+
+            doc_result = {
+                "document_id": doc_info["document_id"],
+                "exhibit_id": doc_info["exhibit_id"],
+                "file_name": doc_info["file_name"],
+                "quotes": parsed_quotes
+            }
+            all_results.append(doc_result)
+
+            # 更新进度
+            _l1_analysis_progress[project_id]["completed"] = idx + 1
+            _l1_analysis_progress[project_id]["results"] = all_results
+
+            # 添加请求间隔以避免触发速率限制
+            await asyncio.sleep(0.5)
+
+        except Exception as e:
+            error_info = {
+                "document_id": doc_info["document_id"],
+                "exhibit_id": doc_info["exhibit_id"],
+                "error": str(e)
+            }
+            errors.append(error_info)
+            _l1_analysis_progress[project_id]["errors"] = errors
+            _l1_analysis_progress[project_id]["completed"] = idx + 1
+
+    # 保存分析结果
+    storage.save_l1_analysis(project_id, all_results)
+
+    # 标记完成
+    _l1_analysis_progress[project_id]["status"] = "completed"
+    _l1_analysis_progress[project_id]["current_doc"] = None
+
+
 @router.post("/l1-analyze/{project_id}")
-async def l1_analyze_project(project_id: str, doc_ids: Optional[str] = None, db: Session = Depends(get_db)):
+async def l1_analyze_project(
+    project_id: str,
+    doc_ids: Optional[str] = None,
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db)
+):
     """Stage 2 (L-1 专项): 整文档 L-1 标准分析（无 Chunking）
 
     参数:
     - project_id: 项目 ID
     - doc_ids: 可选，逗号分隔的文档 ID 列表。如果不提供，分析所有已完成 OCR 的文档
+
+    返回 202 并在后台执行分析，使用 /l1-analyze/stream/{project_id} 监控进度
     """
-    import asyncio
+    global _l1_analysis_progress
+
+    # 检查是否已有分析在进行中
+    if project_id in _l1_analysis_progress:
+        current_status = _l1_analysis_progress[project_id].get("status")
+        if current_status == "processing":
+            return {
+                "success": True,
+                "message": "L1 analysis already in progress",
+                "project_id": project_id,
+                "status": "processing"
+            }
 
     # 基础查询
     query = db.query(Document).filter(
@@ -2015,59 +2214,121 @@ async def l1_analyze_project(project_id: str, doc_ids: Optional[str] = None, db:
     if not documents:
         raise HTTPException(status_code=404, detail="No documents found")
 
-    global current_model
-    all_results = []
-    total_docs_analyzed = 0
-    errors = []
+    # 准备文档信息列表
+    doc_list = [
+        {
+            "document_id": doc.id,
+            "exhibit_id": doc.exhibit_number or "X-1",
+            "file_name": doc.file_name,
+            "text": doc.ocr_text or ""
+        }
+        for doc in documents
+    ]
 
-    for doc in documents:
-        try:
-            # 构建整文档分析数据
-            doc_info = {
-                "document_id": doc.id,
-                "exhibit_id": doc.exhibit_number or "X-1",
-                "file_name": doc.file_name,
-                "text": doc.ocr_text or ""
-            }
-
-            # 生成 L-1 专项提示词（整文档模式）
-            prompt = get_l1_analysis_prompt(doc_info)
-
-            # 调用 LLM (带重试)
-            llm_result = await call_llm(prompt, model_override=current_model, max_retries=3)
-
-            # 解析结果
-            parsed_quotes = parse_analysis_result(llm_result, doc_info)
-
-            doc_result = {
-                "document_id": doc.id,
-                "exhibit_id": doc.exhibit_number,
-                "file_name": doc.file_name,
-                "quotes": parsed_quotes
-            }
-            all_results.append(doc_result)
-            total_docs_analyzed += 1
-
-            # 添加请求间隔以避免触发速率限制
-            await asyncio.sleep(0.5)
-
-        except Exception as e:
-            errors.append({
-                "document_id": doc.id,
-                "exhibit_id": doc.exhibit_number,
-                "error": str(e)
-            })
-
-    # 保存分析结果
-    storage.save_l1_analysis(project_id, all_results)
+    # 启动后台任务
+    asyncio.create_task(_run_l1_analysis_background(project_id, doc_list))
 
     return {
         "success": True,
+        "message": f"Started L1 analysis for {len(documents)} documents",
         "project_id": project_id,
-        "total_docs_analyzed": total_docs_analyzed,
-        "total_quotes_found": sum(len(r.get("quotes", [])) for r in all_results),
-        "errors": errors if errors else None,
-        "model_used": current_model
+        "total": len(documents),
+        "documents": [
+            {"id": doc.id, "file_name": doc.file_name, "exhibit_id": doc.exhibit_number}
+            for doc in documents
+        ]
+    }
+
+
+@router.get("/l1-analyze/stream/{project_id}")
+async def stream_l1_analysis_progress(project_id: str):
+    """SSE 端点：实时推送 L1 分析进度
+
+    返回 Server-Sent Events 流：
+    - event: progress - 进度更新
+    - event: complete - 分析全部完成
+    """
+    global _l1_analysis_progress
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        while True:
+            # 获取当前进度
+            progress_data = _l1_analysis_progress.get(project_id)
+
+            if not progress_data:
+                # 没有分析任务，发送空状态并结束
+                yield f"event: complete\ndata: {json.dumps({'project_id': project_id, 'status': 'idle', 'total': 0, 'completed': 0})}\n\n"
+                break
+
+            status = progress_data.get("status", "unknown")
+            total = progress_data.get("total", 0)
+            completed = progress_data.get("completed", 0)
+            current_doc = progress_data.get("current_doc")
+            errors = progress_data.get("errors", [])
+            results = progress_data.get("results", [])
+            model_used = progress_data.get("model_used", "")
+
+            progress = {
+                "project_id": project_id,
+                "status": status,
+                "total": total,
+                "completed": completed,
+                "progress_percent": round(completed / total * 100, 1) if total > 0 else 0,
+                "current_doc": current_doc,
+                "errors": errors,
+                "total_quotes_found": sum(len(r.get("quotes", [])) for r in results),
+                "model_used": model_used
+            }
+
+            # 检查是否完成
+            if status == "completed":
+                yield f"event: complete\ndata: {json.dumps(progress)}\n\n"
+                break
+
+            # 发送进度更新
+            yield f"event: progress\ndata: {json.dumps(progress)}\n\n"
+
+            # 等待 1 秒后再次检查
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
+@router.get("/l1-analyze/progress/{project_id}")
+async def get_l1_analysis_progress(project_id: str):
+    """获取 L1 分析进度（非 SSE，用于检查状态）"""
+    global _l1_analysis_progress
+
+    progress_data = _l1_analysis_progress.get(project_id)
+
+    if not progress_data:
+        return {
+            "project_id": project_id,
+            "status": "idle",
+            "total": 0,
+            "completed": 0
+        }
+
+    results = progress_data.get("results", [])
+
+    return {
+        "project_id": project_id,
+        "status": progress_data.get("status", "unknown"),
+        "total": progress_data.get("total", 0),
+        "completed": progress_data.get("completed", 0),
+        "progress_percent": round(progress_data.get("completed", 0) / progress_data.get("total", 1) * 100, 1),
+        "current_doc": progress_data.get("current_doc"),
+        "errors": progress_data.get("errors", []),
+        "total_quotes_found": sum(len(r.get("quotes", [])) for r in results),
+        "model_used": progress_data.get("model_used", "")
     }
 
 
