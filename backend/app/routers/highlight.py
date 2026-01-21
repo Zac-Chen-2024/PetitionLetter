@@ -9,14 +9,15 @@ Highlight Router - 高亮分析 API
 """
 
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, AsyncGenerator
 from sqlalchemy.orm import Session
 from datetime import datetime
 import json
 import base64
 import uuid
+import asyncio
 
 from app.db.database import get_db, SessionLocal
 from app.models.document import Document, TextBlock, Highlight, HighlightStatus, OCRStatus
@@ -275,19 +276,96 @@ async def get_project_highlight_progress(
     }
 
 
+@router.get("/stream/{project_id}")
+async def stream_highlight_progress(project_id: str, db: Session = Depends(get_db)):
+    """SSE 端点：实时推送高亮分析进度
+
+    返回 Server-Sent Events 流：
+    - event: progress - 进度更新
+    - event: complete - 分析全部完成
+    """
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        while True:
+            # 获取当前进度
+            documents = db.query(Document).filter(Document.project_id == project_id).all()
+
+            if not documents:
+                yield f"event: complete\ndata: {json.dumps({'project_id': project_id, 'total': 0, 'completed': 0})}\n\n"
+                break
+
+            total = len(documents)
+            not_started = sum(1 for d in documents if d.highlight_status is None)
+            pending = sum(1 for d in documents if d.highlight_status == HighlightStatus.PENDING.value)
+            processing = sum(1 for d in documents if d.highlight_status == HighlightStatus.PROCESSING.value)
+            completed = sum(1 for d in documents if d.highlight_status == HighlightStatus.COMPLETED.value)
+            failed = sum(1 for d in documents if d.highlight_status == HighlightStatus.FAILED.value)
+
+            progress = {
+                "project_id": project_id,
+                "total": total,
+                "not_started": not_started,
+                "pending": pending,
+                "processing": processing,
+                "completed": completed,
+                "failed": failed,
+                "progress_percent": round(completed / total * 100, 1) if total > 0 else 0,
+                "documents": [
+                    {
+                        "id": d.id,
+                        "file_name": d.file_name,
+                        "exhibit_number": d.exhibit_number,
+                        "ocr_status": d.ocr_status,
+                        "highlight_status": d.highlight_status,
+                        "page_count": d.page_count
+                    }
+                    for d in documents
+                ]
+            }
+
+            # 检查是否完成
+            if processing == 0 and pending == 0:
+                yield f"event: complete\ndata: {json.dumps(progress)}\n\n"
+                break
+
+            # 发送进度更新
+            yield f"event: progress\ndata: {json.dumps(progress)}\n\n"
+
+            # 刷新数据库会话
+            db.expire_all()
+
+            # 等待 1 秒
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
 # ============== 文档页面图片 API ==============
+
+# 导入缓存服务
+from app.services import page_cache
+
 
 @router.get("/page/{document_id}/{page_number}/image")
 async def get_document_page_image(
     document_id: str,
     page_number: int,
-    dpi: int = 150,
+    dpi: int = 100,  # 降低默认 DPI 加快响应
     db: Session = Depends(get_db)
 ):
     """
     获取文档指定页面的图片
 
     将 PDF 页面渲染为 JPEG 图片返回
+    优先从磁盘缓存读取，缓存未命中时渲染并缓存
     """
     if not PDF_SUPPORT:
         raise HTTPException(status_code=500, detail="PDF support not available")
@@ -296,11 +374,6 @@ async def get_document_page_image(
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-
-    # 加载原始文件
-    file_bytes = storage.load_uploaded_file(doc.project_id, document_id)
-    if not file_bytes:
-        raise HTTPException(status_code=404, detail="File not found in storage")
 
     # 验证页码
     if page_number < 1 or page_number > doc.page_count:
@@ -311,7 +384,23 @@ async def get_document_page_image(
 
     # 检查文件类型
     if doc.file_name.lower().endswith('.pdf'):
-        # PDF 文件：渲染指定页面
+        # PDF 文件：优先从缓存读取
+        cached_image = page_cache.get_cached_image(document_id, page_number, dpi)
+        if cached_image:
+            return Response(
+                content=cached_image,
+                media_type="image/jpeg",
+                headers={
+                    "Content-Disposition": f"inline; filename=\"{doc.file_name}_page_{page_number}.jpg\"",
+                    "X-Cache": "HIT"
+                }
+            )
+
+        # 缓存未命中，加载文件并渲染
+        file_bytes = storage.load_uploaded_file(doc.project_id, document_id)
+        if not file_bytes:
+            raise HTTPException(status_code=404, detail="File not found in storage")
+
         try:
             pdf_document = fitz.open(stream=file_bytes, filetype="pdf")
             page = pdf_document[page_number - 1]  # 0-indexed
@@ -323,11 +412,15 @@ async def get_document_page_image(
 
             pdf_document.close()
 
+            # 保存到缓存
+            page_cache.save_to_cache(document_id, page_number, img_bytes, dpi)
+
             return Response(
                 content=img_bytes,
                 media_type="image/jpeg",
                 headers={
-                    "Content-Disposition": f"inline; filename=\"{doc.file_name}_page_{page_number}.jpg\""
+                    "Content-Disposition": f"inline; filename=\"{doc.file_name}_page_{page_number}.jpg\"",
+                    "X-Cache": "MISS"
                 }
             )
         except Exception as e:
@@ -336,6 +429,10 @@ async def get_document_page_image(
         # 图片文件：直接返回（只有第 1 页）
         if page_number != 1:
             raise HTTPException(status_code=400, detail="Image file only has 1 page")
+
+        file_bytes = storage.load_uploaded_file(doc.project_id, document_id)
+        if not file_bytes:
+            raise HTTPException(status_code=404, detail="File not found in storage")
 
         content_type = "image/jpeg"
         if doc.file_name.lower().endswith('.png'):
@@ -625,4 +722,135 @@ async def trigger_batch_highlight(
         "message": f"Started highlight analysis for {len(eligible_docs)} documents",
         "total": len(eligible_docs),
         "documents": [{"id": d.id, "file_name": d.file_name} for d in eligible_docs]
+    }
+
+
+# ============== 缓存管理 API ==============
+
+@router.get("/cache/stats")
+async def get_cache_stats():
+    """获取页面图片缓存统计"""
+    stats = page_cache.get_cache_stats()
+    return {
+        "success": True,
+        "cache_root": str(page_cache.CACHE_ROOT),
+        **stats
+    }
+
+
+@router.post("/cache/prerender/{document_id}")
+async def prerender_document_pages(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    手动触发文档页面预渲染
+
+    用于对已存在的文档进行预渲染（OCR 完成前上传的老文档）
+    """
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not doc.file_name.lower().endswith('.pdf'):
+        return {
+            "success": False,
+            "message": "Only PDF documents can be prerendered"
+        }
+
+    # 检查是否已缓存
+    cached_pages = page_cache.get_cached_pages(document_id)
+    if len(cached_pages) >= doc.page_count:
+        return {
+            "success": True,
+            "message": "Document already fully cached",
+            "cached_pages": len(cached_pages),
+            "total_pages": doc.page_count
+        }
+
+    # 后台执行预渲染
+    def do_prerender():
+        file_bytes = storage.load_uploaded_file(doc.project_id, document_id)
+        if file_bytes:
+            page_cache.prerender_document(document_id, file_bytes, doc.page_count)
+
+    background_tasks.add_task(do_prerender)
+
+    return {
+        "success": True,
+        "message": "Prerender started in background",
+        "already_cached": len(cached_pages),
+        "total_pages": doc.page_count
+    }
+
+
+@router.post("/cache/prerender-project/{project_id}")
+async def prerender_project_documents(
+    project_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    预渲染项目中所有 PDF 文档
+
+    用于批量预渲染老文档
+    """
+    docs = db.query(Document).filter(
+        Document.project_id == project_id,
+        Document.ocr_status == OCRStatus.COMPLETED.value
+    ).all()
+
+    pdf_docs = [d for d in docs if d.file_name.lower().endswith('.pdf')]
+
+    if not pdf_docs:
+        return {
+            "success": True,
+            "message": "No PDF documents found",
+            "total": 0
+        }
+
+    # 后台执行预渲染
+    def do_prerender_all():
+        for doc in pdf_docs:
+            try:
+                file_bytes = storage.load_uploaded_file(doc.project_id, doc.id)
+                if file_bytes:
+                    page_cache.prerender_document(doc.id, file_bytes, doc.page_count)
+            except Exception as e:
+                print(f"Failed to prerender {doc.id}: {e}")
+
+    background_tasks.add_task(do_prerender_all)
+
+    return {
+        "success": True,
+        "message": f"Prerender started for {len(pdf_docs)} PDF documents",
+        "total": len(pdf_docs),
+        "documents": [{"id": d.id, "file_name": d.file_name, "pages": d.page_count} for d in pdf_docs]
+    }
+
+
+@router.delete("/cache/cleanup")
+async def cleanup_cache(max_age_days: int = 7):
+    """
+    清理过期缓存
+
+    默认清理 7 天未访问的缓存
+    """
+    cleaned = page_cache.cleanup_old_cache(max_age_days)
+    return {
+        "success": True,
+        "message": f"Cleaned {cleaned} old cache directories",
+        "cleaned_count": cleaned
+    }
+
+
+@router.delete("/cache/{document_id}")
+async def delete_document_cache(document_id: str):
+    """删除指定文档的缓存"""
+    success = page_cache.delete_document_cache(document_id)
+    return {
+        "success": success,
+        "message": "Cache deleted" if success else "Failed to delete cache",
+        "document_id": document_id
     }

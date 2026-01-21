@@ -9,10 +9,12 @@ Document Pipeline Router - 文档处理流水线
 """
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form, BackgroundTasks, Body
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, AsyncGenerator
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+import asyncio
 import httpx
 import json
 import base64
@@ -24,6 +26,7 @@ from app.models.document import Document, DocumentAnalysis, OCRStatus, TextBlock
 from app.services import storage
 from app.services import deepseek_ocr
 from app.services import bbox_matcher
+from app.services import page_cache
 from app.services.ocr_queue import ocr_queue
 from app.services.storage import (
     save_style_template, get_style_templates, get_style_template,
@@ -466,6 +469,12 @@ async def delete_document(document_id: str, db: Session = Depends(get_db)):
     except Exception:
         pass  # 文件可能不存在，忽略错误
 
+    # 删除页面图片缓存
+    try:
+        page_cache.delete_document_cache(document_id)
+    except Exception:
+        pass
+
     return {"success": True, "message": "Document deleted", "document_id": document_id}
 
 
@@ -499,6 +508,12 @@ async def delete_documents_batch(
             # 尝试删除本地存储的文件
             try:
                 storage.delete_document_file(project_id, doc_id)
+            except Exception:
+                pass
+
+            # 删除页面图片缓存
+            try:
+                page_cache.delete_document_cache(doc_id)
             except Exception:
                 pass
         else:
@@ -702,6 +717,16 @@ def _ocr_processor_callback(document_id: str, file_bytes: bytes, file_name: str,
                 _ocr_batch_status[batch_id]["finished_at"] = datetime.utcnow().isoformat()
 
         print(f"[OCR-Queue-Processor] Successfully saved: {document_id}", flush=True)
+
+        # OCR 完成后预渲染所有页面图片到缓存
+        try:
+            file_bytes = storage.load_uploaded_file(doc.project_id, document_id)
+            if file_bytes and doc.file_name.lower().endswith('.pdf'):
+                rendered = page_cache.prerender_document(document_id, file_bytes, page_count)
+                print(f"[OCR-Queue-Processor] Prerendered {rendered}/{page_count} pages for {document_id}", flush=True)
+        except Exception as prerender_err:
+            print(f"[OCR-Queue-Processor] Prerender failed (non-critical): {prerender_err}", flush=True)
+
         return True
 
     except Exception as e:
@@ -1345,6 +1370,99 @@ async def get_project_ocr_progress(project_id: str, db: Session = Depends(get_db
             for d in documents
         ]
     }
+
+
+@router.get("/ocr/stream/{project_id}")
+async def stream_ocr_progress(project_id: str, db: Session = Depends(get_db)):
+    """SSE 端点：实时推送 OCR 进度
+
+    返回 Server-Sent Events 流：
+    - event: progress - 进度更新
+    - event: complete - OCR 全部完成
+    """
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        while True:
+            # 获取当前进度
+            documents = db.query(Document).filter(Document.project_id == project_id).all()
+
+            if not documents:
+                # 没有文档，发送空进度并结束
+                yield f"event: complete\ndata: {json.dumps({'project_id': project_id, 'total': 0, 'completed': 0})}\n\n"
+                break
+
+            total = len(documents)
+            pending = sum(1 for d in documents if d.ocr_status == OCRStatus.PENDING.value)
+            queued = sum(1 for d in documents if d.ocr_status == OCRStatus.QUEUED.value)
+            processing = sum(1 for d in documents if d.ocr_status == OCRStatus.PROCESSING.value)
+            completed = sum(1 for d in documents if d.ocr_status == OCRStatus.COMPLETED.value)
+            failed = sum(1 for d in documents if d.ocr_status == OCRStatus.FAILED.value)
+            partial = sum(1 for d in documents if d.ocr_status == OCRStatus.PARTIAL.value)
+            paused = sum(1 for d in documents if d.ocr_status == OCRStatus.PAUSED.value)
+            cancelled = sum(1 for d in documents if d.ocr_status == OCRStatus.CANCELLED.value)
+
+            # 获取当前正在处理的文档的页级别进度
+            current_processing = None
+            queue_status = ocr_queue.get_queue_status()
+            if queue_status.get("current_task"):
+                current_task = queue_status["current_task"]
+                current_processing = {
+                    "document_id": current_task.get("document_id"),
+                    "file_name": current_task.get("file_name"),
+                    "current_page": current_task.get("current_page", 0),
+                    "total_pages": current_task.get("total_pages", 0),
+                    "page_status": current_task.get("page_status", "")
+                }
+
+            progress = {
+                "project_id": project_id,
+                "total": total,
+                "pending": pending,
+                "queued": queued,
+                "processing": processing,
+                "completed": completed,
+                "failed": failed,
+                "partial": partial,
+                "paused": paused,
+                "cancelled": cancelled,
+                "progress_percent": round(completed / total * 100, 1) if total > 0 else 0,
+                "current_processing": current_processing,
+                "documents": [
+                    {
+                        "id": d.id,
+                        "file_name": d.file_name,
+                        "exhibit_number": d.exhibit_number,
+                        "ocr_status": d.ocr_status,
+                        "page_count": d.page_count,
+                        "ocr_error": d.ocr_error
+                    }
+                    for d in documents
+                ]
+            }
+
+            # 检查是否完成（没有正在处理或等待处理的文档）
+            if processing == 0 and pending == 0 and queued == 0:
+                yield f"event: complete\ndata: {json.dumps(progress)}\n\n"
+                break
+
+            # 发送进度更新
+            yield f"event: progress\ndata: {json.dumps(progress)}\n\n"
+
+            # 刷新数据库会话以获取最新数据
+            db.expire_all()
+
+            # 等待 1 秒后再次检查
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # 禁用 nginx 缓冲
+        }
+    )
 
 
 # ============== 模型配置 ==============
