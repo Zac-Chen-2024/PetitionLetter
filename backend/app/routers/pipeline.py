@@ -32,7 +32,7 @@ from app.services.storage import (
     save_style_template, get_style_templates, get_style_template,
     delete_style_template, update_style_template
 )
-from app.services.l1_analyzer import get_l1_analysis_prompt, parse_analysis_result, L1_STANDARDS
+from app.services.l1_analyzer import get_l1_analysis_prompt, parse_analysis_result, L1_STANDARDS, clean_ocr_for_llm
 from app.services.quote_merger import merge_chunk_analyses, generate_summary, prepare_for_writing, format_citation
 from app.services.model_preloader import get_preload_state
 
@@ -1528,7 +1528,7 @@ async def call_llm(prompt: str, model_override: str = None, max_retries: int = 3
     else:
         # 标准模型使用 max_tokens
         request_body["temperature"] = 0.1
-        request_body["max_tokens"] = 4000
+        request_body["max_tokens"] = 16000  # 增加到 16000 以容纳 Qwen3 思考模式
         # 本地模型可能不支持 response_format，但 vLLM 和 Ollama 支持
         if LLM_PROVIDER == "ollama" or LLM_PROVIDER != "local" or "qwen" in model.lower() or "deepseek" in model.lower():
             request_body["response_format"] = {"type": "json_object"}
@@ -1585,14 +1585,48 @@ async def call_llm(prompt: str, model_override: str = None, max_retries: int = 3
                     raise ValueError("LLM returned empty content")
 
                 # 尝试解析 JSON（推理模型可能返回带有额外文本的 JSON）
-                try:
-                    return json.loads(content)
-                except json.JSONDecodeError:
-                    # 尝试从内容中提取 JSON
-                    json_match = re.search(r'\{[\s\S]*\}', content)
+                def extract_first_json(text: str) -> dict:
+                    """提取第一个完整的 JSON 对象，忽略后面的额外内容"""
+                    # 方法1: 直接解析
+                    try:
+                        return json.loads(text)
+                    except json.JSONDecodeError as e:
+                        # 如果是 "Extra data" 错误，尝试只解析到第一个 JSON 结束位置
+                        if "Extra data" in str(e):
+                            # 找到第一个 { 开始，匹配括号找到结束位置
+                            start = text.find('{')
+                            if start >= 0:
+                                depth = 0
+                                for i in range(start, len(text)):
+                                    if text[i] == '{':
+                                        depth += 1
+                                    elif text[i] == '}':
+                                        depth -= 1
+                                        if depth == 0:
+                                            try:
+                                                return json.loads(text[start:i+1])
+                                            except json.JSONDecodeError:
+                                                break
+
+                    # 方法2: 查找 JSON 代码块
+                    json_block = re.search(r'```json\s*([\s\S]*?)\s*```', text)
+                    if json_block:
+                        try:
+                            return json.loads(json_block.group(1))
+                        except json.JSONDecodeError:
+                            pass
+
+                    # 方法3: 贪婪匹配（最后手段）
+                    json_match = re.search(r'\{[\s\S]*\}', text)
                     if json_match:
-                        return json.loads(json_match.group())
-                    raise ValueError(f"Failed to parse LLM response as JSON: {content[:200]}")
+                        try:
+                            return json.loads(json_match.group())
+                        except json.JSONDecodeError:
+                            pass
+
+                    raise ValueError(f"Failed to parse LLM response as JSON: {text[:200]}")
+
+                return extract_first_json(content)
 
         except Exception as e:
             last_error = e
@@ -2214,13 +2248,13 @@ async def l1_analyze_project(
     if not documents:
         raise HTTPException(status_code=404, detail="No documents found")
 
-    # 准备文档信息列表
+    # 准备文档信息列表（清理 OCR 文本中的垃圾数据，只影响 LLM 输入，不影响原始数据）
     doc_list = [
         {
             "document_id": doc.id,
             "exhibit_id": doc.exhibit_number or "X-1",
             "file_name": doc.file_name,
-            "text": doc.ocr_text or ""
+            "text": clean_ocr_for_llm(doc.ocr_text or "")
         }
         for doc in documents
     ]

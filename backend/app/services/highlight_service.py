@@ -122,13 +122,13 @@ Return at most {max_highlights} highlights, prioritizing the most important ones
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.1,
-        "max_tokens": 4000,
+        "max_tokens": 16000,  # 增加到 16000 以容纳 Qwen3 的思考模式输出
     }
 
     # Ollama 特殊参数：禁用思考模式
     if llm_provider == "ollama":
         request_body["options"] = {
-            "num_ctx": 16000,  # 增加上下文长度
+            "num_ctx": 32768,  # 增加上下文长度
         }
         # 强制 JSON 输出模式
         request_body["format"] = "json"

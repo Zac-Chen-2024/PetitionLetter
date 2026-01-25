@@ -11,6 +11,39 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 
+def clean_ocr_for_llm(ocr_text: str) -> str:
+    """
+    临时清理 OCR 文本用于 LLM 分析
+
+    只移除 DeepSeek-OCR 的调试输出，保留所有实际内容。
+    原始数据库中的 ocr_text 和 text_blocks 不受影响，
+    确保后续 BBox 匹配和回溯功能正常。
+
+    Args:
+        ocr_text: 原始 OCR 文本
+
+    Returns:
+        清理后的文本（仅用于发送给 LLM）
+    """
+    if not ocr_text:
+        return ""
+
+    lines = ocr_text.split('\n')
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        # 跳过 DeepSeek-OCR 调试输出
+        if stripped.startswith('BASE:') and 'torch.Size' in stripped:
+            continue
+        if stripped.startswith('PATCHES:') and 'torch.Size' in stripped:
+            continue
+        # 跳过空的分隔线
+        if stripped == '=====================':
+            continue
+        cleaned.append(line)
+    return '\n'.join(cleaned)
+
+
 # L-1 签证 4 大核心标准
 L1_STANDARDS = {
     "qualifying_relationship": {
@@ -53,37 +86,35 @@ def get_l1_analysis_prompt(doc_info: Dict[str, Any]) -> str:
     file_name = doc_info.get("file_name", "unknown")
     document_text = doc_info.get("text", "")
 
-    prompt = f"""You are a Senior L-1 Immigration Paralegal. Your mission is to precisely extract key factual quotes from a document that are relevant to the L-1 visa application standards.
+    prompt = f"""You are a Senior L-1 Immigration Paralegal. Your mission is to COMPREHENSIVELY extract ALL factual quotes from this document that could support an L-1 visa application.
+
+**IMPORTANT: Extract as many relevant quotes as possible. Each piece of factual information should be a separate quote. Do NOT summarize - extract the EXACT text.**
 
 **L-1 Visa: 4 Core Legal Requirements:**
 
-1.  **Qualifying Corporate Relationship**
-    * **Look for:** "parent", "subsidiary", "affiliate", "branch", "sister company", ownership percentages, stock structure, evidence of common control.
-    * **Related Docs:** Articles of Incorporation, Stock Certificates, Bylaws.
+1.  **Qualifying Corporate Relationship** (qualifying_relationship)
+    Extract: Company names, ownership percentages, stock amounts, parent/subsidiary mentions, affiliate relationships, shareholder info, articles of incorporation details.
 
-2.  **Qualifying Employment Abroad**
-    * **Look for:** Name of the foreign entity, job title, start/end dates of employment, evidence of at least 1 year of continuous work in the past 3 years.
-    * **Related Docs:** Employment Contracts, Employment Verification Letters, Payroll records.
+2.  **Qualifying Employment Abroad** (qualifying_employment)
+    Extract: Foreign company names, job titles, employment dates, work duration, position history, salary info, employment verification.
 
-3.  **Qualifying Capacity**
-    * **L-1A (Executive/Managerial):** "strategic planning", "directs the management", "manages a department", "supervises professionals", "personnel authority" (hire/fire), "budgetary control".
-    * **L-1B (Specialized Knowledge):** "proprietary technology", "unique knowledge", "advanced processes", "difficult to transfer", "not commonly held".
-    * **Related Docs:** Organizational Charts, detailed Job Descriptions, list of subordinates.
+3.  **Qualifying Capacity** (qualifying_capacity)
+    Extract: Job duties, management responsibilities, supervisory roles, strategic planning, decision-making authority, personnel authority, budget control, specialized knowledge, technical expertise.
 
-4.  **Doing Business (Active Operations)** - Most common evidence type.
-    * **Look for:**
-        * **Premises:** Commercial lease, rent payments, office address.
-        * **Financials:** Bank accounts, bank statements, account balance, wire transfers, issued checks.
-        * **Business:** Sales contracts, client orders, purchase orders, invoices.
-        * **Operations:** Number of employees, payroll expenses, corporate filings, EIN verification.
-    * **Note:** A Commercial Lease is critical evidence of active operations!
+4.  **Doing Business / Active Operations** (doing_business) - MOST COMMON, extract generously!
+    Extract:
+    - **Entity Info:** Company name, entity type, status (ACTIVE), registration dates, DOS ID, EIN, incorporation date
+    - **Address:** Any business address, registered agent address, office location
+    - **Financial:** Bank info, account numbers, balances, wire transfers, revenue, expenses
+    - **Operations:** Employee counts, payroll, contracts, invoices, business activities
+    - **Legal:** Lease agreements, rental amounts, contract terms
 
 **Current Document Info:**
 -   **Exhibit ID:** {exhibit_id}
 -   **File Name:** {file_name}
 
 **Output Format (JSON):**
-Return an empty array `[]` if no relevant content is found in the document. Otherwise, use the following structure:
+Extract ALL relevant information. Use this structure:
 
 {{
   "quotes": [
