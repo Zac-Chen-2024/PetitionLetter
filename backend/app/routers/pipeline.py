@@ -2498,44 +2498,135 @@ async def l1_write_section(
     beneficiary_name_str = beneficiary_name if beneficiary_name else "[Beneficiary]"
     petitioner_name = "Kings Elevator Parts Inc."  # TODO: 从项目配置中获取
 
-    prompt = f"""You are a Senior Immigration Attorney at a top-tier U.S. law firm. Your task is to write a single, persuasive paragraph for an L-1 Petition Letter.
+    # 获取证据丰富度元数据（如果有）
+    evidence_metadata = evidence.get("evidence_metadata", {})
+    unique_exhibits = evidence_metadata.get("unique_exhibits", [])
+    data_types = evidence_metadata.get("data_types_found", {})
 
-You will write *only* for the specific section requested, using *only* the evidence provided.
+    prompt = f"""You are a Senior Immigration Attorney at a top-tier U.S. law firm specializing in L-1 visa petitions. Your task is to write a comprehensive, persuasive paragraph for an L-1 Petition Letter that will convince USCIS to approve the petition.
 
-**1. Available Evidence (JSON):**
-(This JSON contains all relevant quotes extracted from the client's documents)
+═══════════════════════════════════════════════════════════════
+SECTION 1: CRITICAL LENGTH & DENSITY REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
+**MINIMUM LENGTH: 200-400 words** (CRITICAL - paragraphs under 200 words will be REJECTED)
+
+**CONTENT DENSITY REQUIREMENTS:**
+- Include AT LEAST 3 distinct factual claims, each with its own citation
+- Reference AT LEAST 2 different Exhibit sources (you have {len(unique_exhibits)} available: {', '.join(unique_exhibits) if unique_exhibits else 'multiple exhibits'})
+- Include AT LEAST 2 of the following data types: specific dates, percentages, dollar amounts, or employee headcounts
+- Every factual claim MUST have an inline citation
+
+═══════════════════════════════════════════════════════════════
+SECTION 2: PARAGRAPH STRUCTURE TEMPLATE
+═══════════════════════════════════════════════════════════════
+
+Your paragraph MUST follow this layered structure:
+
+**Layer 1 - Legal Conclusion Statement (1-2 sentences):**
+State the legal conclusion directly, connecting to the relevant L-1 standard.
+Example: "The Petitioner maintains a qualifying corporate relationship with its foreign parent company, as required under 8 CFR 214.2(l)."
+
+**Layer 2 - Primary Evidence with Specifics (2-3 sentences):**
+Present the most critical facts with specific dates, percentages, and figures.
+Example: "The foreign parent, [Company Name], holds a 51% ownership stake in the Petitioner, as evidenced by the stock certificate issued on [date]. [Exhibit X: Stock Certificate]"
+
+**Layer 3 - Supporting Business Context (2-3 sentences):**
+Describe business operations, products/services, or organizational structure that strengthens the case.
+Example: "The Petitioner operates as a specialized distributor of elevator components, serving over 50 commercial clients across the Northeastern United States. [Exhibit Y: Business Plan]"
+
+**Layer 4 - Financial/Quantitative Evidence (1-2 sentences):**
+Include revenue figures, employee counts, growth projections, or other quantitative data.
+Example: "Since its establishment, the company has grown to employ 7 full-time staff and generated $741,227 in gross revenue for fiscal year 2024. [Exhibits A-6 & B-1: Payroll Records, Financial Statements]"
+
+**Layer 5 - Forward-Looking or Concluding Statement (1-2 sentences):**
+Reinforce the qualifying relationship with future plans or partnership context.
+Example: "This ownership structure ensures continued collaboration and resource sharing between the U.S. and foreign entities, demonstrating a bona fide qualifying relationship."
+
+═══════════════════════════════════════════════════════════════
+SECTION 3: CITATION FORMAT REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
+**CORRECT Citation Formats:**
+- Single exhibit: [Exhibit A-6: Payroll Journal]
+- Multiple exhibits: [Exhibits A-6, B-1 & B-2: Payroll Journal, Business Plan, Organizational Chart]
+
+**INCORRECT Formats (DO NOT USE):**
+- [Exhibit B-2: Exhibit B-2.pdf] ← Never use raw filenames
+- [Exhibit B-2.pdf] ← Missing descriptive title
+- (Exhibit B-2) ← Wrong bracket style
+
+**Use DESCRIPTIVE TITLES for exhibits:**
+- Stock certificates → "Stock Certificate" or "Ownership Documentation"
+- Business plans → "Business Plan"
+- Incorporation documents → "Certificate of Incorporation"
+- Financial documents → "Financial Statements" or "Tax Return"
+- Payroll records → "Payroll Journal" or "Payroll Records"
+- Lease agreements → "Commercial Lease Agreement"
+- Organization charts → "Organizational Chart"
+
+═══════════════════════════════════════════════════════════════
+SECTION 4: LEGAL LANGUAGE REQUIREMENTS
+═══════════════════════════════════════════════════════════════
+
+**USE these professional legal phrases:**
+- "duly established" (for company formation)
+- "maintains a qualifying corporate relationship" (for ownership)
+- "evidenced by" (for documentary proof)
+- "demonstrates" / "establishing" (for conclusions)
+- "in accordance with" / "as required under" (for regulatory references)
+- "bona fide" (for genuine relationships)
+- "requisite" (for required elements)
+
+**AVOID:**
+- Casual language or contractions
+- Hedging words like "seems," "appears," "might"
+- Repetitive phrasing
+
+═══════════════════════════════════════════════════════════════
+SECTION 5: AVAILABLE EVIDENCE
+═══════════════════════════════════════════════════════════════
+
+**Evidence JSON** (synthesize facts from these quotes):
 {json.dumps(evidence["quotes"], indent=2, ensure_ascii=False)}
 
-**2. Context for this Task:**
-* **Section to Write:** {section_type}
-    *(e.g., "Qualifying Corporate Relationship", "Beneficiary's Managerial Capacity Abroad", "Petitioner's Active Operations")*
-* **Beneficiary Name:** {beneficiary_name_str}
-* **Petitioner Name:** {petitioner_name}
+**Task Context:**
+- Section to Write: {section_type}
+- Beneficiary Name: {beneficiary_name_str}
+- Petitioner Name: {petitioner_name}
 
-**3. Strict Instructions:**
+═══════════════════════════════════════════════════════════════
+SECTION 6: OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════
 
-* **Language:** You must write in formal, professional, and persuasive legal English.
-* **Focus:** The `paragraph_text` must *only* address the `{section_type}`. Do not include facts or arguments irrelevant to this specific legal standard.
-* **Evidence-Based:** Your argument *must* be built by synthesizing one or more `quote` fields from the Evidence JSON. Do not make any claims that are not directly supported by the provided quotes.
-* **Inline Citations (MANDATORY):**
-    1.  Every factual claim you make in the `paragraph_text` *must* be followed by an inline citation.
-    2.  You will create the citation using the `source` object (which contains `exhibit_id` and `file_name`) found within the Evidence JSON.
-    3.  **Citation Format:** `[Exhibit {{exhibit_id}}: {{file_name}}]`
-* **Output Format:** You *must* provide your response as a single JSON object matching the exact structure specified below.
-
-**4. Required Output Format (JSON):**
+Respond with a JSON object in this EXACT format:
 
 {{
-  "paragraph_text": "The generated paragraph text, complete with inline citations. For example: The Petitioner, {petitioner_name}, has secured a physical office space [Exhibit A-1: Commercial Lease] and has been actively doing business since its incorporation [Exhibit A-2: NYS DOS Filing]...",
+  "paragraph_text": "[Your 200-400 word paragraph here, with inline citations using descriptive titles. Example: {petitioner_name} maintains a qualifying corporate relationship with its foreign parent company, Fuzhou Shinestone Trade Co., Ltd., through a 51% ownership stake held by Shinestone in the Petitioner. [Exhibit B-2: Stock Certificate] The Petitioner was duly established on April 22, 2022, in the State of New York, as a corporation engaged in the wholesale distribution of elevator parts and components. [Exhibit A-1: Certificate of Incorporation] ... (continue for 200-400 words total)]",
   "citations_used": [
     {{
+      "exhibit": "B-2",
+      "descriptive_title": "Stock Certificate",
+      "quote": "The exact quote from the evidence that supports this claim...",
+      "claim": "Brief summary of the fact supported (e.g., 'Foreign parent holds 51% ownership stake')"
+    }},
+    {{
       "exhibit": "A-1",
-      "file_name": "Commercial Lease",
-      "quote": "The specific quote from the evidence_json that was used...",
-      "claim": "A brief summary of the specific fact supported by this quote (e.g., 'Petitioner secured a physical office.')"
+      "descriptive_title": "Certificate of Incorporation",
+      "quote": "The exact quote...",
+      "claim": "Brief summary..."
     }}
   ]
 }}
+
+**FINAL CHECKLIST before responding:**
+☐ Paragraph is 200-400 words (count carefully!)
+☐ At least 3 distinct facts with citations
+☐ At least 2 different Exhibits cited
+☐ Citations use descriptive titles, NOT filenames
+☐ Includes specific dates, percentages, or amounts
+☐ Uses professional legal language
+☐ Follows the 5-layer structure
 """
 
     global current_model
