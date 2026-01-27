@@ -22,7 +22,7 @@ import uuid
 
 from app.core.config import settings
 from app.db.database import get_db, SessionLocal
-from app.models.document import Document, DocumentAnalysis, OCRStatus, TextBlock
+from app.models.document import Document, DocumentAnalysis, OCRStatus, TextBlock, Highlight
 from app.services import storage
 from app.services import deepseek_ocr
 from app.services import bbox_matcher
@@ -3154,5 +3154,252 @@ async def cancel_chunked_upload(upload_id: str):
     del _upload_sessions[upload_id]
 
     return {"success": True, "message": "Upload cancelled"}
+
+
+# ============== 写作修改 API (Writing Module) ==============
+
+class ReviseSelection(BaseModel):
+    """选中文本范围"""
+    text: str
+    start: int
+    end: int
+
+
+class ReviseRequest(BaseModel):
+    """修改段落请求"""
+    section_type: str
+    current_content: str
+    instruction: str
+    selection: Optional[ReviseSelection] = None
+
+
+@router.post("/l1-revise/{project_id}")
+async def revise_paragraph(project_id: str, data: ReviseRequest):
+    """根据自然语言指令修改段落
+
+    支持两种模式：
+    1. 全文修改 - selection 为空时，根据指令修改整个段落
+    2. 选中修改 - selection 不为空时，只修改选中部分
+    """
+    section_names = {
+        "qualifying_relationship": "Qualifying Corporate Relationship",
+        "qualifying_employment": "Qualifying Employment Abroad",
+        "qualifying_capacity": "Qualifying Capacity",
+        "doing_business": "Doing Business"
+    }
+
+    section_name = section_names.get(data.section_type, data.section_type)
+
+    # 构建修改提示词
+    if data.selection:
+        prompt = f"""You are editing an L-1 petition letter paragraph.
+
+**Section:** {section_name}
+
+**Current Paragraph:**
+{data.current_content}
+
+**Selected Text to Modify:**
+"{data.selection.text}"
+
+**User's Instruction:**
+{data.instruction}
+
+**Your Task:**
+1. Modify ONLY the selected text according to the user's instruction
+2. Keep the rest of the paragraph unchanged
+3. Maintain the formal, legal writing style
+4. Keep all existing citations in [Exhibit X-Y: Title] format
+5. Ensure the modified text flows naturally with the surrounding content
+
+**Output Format (JSON):**
+{{
+  "revised_content": "The complete paragraph with the selected portion modified",
+  "changes_made": "Brief description of what was changed"
+}}
+"""
+    else:
+        prompt = f"""You are editing an L-1 petition letter paragraph.
+
+**Section:** {section_name}
+
+**Current Paragraph:**
+{data.current_content}
+
+**User's Instruction:**
+{data.instruction}
+
+**Your Task:**
+1. Modify the paragraph according to the user's instruction
+2. Maintain the formal, legal writing style
+3. Keep all existing citations in [Exhibit X-Y: Title] format
+4. Preserve important factual information unless instructed otherwise
+
+**Output Format (JSON):**
+{{
+  "revised_content": "The revised paragraph text",
+  "changes_made": "Brief description of what was changed"
+}}
+"""
+
+    global current_model
+    result = await call_llm(prompt, model_override=current_model)
+
+    # 保存修改后的内容
+    revised_content = result.get("revised_content", data.current_content)
+    changes_made = result.get("changes_made", "Content updated")
+
+    # 加载现有写作结果获取 citations
+    existing = storage.load_writing(project_id, data.section_type)
+    citations = existing.get("citations", []) if existing else []
+
+    # 保存更新后的内容
+    storage.save_writing(project_id, data.section_type, revised_content, citations)
+
+    return {
+        "success": True,
+        "revised_content": revised_content,
+        "changes_made": changes_made
+    }
+
+
+@router.get("/pdf-preview/{document_id}/{page}")
+async def get_pdf_preview(
+    document_id: str,
+    page: int,
+    bbox: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """获取 PDF 页面预览图 (base64)
+
+    可选参数 bbox 用于裁剪特定区域，格式为 JSON: {"x1":0,"y1":0,"x2":100,"y2":100}
+    """
+    # 检查文档是否存在
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 获取文件路径
+    file_path = storage.get_document_path(doc.project_id, doc.id, doc.file_name)
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Document file not found")
+
+    try:
+        import fitz  # PyMuPDF
+        from PIL import Image
+        import io
+        import base64
+
+        # 打开 PDF
+        pdf_doc = fitz.open(file_path)
+        if page < 1 or page > len(pdf_doc):
+            raise HTTPException(status_code=400, detail=f"Invalid page number. Document has {len(pdf_doc)} pages.")
+
+        # 渲染页面
+        pdf_page = pdf_doc[page - 1]
+        mat = fitz.Matrix(1.5, 1.5)  # 150% zoom for better quality
+        pix = pdf_page.get_pixmap(matrix=mat)
+
+        # 转换为 PIL Image
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+        # 如果有 bbox，裁剪区域
+        if bbox:
+            try:
+                bbox_data = json.loads(bbox)
+                # 缩放 bbox 坐标（考虑 zoom 因子）
+                scale = 1.5
+                x1 = int(bbox_data.get("x1", 0) * scale)
+                y1 = int(bbox_data.get("y1", 0) * scale)
+                x2 = int(bbox_data.get("x2", img.width) * scale)
+                y2 = int(bbox_data.get("y2", img.height) * scale)
+
+                # 添加 padding
+                padding = 20
+                x1 = max(0, x1 - padding)
+                y1 = max(0, y1 - padding)
+                x2 = min(img.width, x2 + padding)
+                y2 = min(img.height, y2 + padding)
+
+                img = img.crop((x1, y1, x2, y2))
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"[PDF Preview] Invalid bbox format: {e}")
+
+        # 转换为 base64
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG", optimize=True)
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+        pdf_doc.close()
+
+        return {
+            "image": f"data:image/png;base64,{img_base64}",
+            "document_id": document_id,
+            "page": page
+        }
+
+    except ImportError:
+        raise HTTPException(status_code=500, detail="PDF support not available (PyMuPDF not installed)")
+    except Exception as e:
+        print(f"[PDF Preview] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate preview: {str(e)}")
+
+
+@router.get("/citation-index/{project_id}")
+async def get_citation_index(project_id: str, db: Session = Depends(get_db)):
+    """获取项目的引用索引
+
+    返回所有 Exhibit 的文档 ID、页码和位置信息，用于快速查找 PDF 预览
+    """
+    # 获取项目的所有文档
+    docs = db.query(Document).filter(Document.project_id == project_id).all()
+
+    if not docs:
+        return {"project_id": project_id, "citations": {}}
+
+    citations = {}
+
+    for doc in docs:
+        if doc.exhibit_number:
+            exhibit_key = doc.exhibit_number
+
+            # 获取该文档的高亮结果（如果有）
+            highlights = db.query(Highlight).filter(Highlight.document_id == doc.id).all()
+
+            quotes = []
+            for hl in highlights:
+                if hl.text_content:
+                    quote_data = {
+                        "text": hl.text_content[:200],  # 截取前200字
+                        "page": hl.page_number,
+                    }
+                    if hl.bbox_x1 is not None:
+                        quote_data["bbox"] = {
+                            "x1": hl.bbox_x1,
+                            "y1": hl.bbox_y1,
+                            "x2": hl.bbox_x2,
+                            "y2": hl.bbox_y2
+                        }
+                    quotes.append(quote_data)
+
+            # 如果没有高亮，添加基本信息
+            if not quotes:
+                quotes.append({
+                    "text": "",
+                    "page": 1
+                })
+
+            citations[exhibit_key] = {
+                "document_id": doc.id,
+                "file_name": doc.file_name,
+                "quotes": quotes
+            }
+
+    return {
+        "project_id": project_id,
+        "citations": citations
+    }
 
 

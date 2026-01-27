@@ -386,6 +386,39 @@ def load_all_writing(project_id: str) -> Dict[str, Dict]:
     return sections
 
 
+def load_writing(project_id: str, section: str) -> Optional[Dict]:
+    """加载指定 section 的最新写作结果"""
+    all_writing = load_all_writing(project_id)
+    return all_writing.get(section)
+
+
+def get_document_path(project_id: str, document_id: str, file_name: str) -> Optional[str]:
+    """获取文档文件路径
+
+    Args:
+        project_id: 项目ID
+        document_id: 文档ID
+        file_name: 原始文件名（用于获取扩展名）
+
+    Returns:
+        文件路径字符串，如果不存在返回 None
+    """
+    files_dir = get_files_dir(project_id)
+    ext = Path(file_name).suffix.lower()
+    file_path = files_dir / f"{document_id}{ext}"
+
+    if file_path.exists():
+        return str(file_path)
+
+    # 尝试常见扩展名
+    for ext in ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff']:
+        file_path = files_dir / f"{document_id}{ext}"
+        if file_path.exists():
+            return str(file_path)
+
+    return None
+
+
 # ==================== L-1 专项分析存储 ====================
 
 def save_chunks(project_id: str, document_id: str, chunks: List[Dict]) -> str:
