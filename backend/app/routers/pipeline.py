@@ -34,6 +34,10 @@ from app.services.storage import (
 )
 from app.services.l1_analyzer import get_l1_analysis_prompt, parse_analysis_result, L1_STANDARDS, clean_ocr_for_llm
 from app.services.quote_merger import merge_chunk_analyses, generate_summary, prepare_for_writing, format_citation
+from app.services.quote_consolidator import (
+    consolidate_all_document_quotes,
+    enrich_all_quotes_with_bbox
+)
 from app.services.model_preloader import get_preload_state
 
 router = APIRouter(prefix="/api", tags=["pipeline"])
@@ -2276,6 +2280,35 @@ async def _run_l1_analysis_background(project_id: str, doc_list: List[Dict[str, 
             errors.append(error_info)
             _l1_analysis_progress[project_id]["errors"] = errors
             _l1_analysis_progress[project_id]["completed"] = idx + 1
+
+    # === 引用整合阶段 ===
+    if all_results:
+        print(f"[L1] Starting quote consolidation for {len(all_results)} documents...")
+
+        # Step 1: 为引用添加 bbox 信息（用于位置整合）
+        try:
+            from app.db.database import SessionLocal
+            db_session = SessionLocal()
+            try:
+                all_results = enrich_all_quotes_with_bbox(all_results, db_session)
+                print(f"[L1] Enriched quotes with bbox information")
+            finally:
+                db_session.close()
+        except Exception as e:
+            print(f"[L1] Warning: Could not enrich quotes with bbox: {e}")
+
+        # Step 2: 位置整合（硬编码规则）
+        try:
+            all_results, consolidation_stats = consolidate_all_document_quotes(all_results)
+            print(f"[L1] Quote consolidation complete:")
+            print(f"     Original: {consolidation_stats['total_original']} quotes")
+            print(f"     After consolidation: {consolidation_stats['total_final']} quotes")
+            print(f"     Reduction: {consolidation_stats['total_reduction']} ({consolidation_stats['reduction_rate']}%)")
+
+            # 更新进度信息
+            _l1_analysis_progress[project_id]["consolidation_stats"] = consolidation_stats
+        except Exception as e:
+            print(f"[L1] Warning: Quote consolidation failed: {e}")
 
     # 保存分析结果
     storage.save_l1_analysis(project_id, all_results)
