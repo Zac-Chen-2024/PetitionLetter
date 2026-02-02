@@ -49,6 +49,7 @@ yarn-error.log*
 # 调试文件
 # ===================
 backend/data/debug_*.json
+backend/app/back/
 
 # ===================
 # Python
