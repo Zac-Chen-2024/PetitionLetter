@@ -2233,131 +2233,196 @@ class ManualAnalysisRequest(BaseModel):
     quotes: List[Dict[str, Any]]
 
 
-async def _run_l1_analysis_background(project_id: str, doc_list: List[Dict[str, Any]]):
-    """后台运行 L1 分析任务 - 支持语义分组模式"""
+async def _run_l1_analysis_background(
+    project_id: str,
+    doc_list: List[Dict[str, Any]],
+    force_restart: bool = False
+):
+    """后台运行 L1 分析任务 - 支持语义分组模式和断点续传"""
     global _l1_analysis_progress, current_model
 
-    # 导入语义分组函数
+    # 导入语义分组函数和 checkpoint
     from app.services.l1_analyzer import (
         should_use_page_mode, load_ocr_pages, group_pages_semantically,
-        LONG_DOC_THRESHOLD, MAX_PAGE_GROUP_SIZE
+        LONG_DOC_THRESHOLD, MAX_PAGE_GROUP_SIZE, L1AnalysisCheckpoint
     )
     from app.services.quote_merger import merge_page_group_results
 
+    MAX_RETRIES = 3  # 单文档最大重试次数
+
+    # 创建 checkpoint 管理器
+    checkpoint = L1AnalysisCheckpoint(project_id)
+
+    # 如果强制重启，清除旧的 checkpoint
+    if force_restart:
+        checkpoint.clear()
+        checkpoint = L1AnalysisCheckpoint(project_id)  # 重新创建
+        print(f"[L1] 强制重启，清除旧的 checkpoint")
+
+    # 检查是否有断点可恢复
+    has_checkpoint = checkpoint.has_valid_checkpoint()
+    if has_checkpoint:
+        # 从 checkpoint 恢复
+        saved_doc_list = checkpoint.get_doc_list()
+        if saved_doc_list:
+            doc_list = saved_doc_list
+        resume_info = checkpoint.get_resume_info()
+        print(f"[L1] 从断点恢复: 已完成 {resume_info['completed_count']}/{resume_info['total']} 文档")
+        # 加载已完成的结果
+        all_results = checkpoint.get_all_results()
+    else:
+        all_results = []
+        # 初始化新的 checkpoint
+        checkpoint.init_new(doc_list)
+        print(f"[L1] 开始新的分析任务")
+
     total = len(doc_list)
+    completed_count = len(checkpoint.state.get("completed_docs", []))
+
     _l1_analysis_progress[project_id] = {
         "status": "processing",
         "total": total,
-        "completed": 0,
+        "completed": completed_count,
         "current_doc": None,
         "errors": [],
-        "results": [],
-        "model_used": current_model
+        "results": all_results,
+        "model_used": current_model,
+        "resumed": has_checkpoint
     }
 
-    all_results = []
     errors = []
 
     for idx, doc_info in enumerate(doc_list):
-        try:
-            doc_id = doc_info["document_id"]
-            doc_text = doc_info.get("text", "")
-            text_length = len(doc_text)
+        doc_id = doc_info["document_id"]
 
-            # 更新当前处理的文档
-            _l1_analysis_progress[project_id]["current_doc"] = {
-                "document_id": doc_id,
-                "file_name": doc_info["file_name"],
-                "exhibit_id": doc_info["exhibit_id"],
-                "text_length": text_length
-            }
+        # 跳过已完成的文档
+        if checkpoint.is_doc_completed(doc_id):
+            continue
 
-            # 判断是否使用语义分组模式
-            if should_use_page_mode(project_id, doc_id, text_length):
-                # === 语义分组分析模式 ===
-                print(f"[L1] Using SEMANTIC page-group mode for {doc_info['file_name']} ({text_length:,} chars)")
+        # 标记文档处理中
+        checkpoint.mark_doc_in_progress(doc_id)
 
-                pages = load_ocr_pages(project_id, doc_id)
-                page_groups = group_pages_semantically(pages, max_chars=MAX_PAGE_GROUP_SIZE)
+        # 带重试的文档处理
+        doc_success = False
+        last_error = None
 
-                # 打印语义分组详情
-                print(f"[L1] Split into {len(page_groups)} semantic groups:")
-                for g in page_groups:
-                    print(f"  - Group {g['group_id']}: pages {g['page_range']} | {g['type_desc']} | {g['char_count']:,} chars")
+        for retry in range(MAX_RETRIES):
+            try:
+                doc_text = doc_info.get("text", "")
+                text_length = len(doc_text)
 
-                # 更新进度信息
-                _l1_analysis_progress[project_id]["current_doc"]["mode"] = "semantic_groups"
-                _l1_analysis_progress[project_id]["current_doc"]["total_groups"] = len(page_groups)
+                # 更新当前处理的文档
+                _l1_analysis_progress[project_id]["current_doc"] = {
+                    "document_id": doc_id,
+                    "file_name": doc_info["file_name"],
+                    "exhibit_id": doc_info["exhibit_id"],
+                    "text_length": text_length
+                }
 
-                group_results = []
-                for group in page_groups:
-                    # 构建分组文档信息，包含语义上下文
-                    group_doc_info = {
-                        **doc_info,
-                        "text": group["text"],
-                        "page_group_id": group["group_id"],
-                        "page_range": group["page_range"],
-                        "semantic_type": group["semantic_type"],
-                        "semantic_desc": group["type_desc"]
-                    }
+                # 判断是否使用语义分组模式
+                if should_use_page_mode(project_id, doc_id, text_length):
+                    # === 语义分组分析模式 ===
+                    print(f"[L1] Using SEMANTIC page-group mode for {doc_info['file_name']} ({text_length:,} chars)")
 
-                    prompt = get_l1_analysis_prompt(group_doc_info)
+                    pages = load_ocr_pages(project_id, doc_id)
+                    page_groups = group_pages_semantically(pages, max_chars=MAX_PAGE_GROUP_SIZE)
+
+                    # 打印语义分组详情
+                    print(f"[L1] Split into {len(page_groups)} semantic groups:")
+                    for g in page_groups:
+                        print(f"  - Group {g['group_id']}: pages {g['page_range']} | {g['type_desc']} | {g['char_count']:,} chars")
+
+                    # 更新进度信息
+                    _l1_analysis_progress[project_id]["current_doc"]["mode"] = "semantic_groups"
+                    _l1_analysis_progress[project_id]["current_doc"]["total_groups"] = len(page_groups)
+
+                    group_results = []
+                    for group in page_groups:
+                        # 构建分组文档信息，包含语义上下文
+                        group_doc_info = {
+                            **doc_info,
+                            "text": group["text"],
+                            "page_group_id": group["group_id"],
+                            "page_range": group["page_range"],
+                            "semantic_type": group["semantic_type"],
+                            "semantic_desc": group["type_desc"]
+                        }
+
+                        prompt = get_l1_analysis_prompt(group_doc_info)
+                        llm_result = await call_llm(prompt, model_override=current_model, max_retries=3)
+                        group_quotes = parse_analysis_result(llm_result, group_doc_info)
+                        group_results.append(group_quotes)
+
+                        print(f"[L1] Group {group['group_id']} ({group['type_desc']}): {len(group_quotes)} quotes")
+
+                        # 更新分组进度
+                        _l1_analysis_progress[project_id]["current_doc"]["current_group"] = group["group_id"]
+
+                        await asyncio.sleep(0.5)  # Rate limit between groups
+
+                    # 合并所有分组的结果并去重
+                    parsed_quotes = merge_page_group_results(group_results)
+                    print(f"[L1] Merged total: {len(parsed_quotes)} unique quotes from {doc_info['file_name']}")
+
+                else:
+                    # === 原有整文档模式（短文档） ===
+                    print(f"[L1] Using whole-doc mode for {doc_info['file_name']} ({text_length:,} chars)")
+                    _l1_analysis_progress[project_id]["current_doc"]["mode"] = "whole_doc"
+
+                    prompt = get_l1_analysis_prompt(doc_info)
                     llm_result = await call_llm(prompt, model_override=current_model, max_retries=3)
-                    group_quotes = parse_analysis_result(llm_result, group_doc_info)
-                    group_results.append(group_quotes)
+                    parsed_quotes = parse_analysis_result(llm_result, doc_info)
 
-                    print(f"[L1] Group {group['group_id']} ({group['type_desc']}): {len(group_quotes)} quotes")
+                    doc_result = {
+                        "document_id": doc_id,
+                        "exhibit_id": doc_info["exhibit_id"],
+                        "file_name": doc_info["file_name"],
+                        "quotes": parsed_quotes
+                    }
+                    all_results.append(doc_result)
 
-                    # 更新分组进度
-                    _l1_analysis_progress[project_id]["current_doc"]["current_group"] = group["group_id"]
+                    # 保存到 checkpoint
+                    checkpoint.mark_doc_completed(doc_id, doc_result)
+                    doc_success = True
 
-                    await asyncio.sleep(0.5)  # Rate limit between groups
+                    # 更新进度
+                    completed_count = len(checkpoint.state.get("completed_docs", []))
+                    _l1_analysis_progress[project_id]["completed"] = completed_count
+                    _l1_analysis_progress[project_id]["results"] = all_results
 
-                # 合并所有分组的结果并去重
-                parsed_quotes = merge_page_group_results(group_results)
-                print(f"[L1] Merged total: {len(parsed_quotes)} unique quotes from {doc_info['file_name']}")
+                    # 成功，跳出重试循环
+                    break
 
-            else:
-                # === 原有整文档模式（短文档） ===
-                print(f"[L1] Using whole-doc mode for {doc_info['file_name']} ({text_length:,} chars)")
-                _l1_analysis_progress[project_id]["current_doc"]["mode"] = "whole_doc"
+            except Exception as e:
+                import traceback
+                error_traceback = traceback.format_exc()
+                last_error = str(e) if str(e) else f"{type(e).__name__}: {repr(e)}"
+                print(f"[L1] Error processing {doc_info['exhibit_id']} (retry {retry + 1}/{MAX_RETRIES}): {e}")
 
-                prompt = get_l1_analysis_prompt(doc_info)
-                llm_result = await call_llm(prompt, model_override=current_model, max_retries=3)
-                parsed_quotes = parse_analysis_result(llm_result, doc_info)
+                if retry < MAX_RETRIES - 1:
+                    print(f"[L1] Retrying in 2 seconds...")
+                    await asyncio.sleep(2.0)
+                else:
+                    print(f"[L1] Max retries reached for {doc_info['exhibit_id']}")
+                    print(f"[L1] Traceback:\n{error_traceback}")
 
-            doc_result = {
-                "document_id": doc_id,
-                "exhibit_id": doc_info["exhibit_id"],
-                "file_name": doc_info["file_name"],
-                "quotes": parsed_quotes
-            }
-            all_results.append(doc_result)
+        # 处理最终失败的情况
+        if not doc_success:
+            # 标记文档失败
+            checkpoint.mark_doc_failed(doc_id, last_error or "Unknown error")
 
-            # 更新进度
-            _l1_analysis_progress[project_id]["completed"] = idx + 1
-            _l1_analysis_progress[project_id]["results"] = all_results
-
-            # 添加请求间隔以避免触发速率限制
-            await asyncio.sleep(0.5)
-
-        except Exception as e:
-            import traceback
-            error_traceback = traceback.format_exc()
-            print(f"[L1] Error processing {doc_info['exhibit_id']}: {e}")
-            print(f"[L1] Traceback:\n{error_traceback}")
-
-            # 捕获更详细的错误信息
-            error_msg = str(e) if str(e) else f"{type(e).__name__}: {repr(e)}"
             error_info = {
                 "document_id": doc_info["document_id"],
                 "exhibit_id": doc_info["exhibit_id"],
-                "error": error_msg,
-                "traceback": error_traceback[:500]  # 保存部分 traceback
+                "error": last_error,
+                "retries": MAX_RETRIES
             }
             errors.append(error_info)
             _l1_analysis_progress[project_id]["errors"] = errors
-            _l1_analysis_progress[project_id]["completed"] = idx + 1
+            print(f"[L1] Document {doc_info['exhibit_id']} failed after {MAX_RETRIES} retries")
+
+        # 添加请求间隔以避免触发速率限制
+        await asyncio.sleep(0.5)
 
     # === 引用整合阶段 (v2.2 LLM 主导) ===
     if all_results:
@@ -2439,27 +2504,38 @@ async def _run_l1_analysis_background(project_id: str, doc_list: List[Dict[str, 
     # 保存分析结果
     storage.save_l1_analysis(project_id, all_results)
 
-    # 标记完成
+    # 标记完成并清理 checkpoint
+    checkpoint.mark_completed()
+
+    # 添加统计信息
+    failed_docs = checkpoint.state.get("failed_docs", []) if hasattr(checkpoint, 'state') else []
+
     _l1_analysis_progress[project_id]["status"] = "completed"
     _l1_analysis_progress[project_id]["current_doc"] = None
+    _l1_analysis_progress[project_id]["failed_docs"] = failed_docs
+
+    print(f"[L1] 分析完成: {len(all_results)} 文档成功, {len(failed_docs)} 文档失败")
 
 
 @router.post("/l1-analyze/{project_id}")
 async def l1_analyze_project(
     project_id: str,
     doc_ids: Optional[str] = None,
+    force: bool = False,
     background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db)
 ):
-    """Stage 2 (L-1 专项): 整文档 L-1 标准分析（无 Chunking）
+    """Stage 2 (L-1 专项): 整文档 L-1 标准分析（无 Chunking）- 支持断点续传
 
     参数:
     - project_id: 项目 ID
     - doc_ids: 可选，逗号分隔的文档 ID 列表。如果不提供，分析所有已完成 OCR 的文档
+    - force: 如果为 true，强制从头开始分析（忽略断点）
 
     返回 202 并在后台执行分析，使用 /l1-analyze/stream/{project_id} 监控进度
     """
     global _l1_analysis_progress
+    from app.services.l1_analyzer import L1AnalysisCheckpoint
 
     # 检查是否已有分析在进行中
     if project_id in _l1_analysis_progress:
@@ -2472,45 +2548,62 @@ async def l1_analyze_project(
                 "status": "processing"
             }
 
-    # 基础查询
-    query = db.query(Document).filter(
-        Document.project_id == project_id,
-        Document.ocr_status == OCRStatus.COMPLETED.value
-    )
+    # 检查是否有断点可恢复
+    checkpoint = L1AnalysisCheckpoint(project_id)
+    has_checkpoint = checkpoint.has_valid_checkpoint() and not force
 
-    # 如果提供了 doc_ids，只分析选中的文档
-    if doc_ids:
-        doc_id_list = [id.strip() for id in doc_ids.split(',') if id.strip()]
-        if doc_id_list:
-            query = query.filter(Document.id.in_(doc_id_list))
+    if has_checkpoint:
+        # 从断点恢复，使用 checkpoint 中保存的文档列表
+        doc_list = checkpoint.get_doc_list()
+        resume_info = checkpoint.get_resume_info()
 
-    documents = query.all()
+        if not doc_list:
+            # checkpoint 数据不完整，需要重新加载
+            has_checkpoint = False
+        else:
+            print(f"[L1] 从断点恢复: 已完成 {resume_info['completed_count']}/{resume_info['total']} 文档")
 
-    if not documents:
-        raise HTTPException(status_code=404, detail="No documents found")
+    if not has_checkpoint:
+        # 基础查询
+        query = db.query(Document).filter(
+            Document.project_id == project_id,
+            Document.ocr_status == OCRStatus.COMPLETED.value
+        )
 
-    # 准备文档信息列表（清理 OCR 文本中的垃圾数据，只影响 LLM 输入，不影响原始数据）
-    doc_list = [
-        {
-            "document_id": doc.id,
-            "exhibit_id": doc.exhibit_number or "X-1",
-            "file_name": doc.file_name,
-            "text": clean_ocr_for_llm(doc.ocr_text or "")
-        }
-        for doc in documents
-    ]
+        # 如果提供了 doc_ids，只分析选中的文档
+        if doc_ids:
+            doc_id_list = [id.strip() for id in doc_ids.split(',') if id.strip()]
+            if doc_id_list:
+                query = query.filter(Document.id.in_(doc_id_list))
 
-    # 启动后台任务
-    asyncio.create_task(_run_l1_analysis_background(project_id, doc_list))
+        documents = query.all()
+
+        if not documents:
+            raise HTTPException(status_code=404, detail="No documents found")
+
+        # 准备文档信息列表（清理 OCR 文本中的垃圾数据，只影响 LLM 输入，不影响原始数据）
+        doc_list = [
+            {
+                "document_id": doc.id,
+                "exhibit_id": doc.exhibit_number or "X-1",
+                "file_name": doc.file_name,
+                "text": clean_ocr_for_llm(doc.ocr_text or "")
+            }
+            for doc in documents
+        ]
+
+    # 启动后台任务（支持断点续传）
+    asyncio.create_task(_run_l1_analysis_background(project_id, doc_list, force_restart=force))
 
     return {
         "success": True,
-        "message": f"Started L1 analysis for {len(documents)} documents",
+        "message": "Resuming L1 analysis from checkpoint" if has_checkpoint else f"Started L1 analysis for {len(doc_list)} documents",
         "project_id": project_id,
-        "total": len(documents),
+        "total": len(doc_list),
+        "resumed_from_checkpoint": has_checkpoint,
         "documents": [
-            {"id": doc.id, "file_name": doc.file_name, "exhibit_id": doc.exhibit_number}
-            for doc in documents
+            {"id": d["document_id"], "file_name": d["file_name"], "exhibit_id": d["exhibit_id"]}
+            for d in doc_list
         ]
     }
 
@@ -2604,6 +2697,47 @@ async def get_l1_analysis_progress(project_id: str):
         "errors": progress_data.get("errors", []),
         "total_quotes_found": sum(len(r.get("quotes", [])) for r in results),
         "model_used": progress_data.get("model_used", "")
+    }
+
+
+@router.get("/l1-analyze/checkpoint/{project_id}")
+async def get_l1_checkpoint_status(project_id: str):
+    """获取 L1 分析断点状态"""
+    from app.services.l1_analyzer import L1AnalysisCheckpoint
+
+    checkpoint = L1AnalysisCheckpoint(project_id)
+
+    if not checkpoint.has_valid_checkpoint():
+        return {
+            "success": True,
+            "project_id": project_id,
+            "has_checkpoint": False,
+            "progress": None
+        }
+
+    progress = checkpoint.get_progress()
+    return {
+        "success": True,
+        "project_id": project_id,
+        "has_checkpoint": True,
+        "progress": progress
+    }
+
+
+@router.delete("/l1-analyze/checkpoint/{project_id}")
+async def delete_l1_checkpoint(project_id: str):
+    """删除 L1 分析的断点，下次分析将从头开始"""
+    from app.services.l1_analyzer import L1AnalysisCheckpoint
+
+    checkpoint = L1AnalysisCheckpoint(project_id)
+    had_checkpoint = checkpoint.has_valid_checkpoint()
+
+    checkpoint.clear()
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "had_checkpoint": had_checkpoint
     }
 
 
