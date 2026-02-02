@@ -32,13 +32,41 @@ from app.services.storage import (
     save_style_template, get_style_templates, get_style_template,
     delete_style_template, update_style_template
 )
-from app.services.l1_analyzer import get_l1_analysis_prompt, parse_analysis_result, L1_STANDARDS, clean_ocr_for_llm
+from app.services.l1_analyzer import (
+    get_l1_analysis_prompt, parse_analysis_result, L1_STANDARDS, clean_ocr_for_llm,
+    get_l1_analysis_prompt_for_material, parse_material_analysis_result,
+    MaterialAnalysisResult, save_material_analysis,
+    get_l1_analysis_prompt_for_material_with_blocks
+)
 from app.services.quote_merger import merge_chunk_analyses, generate_summary, prepare_for_writing, format_citation
 from app.services.quote_consolidator import (
     consolidate_all_document_quotes,
-    enrich_all_quotes_with_bbox
+    enrich_all_quotes_with_bbox,
+    consolidate_all_quotes_with_llm,
+    consolidate_material_quotes,
+    consolidate_all_material_quotes,
+    enrich_quotes_with_bbox
 )
 from app.services.model_preloader import get_preload_state
+
+# New imports for material-based pipeline
+from app.services.material_splitter import (
+    split_exhibit_into_materials,
+    load_ocr_pages_for_document,
+    save_materials,
+    load_materials,
+    load_all_materials_for_project,
+    Material
+)
+from app.services.highlight_analyzer import (
+    analyze_material_highlights,
+    analyze_all_materials,
+    save_highlight_results,
+    load_highlight_result,
+    load_all_highlight_results,
+    get_highlight_context_for_l1,
+    HighlightResult
+)
 
 router = APIRouter(prefix="/api", tags=["pipeline"])
 
@@ -1758,21 +1786,65 @@ async def save_manual_relationship(project_id: str, data: ManualRelationshipRequ
     }
 
 
-async def _run_relationship_analysis_background(project_id: str, prompt: str):
-    """后台运行关系分析任务"""
+async def _run_relationship_analysis_background(
+    project_id: str,
+    quotes: List[Dict],
+    quote_index_map: Dict = None,
+    force_restart: bool = False
+):
+    """后台运行关系分析任务 - 使用增量式分析器（支持断点续传）"""
     global _relationship_progress
+    from app.services.relationship_analyzer import run_relationship_analysis, RelationshipCheckpoint
+
+    # 创建 checkpoint 管理器
+    checkpoint = RelationshipCheckpoint(project_id)
+
+    # 如果强制重启，清除旧的 checkpoint
+    if force_restart:
+        checkpoint.clear()
+        print(f"[Relationship] 强制重启，清除旧的 checkpoint")
+
+    # 检查是否有有效断点可恢复
+    has_checkpoint = checkpoint.has_valid_checkpoint()
+    if has_checkpoint:
+        # 从 checkpoint 恢复 quotes 和 quote_index_map
+        saved_quotes = checkpoint.get_quotes_list()
+        saved_quote_map = checkpoint.get_quote_index_map()
+        if saved_quotes:
+            quotes = saved_quotes
+            quote_index_map = saved_quote_map
+        checkpoint_progress = checkpoint.get_progress()
+        print(f"[Relationship] 检测到断点: 已完成 {checkpoint_progress['completed']}/{checkpoint_progress['total']} 批次")
 
     _relationship_progress[project_id] = {
         "status": "processing",
         "result": None,
-        "error": None
+        "error": None,
+        "progress": {"current": 0, "total": 0, "message": "初始化..."},
+        "resumed": has_checkpoint
     }
 
+    def progress_callback(current, total, message):
+        _relationship_progress[project_id]["progress"] = {
+            "current": current,
+            "total": total,
+            "message": message
+        }
+
     try:
-        result = await call_llm(prompt)
+        result = await run_relationship_analysis(
+            quotes=quotes,
+            progress_callback=progress_callback,
+            checkpoint=checkpoint,
+            quote_index_map=quote_index_map
+        )
 
         # 保存到本地文件
         storage.save_relationship(project_id, result)
+
+        # 同时保存引用索引映射（用于 bbox 回溯）
+        if quote_index_map:
+            storage.save_quote_index_map(project_id, quote_index_map)
 
         _relationship_progress[project_id] = {
             "status": "completed",
@@ -1780,6 +1852,10 @@ async def _run_relationship_analysis_background(project_id: str, prompt: str):
             "error": None
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        # 标记 checkpoint 失败但保留状态以便恢复
+        checkpoint.mark_failed(str(e))
         _relationship_progress[project_id] = {
             "status": "failed",
             "result": None,
@@ -1788,12 +1864,21 @@ async def _run_relationship_analysis_background(project_id: str, prompt: str):
 
 
 @router.post("/relationship/{project_id}")
-async def analyze_relationships(project_id: str, beneficiary_name: Optional[str] = None, db: Session = Depends(get_db)):
+async def analyze_relationships(
+    project_id: str,
+    beneficiary_name: Optional[str] = None,
+    force: bool = False,
+    db: Session = Depends(get_db)
+):
     """Stage 3: LLM2 分析实体关系 - 使用 L-1 专项分析的所有 quotes 数据
 
     现在返回 202 并在后台执行分析，使用 /relationship/stream/{project_id} 监控进度
+
+    Query Parameters:
+        force: 如果为 true，强制从头开始分析（忽略断点）
     """
     global _relationship_progress
+    from app.services.relationship_analyzer import RelationshipCheckpoint
 
     # 检查是否已有分析在进行中
     if project_id in _relationship_progress:
@@ -1806,124 +1891,117 @@ async def analyze_relationships(project_id: str, beneficiary_name: Optional[str]
                 "status": "processing"
             }
 
-    # 从 L-1 专项分析加载所有 quotes（使用 load_l1_analysis 而不是 summary）
-    l1_analyses = storage.load_l1_analysis(project_id)
+    # 检查是否有断点可恢复
+    checkpoint = RelationshipCheckpoint(project_id)
+    has_checkpoint = checkpoint.has_valid_checkpoint() and not force
 
-    if l1_analyses and len(l1_analyses) > 0:
-        # 使用高价值引用筛选，避免数据量过大导致 LLM 处理效果下降
-        from app.services.quote_merger import is_high_value_quote
+    if has_checkpoint:
+        # 从断点恢复，使用 checkpoint 中保存的 quotes
+        checkpoint_progress = checkpoint.get_progress()
+        quotes_list = checkpoint.get_quotes_list()
+        quote_index_map = checkpoint.get_quote_index_map()
 
-        docs_data = []
-        total_quotes = 0
-        high_value_quotes = 0
+        if not quotes_list:
+            # checkpoint 数据不完整，需要重新加载
+            has_checkpoint = False
+        else:
+            print(f"[Relationship] 从断点恢复: 已完成 {checkpoint_progress['completed']}/{checkpoint_progress['total']} 批次")
 
+    if not has_checkpoint:
+        # 从 L-1 专项分析加载所有 quotes（支持新版材料级分析格式）
+        l1_analyses = storage.load_l1_analysis(project_id)
+
+        if not l1_analyses or len(l1_analyses) == 0:
+            raise HTTPException(status_code=400, detail="No L-1 analysis found. Run L-1 Analysis first.")
+
+        # v3.0: 构建引用列表，用于增量式关系分析
+        quotes_list = []  # 传给分析器的引用列表
+        quote_index_map = {}  # idx -> 完整引用数据（用于 bbox 回溯）
+
+        idx = 0
         for doc_analysis in l1_analyses:
             exhibit_id = doc_analysis.get("exhibit_id", "Unknown")
-            file_name = doc_analysis.get("file_name", "Unknown")
             quotes = doc_analysis.get("quotes", [])
 
-            # 筛选高价值引用
-            filtered_quotes = []
             for q in quotes:
-                total_quotes += 1
-                quote_text = q.get("quote", "")
-                result = is_high_value_quote(quote_text)
-                if result["is_high_value"]:
-                    high_value_quotes += 1
-                    # 添加价值类型标记
-                    q_with_value = {**q, "value_types": result["value_types"]}
-                    filtered_quotes.append(q_with_value)
-
-            if filtered_quotes:
-                docs_data.append({
+                # 构建引用对象
+                quotes_list.append({
+                    "quote": q.get("quote", ""),
+                    "standard_key": q.get("standard_key", ""),
                     "exhibit_id": exhibit_id,
-                    "file_name": file_name,
-                    "quotes": filtered_quotes
+                    "page": q.get("page"),
                 })
 
-        print(f"[Relationship] 高价值引用筛选: {total_quotes} -> {high_value_quotes} ({high_value_quotes*100//max(total_quotes,1)}%)")
+                # 保存完整信息用于回溯
+                quote_index_map[idx] = {
+                    "exhibit_id": exhibit_id,
+                    "material_id": q.get("source", {}).get("material_id", ""),
+                    "page": q.get("page"),
+                    "quote": q.get("quote", ""),
+                    "standard_key": q.get("standard_key", ""),
+                    "bbox": q.get("bbox")
+                }
+                idx += 1
 
-        if not docs_data:
-            raise HTTPException(status_code=400, detail="No L-1 analysis quotes found. Run L-1 Analysis first.")
+        print(f"[Relationship] 加载引用: {len(quotes_list)} 条")
 
-        beneficiary_ctx = f"\nBeneficiary: {beneficiary_name}\n" if beneficiary_name else ""
+        if not quotes_list:
+            raise HTTPException(status_code=400, detail="No quotes found in L-1 analysis.")
 
-        prompt = f"""You are a Senior L-1 Immigration Paralegal. Analyze relationships between entities across the following L-1 visa evidence documents.
+    item_count = len(quotes_list)
 
-**L-1 Visa: 4 Core Legal Requirements:**
-1. **Qualifying Corporate Relationship** - Parent/subsidiary/affiliate relationship between foreign and U.S. entities
-2. **Qualifying Employment Abroad** - At least 1 year of continuous employment with the foreign entity in the past 3 years
-3. **Qualifying Capacity** - L-1A (Executive/Managerial) or L-1B (Specialized Knowledge) role
-4. **Doing Business (Active Operations)** - Both entities must be actively doing business
-{beneficiary_ctx}
-**DOCUMENTS WITH EXTRACTED QUOTES:**
-{json.dumps(docs_data, indent=2, ensure_ascii=False)}
-
-**Your Task:**
-Based on the quotes extracted from the documents above, identify:
-1. **Entities**: People, companies, positions mentioned across documents
-2. **Relations**: Relationships between entities (e.g., "employed_by", "owns", "subsidiary_of", "manages")
-3. **Evidence Chains**: How the documents support each L-1 standard (qualifying_relationship, qualifying_employment, qualifying_capacity, doing_business)
-
-**Return JSON:**
-{{
-  "entities": [
-    {{"id": "e1", "type": "person|company|position", "name": "...", "documents": ["exhibit_id"], "attributes": {{"role": "...", "title": "..."}}}}
-  ],
-  "relations": [
-    {{"source_id": "e1", "target_id": "e2", "relation_type": "employed_by|owns|subsidiary_of|manages|founded", "evidence": ["exhibit_id"], "description": "..."}}
-  ],
-  "evidence_chains": [
-    {{"claim": "Qualifying Corporate Relationship|Qualifying Employment Abroad|Qualifying Capacity|Doing Business", "documents": ["exhibit_id"], "strength": "strong|moderate|weak", "reasoning": "..."}}
-  ]
-}}
-"""
-    else:
-        # 回退到原来的通用分析方式
-        documents = db.query(Document).filter(Document.project_id == project_id).all()
-        if not documents:
-            raise HTTPException(status_code=404, detail="No documents found")
-
-        # 收集分析数据
-        docs_data = []
-        for doc in documents:
-            analysis = db.query(DocumentAnalysis).filter(DocumentAnalysis.document_id == doc.id).first()
-            if analysis:
-                docs_data.append({
-                    "id": doc.id,
-                    "exhibit": doc.exhibit_number,
-                    "title": doc.exhibit_title,
-                    "type": analysis.document_type,
-                    "entities": json.loads(analysis.entities_json) if analysis.entities_json else [],
-                    "tags": json.loads(analysis.tags_json) if analysis.tags_json else []
-                })
-
-        if not docs_data:
-            raise HTTPException(status_code=400, detail="No analyzed documents. Run L-1 Analysis or general Analysis first.")
-
-        beneficiary_ctx = f"\nBeneficiary: {beneficiary_name}\n" if beneficiary_name else ""
-
-        prompt = f"""Analyze relationships between entities across these documents.
-{beneficiary_ctx}
-DOCUMENTS:
-{json.dumps(docs_data, indent=2)}
-
-Return JSON:
-{{
-  "entities": [{{"id": "e1", "type": "person", "name": "...", "documents": ["doc_id"], "attributes": {{}}}}],
-  "relations": [{{"source_id": "e1", "target_id": "e2", "relation_type": "employed_by", "evidence": ["doc_id"], "description": "..."}}],
-  "evidence_chains": [{{"claim": "Executive Capacity", "documents": ["doc_id"], "strength": "strong", "reasoning": "..."}}]
-}}
-"""
-
-    # 启动后台任务
-    asyncio.create_task(_run_relationship_analysis_background(project_id, prompt))
+    # 启动后台任务 - 使用增量式分析器（支持断点续传）
+    asyncio.create_task(_run_relationship_analysis_background(
+        project_id, quotes_list, quote_index_map, force_restart=force
+    ))
 
     return {
         "success": True,
-        "message": "Started relationship analysis",
+        "message": "Resuming relationship analysis from checkpoint" if has_checkpoint else "Started relationship analysis",
         "project_id": project_id,
-        "documents_count": len(docs_data)
+        "quotes_count": item_count,
+        "resumed_from_checkpoint": has_checkpoint
+    }
+
+
+@router.delete("/relationship/checkpoint/{project_id}")
+async def delete_relationship_checkpoint(project_id: str):
+    """删除关系分析的断点，下次分析将从头开始"""
+    from app.services.relationship_analyzer import RelationshipCheckpoint
+
+    checkpoint = RelationshipCheckpoint(project_id)
+    had_checkpoint = checkpoint.has_valid_checkpoint()
+    checkpoint.clear()
+
+    return {
+        "success": True,
+        "message": "Checkpoint cleared" if had_checkpoint else "No checkpoint found",
+        "project_id": project_id,
+        "had_checkpoint": had_checkpoint
+    }
+
+
+@router.get("/relationship/checkpoint/{project_id}")
+async def get_relationship_checkpoint_status(project_id: str):
+    """获取关系分析断点状态"""
+    from app.services.relationship_analyzer import RelationshipCheckpoint
+
+    checkpoint = RelationshipCheckpoint(project_id)
+
+    if not checkpoint.has_valid_checkpoint():
+        return {
+            "success": True,
+            "project_id": project_id,
+            "has_checkpoint": False,
+            "progress": None
+        }
+
+    progress = checkpoint.get_progress()
+    return {
+        "success": True,
+        "project_id": project_id,
+        "has_checkpoint": True,
+        "progress": progress
     }
 
 
@@ -2281,34 +2359,82 @@ async def _run_l1_analysis_background(project_id: str, doc_list: List[Dict[str, 
             _l1_analysis_progress[project_id]["errors"] = errors
             _l1_analysis_progress[project_id]["completed"] = idx + 1
 
-    # === 引用整合阶段 ===
+    # === 引用整合阶段 (v2.2 LLM 主导) ===
     if all_results:
-        print(f"[L1] Starting quote consolidation for {len(all_results)} documents...")
+        print(f"[L1] Starting quote consolidation v2.2 for {len(all_results)} documents...")
+        _l1_analysis_progress[project_id]["current_doc"] = {"stage": "consolidation"}
 
-        # Step 1: 为引用添加 bbox 信息（用于位置整合）
+        # Step 1: 为引用添加 bbox 信息（用于位置整合和前端高亮）
+        bbox_stats = {}
         try:
             from app.db.database import SessionLocal
             db_session = SessionLocal()
             try:
-                all_results = enrich_all_quotes_with_bbox(all_results, db_session)
-                print(f"[L1] Enriched quotes with bbox information")
+                all_results, bbox_stats = enrich_all_quotes_with_bbox(all_results, db_session)
+                print(f"[L1] Enriched quotes with bbox information:")
+                print(f"     Matched: {bbox_stats.get('total_matched', 0)}/{bbox_stats.get('total_quotes', 0)}")
+                print(f"     Match rate: {bbox_stats.get('overall_match_rate', 0)}%")
             finally:
                 db_session.close()
         except Exception as e:
             print(f"[L1] Warning: Could not enrich quotes with bbox: {e}")
 
-        # Step 2: 位置整合（硬编码规则）
+        # Step 2: LLM 主导整合 (带降级)
         try:
-            all_results, consolidation_stats = consolidate_all_document_quotes(all_results)
-            print(f"[L1] Quote consolidation complete:")
-            print(f"     Original: {consolidation_stats['total_original']} quotes")
-            print(f"     After consolidation: {consolidation_stats['total_final']} quotes")
-            print(f"     Reduction: {consolidation_stats['total_reduction']} ({consolidation_stats['reduction_rate']}%)")
+            # 检查 Ollama 是否可用
+            ollama_available = False
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    response = await client.get(f"{settings.ollama_api_base.replace('/v1', '')}/api/tags")
+                    ollama_available = response.status_code == 200
+            except Exception:
+                pass
+
+            if ollama_available and LLM_PROVIDER == "ollama":
+                # 使用 LLM 主导整合
+                print(f"[L1] Using LLM-led consolidation (model: {settings.ollama_model})")
+                _l1_analysis_progress[project_id]["current_doc"]["consolidation_mode"] = "llm_led"
+
+                all_results, consolidation_stats = await consolidate_all_quotes_with_llm(
+                    all_results,
+                    call_llm,
+                    project_id=project_id,
+                    model=settings.ollama_model
+                )
+
+                print(f"[L1] LLM consolidation complete:")
+                print(f"     Original: {consolidation_stats.get('original_count', 0)} quotes")
+                print(f"     Final: {consolidation_stats.get('final_count', 0)} quotes")
+                print(f"     LLM coverage: {consolidation_stats.get('llm_coverage', 0)}%")
+                print(f"     Method: {consolidation_stats.get('method', 'unknown')}")
+            else:
+                # 降级到仅粗筛
+                print(f"[L1] Ollama not available, using fallback consolidation")
+                _l1_analysis_progress[project_id]["current_doc"]["consolidation_mode"] = "fallback"
+
+                all_results, consolidation_stats = consolidate_all_document_quotes(all_results)
+                consolidation_stats["warning"] = "LLM not available, quotes not reviewed"
+
+                print(f"[L1] Fallback consolidation complete:")
+                print(f"     Original: {consolidation_stats.get('total_original', 0)} quotes")
+                print(f"     Final: {consolidation_stats.get('total_final', 0)} quotes")
+
+            # 添加 bbox 统计
+            consolidation_stats["bbox_stats"] = bbox_stats
 
             # 更新进度信息
             _l1_analysis_progress[project_id]["consolidation_stats"] = consolidation_stats
+
         except Exception as e:
+            import traceback
             print(f"[L1] Warning: Quote consolidation failed: {e}")
+            print(f"[L1] Traceback:\n{traceback.format_exc()}")
+            # 出错时保留原始结果
+            _l1_analysis_progress[project_id]["consolidation_stats"] = {
+                "error": str(e),
+                "method": "failed"
+            }
 
     # 保存分析结果
     storage.save_l1_analysis(project_id, all_results)
@@ -3662,4 +3788,697 @@ async def get_citation_index(project_id: str, db: Session = Depends(get_db)):
         "citations": citations
     }
 
+
+# ============== Material-Based Pipeline (v2.0) ==============
+# New architecture: OCR → Material Splitting → Highlight Analysis → L1 Analysis → Quote Consolidation
+
+# Progress tracking for material-based analysis
+_material_analysis_progress: Dict[str, Dict[str, Any]] = {}
+
+
+@router.post("/pipeline/split-materials/{project_id}")
+async def split_materials_for_project(
+    project_id: str,
+    doc_ids: Optional[str] = None,
+    use_llm: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Phase 1: 材料分割
+
+    将 Exhibit PDF 拆分为独立材料（合同、邮件、发票等）
+
+    参数:
+    - project_id: 项目 ID
+    - doc_ids: 可选，逗号分隔的文档 ID
+    - use_llm: 是否使用 LLM 进行分割（默认 True）
+    """
+    # 基础查询
+    query = db.query(Document).filter(
+        Document.project_id == project_id,
+        Document.ocr_status == OCRStatus.COMPLETED.value
+    )
+
+    if doc_ids:
+        doc_id_list = [id.strip() for id in doc_ids.split(',') if id.strip()]
+        if doc_id_list:
+            query = query.filter(Document.id.in_(doc_id_list))
+
+    documents = query.all()
+
+    if not documents:
+        raise HTTPException(status_code=404, detail="No documents found")
+
+    all_materials = []
+    results = []
+
+    for doc in documents:
+        exhibit_id = doc.exhibit_number or f"doc_{doc.id[:8]}"
+
+        # 加载 OCR 页面数据
+        ocr_pages = load_ocr_pages_for_document(project_id, doc.id)
+
+        if not ocr_pages:
+            results.append({
+                "document_id": doc.id,
+                "exhibit_id": exhibit_id,
+                "error": "No OCR pages found"
+            })
+            continue
+
+        # 分割材料
+        try:
+            # 为 LLM 分割提供 call_llm 函数
+            call_llm_wrapper = None
+            if use_llm:
+                async def call_llm_wrapper(prompt, max_retries=2):
+                    return await call_llm(prompt, max_retries=max_retries)
+
+            materials = await split_exhibit_into_materials(
+                project_id=project_id,
+                exhibit_id=exhibit_id,
+                document_id=doc.id,
+                file_name=doc.file_name,
+                ocr_pages=ocr_pages,
+                call_llm_func=call_llm_wrapper,
+                use_llm=use_llm
+            )
+
+            # 保存材料
+            save_materials(project_id, exhibit_id, materials)
+
+            all_materials.extend(materials)
+            results.append({
+                "document_id": doc.id,
+                "exhibit_id": exhibit_id,
+                "file_name": doc.file_name,
+                "materials_count": len(materials),
+                "materials": [m.to_dict() for m in materials]
+            })
+
+        except Exception as e:
+            results.append({
+                "document_id": doc.id,
+                "exhibit_id": exhibit_id,
+                "error": str(e)
+            })
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "total_documents": len(documents),
+        "total_materials": len(all_materials),
+        "results": results
+    }
+
+
+@router.post("/pipeline/highlight-analyze/{project_id}")
+async def analyze_highlights_for_project(
+    project_id: str,
+    exhibit_ids: Optional[str] = None,
+    use_llm: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Phase 2: 高光分析
+
+    对每个独立材料进行预处理和关键信息标记
+
+    参数:
+    - project_id: 项目 ID
+    - exhibit_ids: 可选，逗号分隔的 Exhibit ID
+    - use_llm: 是否使用 LLM（默认 True）
+    """
+    # 加载所有材料
+    all_materials_dict = load_all_materials_for_project(project_id)
+
+    if not all_materials_dict:
+        raise HTTPException(status_code=404, detail="No materials found. Run /pipeline/split-materials first.")
+
+    # 过滤指定的 exhibit
+    if exhibit_ids:
+        exhibit_id_list = [id.strip() for id in exhibit_ids.split(',') if id.strip()]
+        all_materials_dict = {k: v for k, v in all_materials_dict.items() if k in exhibit_id_list}
+
+    if not all_materials_dict:
+        raise HTTPException(status_code=404, detail="No matching exhibits found")
+
+    # 收集所有材料
+    all_materials = []
+    for materials in all_materials_dict.values():
+        all_materials.extend(materials)
+
+    # 准备 LLM 调用函数
+    call_llm_wrapper = None
+    if use_llm:
+        async def call_llm_wrapper(prompt, max_retries=2):
+            return await call_llm(prompt, max_retries=max_retries)
+
+    # 分析所有材料
+    highlight_results = await analyze_all_materials(
+        materials=all_materials,
+        call_llm_func=call_llm_wrapper,
+        use_llm=use_llm
+    )
+
+    # 保存结果
+    save_highlight_results(project_id, highlight_results)
+
+    # 返回摘要
+    results_summary = []
+    for material_id, result in highlight_results.items():
+        results_summary.append({
+            "material_id": material_id,
+            "document_type": result.metadata.document_type,
+            "title": result.metadata.title,
+            "date": result.metadata.date,
+            "parties": result.metadata.parties,
+            "highlight_count": len(result.highlights)
+        })
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "total_materials": len(all_materials),
+        "analyzed_count": len(highlight_results),
+        "results": results_summary
+    }
+
+
+async def _run_material_l1_analysis_background(
+    project_id: str,
+    materials: list,
+    highlight_results: Dict[str, HighlightResult]
+):
+    """后台运行材料级 L1 分析任务"""
+    global _material_analysis_progress, current_model
+
+    total = len(materials)
+    _material_analysis_progress[project_id] = {
+        "status": "processing",
+        "phase": "l1_analysis",
+        "total": total,
+        "completed": 0,
+        "current_material": None,
+        "errors": [],
+        "results": [],
+        "model_used": current_model
+    }
+
+    all_results = []
+    errors = []
+
+    for idx, material in enumerate(materials):
+        try:
+            material_id = material.material_id
+
+            # 更新当前处理的材料
+            _material_analysis_progress[project_id]["current_material"] = {
+                "material_id": material_id,
+                "exhibit_id": material.exhibit_id,
+                "title": material.title,
+                "page_range": material.page_range
+            }
+
+            # 获取高光分析上下文
+            highlight_context = None
+            if material_id in highlight_results:
+                highlight_context = get_highlight_context_for_l1(highlight_results[material_id])
+
+            # 构建材料信息
+            material_info = {
+                "material_id": material_id,
+                "exhibit_id": material.exhibit_id,
+                "document_id": material.document_id,
+                "file_name": material.file_name,
+                "text": clean_ocr_for_llm(material.get_full_text()),
+                "material_type": material.material_type,
+                "title": material.title,
+                "date": material.date,
+                "page_range": material.page_range
+            }
+
+            # 获取文本块（v3.0 架构改进）
+            text_blocks = material.get_all_text_blocks()
+
+            # 生成 prompt（优先使用文本块格式，带高光上下文）
+            if text_blocks:
+                # 使用 v3.0 文本块感知 prompt
+                prompt = get_l1_analysis_prompt_for_material_with_blocks(
+                    material_info, text_blocks, highlight_context
+                )
+            else:
+                # 降级到传统文本 prompt
+                prompt = get_l1_analysis_prompt_for_material(material_info, highlight_context)
+
+            # 调用 LLM
+            llm_result = await call_llm(prompt, model_override=current_model, max_retries=3)
+
+            # 解析结果
+            parsed_quotes = parse_material_analysis_result(llm_result, material_info)
+
+            # 创建分析结果对象
+            analysis_result = MaterialAnalysisResult(
+                material_id=material_id,
+                exhibit_id=material.exhibit_id,
+                document_id=material.document_id
+            )
+            analysis_result.add_quotes(parsed_quotes)
+            analysis_result.model_used = current_model
+
+            all_results.append(analysis_result)
+
+            print(f"[L1-Material] {material_id}: {len(parsed_quotes)} quotes extracted")
+
+            # 更新进度
+            _material_analysis_progress[project_id]["completed"] = idx + 1
+            _material_analysis_progress[project_id]["results"] = [r.to_dict() for r in all_results]
+
+            # Rate limit
+            await asyncio.sleep(0.5)
+
+        except Exception as e:
+            import traceback
+            error_traceback = traceback.format_exc()
+            print(f"[L1-Material] Error processing {material.material_id}: {e}")
+
+            error_info = {
+                "material_id": material.material_id,
+                "exhibit_id": material.exhibit_id,
+                "error": str(e),
+                "traceback": error_traceback[:500]
+            }
+            errors.append(error_info)
+            _material_analysis_progress[project_id]["errors"] = errors
+            _material_analysis_progress[project_id]["completed"] = idx + 1
+
+    # 引用整合阶段（按材料逐个处理）
+    if all_results:
+        print(f"[L1-Material] Starting per-material quote consolidation for {len(all_results)} materials...")
+        _material_analysis_progress[project_id]["phase"] = "consolidation"
+        _material_analysis_progress[project_id]["current_material"] = {"stage": "consolidation"}
+
+        # 转换为材料结果格式
+        material_results = []
+        for result in all_results:
+            material_results.append({
+                "document_id": result.document_id,
+                "exhibit_id": result.exhibit_id,
+                "material_id": result.material_id,
+                "file_name": "",
+                "quotes": result.quotes
+            })
+
+        # BBox 富化（按材料）
+        total_bbox_stats = {"total_matched": 0, "total_quotes": 0}
+        try:
+            db_session = SessionLocal()
+            try:
+                for mat_result in material_results:
+                    document_id = mat_result.get("document_id")
+                    quotes = mat_result.get("quotes", [])
+                    if document_id and quotes:
+                        enriched_quotes, stats = enrich_quotes_with_bbox(quotes, document_id, db_session)
+                        mat_result["quotes"] = enriched_quotes
+                        total_bbox_stats["total_matched"] += stats.get("matched", 0)
+                        total_bbox_stats["total_quotes"] += stats.get("total", 0)
+
+                overall_match_rate = round(
+                    total_bbox_stats["total_matched"] / total_bbox_stats["total_quotes"] * 100, 1
+                ) if total_bbox_stats["total_quotes"] else 0
+                total_bbox_stats["overall_match_rate"] = overall_match_rate
+                print(f"[L1-Material] BBox enrichment: {overall_match_rate}% match rate")
+            finally:
+                db_session.close()
+        except Exception as e:
+            print(f"[L1-Material] Warning: BBox enrichment failed: {e}")
+
+        # LLM 整合（按材料逐个处理 - 新架构核心）
+        consolidation_stats = {}
+        try:
+            # 检查 Ollama 可用性
+            ollama_available = False
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    response = await client.get(f"{settings.ollama_api_base.replace('/v1', '')}/api/tags")
+                    ollama_available = response.status_code == 200
+            except Exception:
+                pass
+
+            if ollama_available and LLM_PROVIDER == "ollama":
+                # 使用材料级 LLM 整合
+                material_results, consolidation_stats = await consolidate_all_material_quotes(
+                    material_results,
+                    call_llm,
+                    project_id=project_id,
+                    model=settings.ollama_model
+                )
+            else:
+                # 使用降级方案（无 LLM）
+                from app.services.quote_consolidator import consolidate_material_quotes_sync
+                total_original = 0
+                total_final = 0
+                for mat_result in material_results:
+                    quotes = mat_result.get("quotes", [])
+                    total_original += len(quotes)
+                    consolidated, _ = consolidate_material_quotes_sync(
+                        mat_result.get("material_id", "unknown"),
+                        quotes
+                    )
+                    mat_result["quotes"] = consolidated
+                    total_final += len(consolidated)
+                consolidation_stats = {
+                    "total_original": total_original,
+                    "total_final": total_final,
+                    "method": "material_level_fallback"
+                }
+
+            consolidation_stats["bbox_stats"] = total_bbox_stats
+            _material_analysis_progress[project_id]["consolidation_stats"] = consolidation_stats
+
+        except Exception as e:
+            print(f"[L1-Material] Warning: Consolidation failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # 更新结果（整合后）
+        for i, mat_result in enumerate(material_results):
+            if i < len(all_results):
+                all_results[i].quotes = mat_result.get("quotes", [])
+
+    # 保存分析结果
+    save_material_analysis(project_id, all_results)
+
+    # 同时保存为旧格式以兼容现有前端
+    chunk_analyses = []
+    for result in all_results:
+        chunk_analyses.append({
+            "document_id": result.document_id,
+            "exhibit_id": result.exhibit_id,
+            "file_name": "",
+            "quotes": result.quotes
+        })
+    storage.save_l1_analysis(project_id, chunk_analyses)
+
+    # 标记完成
+    _material_analysis_progress[project_id]["status"] = "completed"
+    _material_analysis_progress[project_id]["current_material"] = None
+    _material_analysis_progress[project_id]["phase"] = "done"
+
+
+@router.post("/pipeline/l1-analyze-materials/{project_id}")
+async def l1_analyze_materials(
+    project_id: str,
+    exhibit_ids: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Phase 3: L1 分析（材料级）
+
+    对每个独立材料进行四维度分析，提取原文引用
+
+    参数:
+    - project_id: 项目 ID
+    - exhibit_ids: 可选，逗号分隔的 Exhibit ID
+    """
+    global _material_analysis_progress
+
+    # 检查是否已有分析在进行中
+    if project_id in _material_analysis_progress:
+        current_status = _material_analysis_progress[project_id].get("status")
+        if current_status == "processing":
+            return {
+                "success": True,
+                "message": "Material L1 analysis already in progress",
+                "project_id": project_id,
+                "status": "processing"
+            }
+
+    # 加载材料
+    all_materials_dict = load_all_materials_for_project(project_id)
+
+    if not all_materials_dict:
+        raise HTTPException(status_code=404, detail="No materials found. Run /pipeline/split-materials first.")
+
+    # 过滤指定的 exhibit
+    if exhibit_ids:
+        exhibit_id_list = [id.strip() for id in exhibit_ids.split(',') if id.strip()]
+        all_materials_dict = {k: v for k, v in all_materials_dict.items() if k in exhibit_id_list}
+
+    # 收集所有材料
+    all_materials = []
+    for materials in all_materials_dict.values():
+        all_materials.extend(materials)
+
+    if not all_materials:
+        raise HTTPException(status_code=404, detail="No materials found")
+
+    # 加载高光分析结果
+    highlight_results = load_all_highlight_results(project_id)
+
+    # 启动后台任务
+    asyncio.create_task(_run_material_l1_analysis_background(
+        project_id, all_materials, highlight_results
+    ))
+
+    return {
+        "success": True,
+        "message": f"Started material L1 analysis for {len(all_materials)} materials",
+        "project_id": project_id,
+        "total_materials": len(all_materials)
+    }
+
+
+@router.get("/pipeline/l1-analyze-materials/progress/{project_id}")
+async def get_material_l1_analysis_progress(project_id: str):
+    """获取材料级 L1 分析进度"""
+    global _material_analysis_progress
+
+    progress_data = _material_analysis_progress.get(project_id)
+
+    if not progress_data:
+        return {
+            "project_id": project_id,
+            "status": "idle",
+            "phase": None,
+            "total": 0,
+            "completed": 0
+        }
+
+    return {
+        "project_id": project_id,
+        "status": progress_data.get("status", "unknown"),
+        "phase": progress_data.get("phase", ""),
+        "total": progress_data.get("total", 0),
+        "completed": progress_data.get("completed", 0),
+        "current_material": progress_data.get("current_material"),
+        "errors": progress_data.get("errors", []),
+        "model_used": progress_data.get("model_used", ""),
+        "consolidation_stats": progress_data.get("consolidation_stats", {})
+    }
+
+
+@router.post("/pipeline/analyze/{project_id}")
+async def run_full_material_pipeline(
+    project_id: str,
+    mode: str = "split",
+    doc_ids: Optional[str] = None,
+    use_llm: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    完整材料分析流水线
+
+    运行完整的 3 阶段流程：材料分割 → 高光分析 → L1 分析
+
+    参数:
+    - project_id: 项目 ID
+    - mode: "split" (需要分割) 或 "direct" (已分割)
+    - doc_ids: 可选，逗号分隔的文档 ID
+    - use_llm: 是否使用 LLM（默认 True）
+    """
+    global _material_analysis_progress
+
+    # 检查是否已有分析在进行中
+    if project_id in _material_analysis_progress:
+        current_status = _material_analysis_progress[project_id].get("status")
+        if current_status == "processing":
+            return {
+                "success": True,
+                "message": "Pipeline already in progress",
+                "project_id": project_id,
+                "status": "processing"
+            }
+
+    # 启动完整流程的后台任务
+    asyncio.create_task(_run_full_pipeline_background(
+        project_id, mode, doc_ids, use_llm, db
+    ))
+
+    return {
+        "success": True,
+        "message": f"Started full material pipeline (mode: {mode})",
+        "project_id": project_id,
+        "mode": mode
+    }
+
+
+async def _run_full_pipeline_background(
+    project_id: str,
+    mode: str,
+    doc_ids: Optional[str],
+    use_llm: bool,
+    db: Session
+):
+    """后台运行完整材料分析流水线"""
+    global _material_analysis_progress
+
+    try:
+        _material_analysis_progress[project_id] = {
+            "status": "processing",
+            "phase": "splitting",
+            "total": 0,
+            "completed": 0,
+            "current_material": None,
+            "errors": []
+        }
+
+        # Phase 1: 材料分割
+        if mode == "split":
+            print(f"[Pipeline] Phase 1: Material splitting...")
+            _material_analysis_progress[project_id]["phase"] = "splitting"
+
+            # 获取文档列表
+            query = db.query(Document).filter(
+                Document.project_id == project_id,
+                Document.ocr_status == OCRStatus.COMPLETED.value
+            )
+
+            if doc_ids:
+                doc_id_list = [id.strip() for id in doc_ids.split(',') if id.strip()]
+                if doc_id_list:
+                    query = query.filter(Document.id.in_(doc_id_list))
+
+            documents = query.all()
+
+            # 分割每个文档
+            all_materials = []
+            for doc in documents:
+                exhibit_id = doc.exhibit_number or f"doc_{doc.id[:8]}"
+                ocr_pages = load_ocr_pages_for_document(project_id, doc.id)
+
+                if ocr_pages:
+                    call_llm_wrapper = None
+                    if use_llm:
+                        async def call_llm_wrapper(prompt, max_retries=2):
+                            return await call_llm(prompt, max_retries=max_retries)
+
+                    materials = await split_exhibit_into_materials(
+                        project_id=project_id,
+                        exhibit_id=exhibit_id,
+                        document_id=doc.id,
+                        file_name=doc.file_name,
+                        ocr_pages=ocr_pages,
+                        call_llm_func=call_llm_wrapper,
+                        use_llm=use_llm
+                    )
+                    save_materials(project_id, exhibit_id, materials)
+                    all_materials.extend(materials)
+
+            print(f"[Pipeline] Split into {len(all_materials)} materials")
+        else:
+            # 模式 B: 已分割，直接加载
+            all_materials_dict = load_all_materials_for_project(project_id)
+            all_materials = []
+            for materials in all_materials_dict.values():
+                all_materials.extend(materials)
+
+        if not all_materials:
+            _material_analysis_progress[project_id]["status"] = "failed"
+            _material_analysis_progress[project_id]["errors"].append("No materials found")
+            return
+
+        _material_analysis_progress[project_id]["total"] = len(all_materials)
+
+        # Phase 2: 高光分析
+        print(f"[Pipeline] Phase 2: Highlight analysis...")
+        _material_analysis_progress[project_id]["phase"] = "highlighting"
+
+        call_llm_wrapper = None
+        if use_llm:
+            async def call_llm_wrapper(prompt, max_retries=2):
+                return await call_llm(prompt, max_retries=max_retries)
+
+        highlight_results = await analyze_all_materials(
+            materials=all_materials,
+            call_llm_func=call_llm_wrapper,
+            use_llm=use_llm
+        )
+        save_highlight_results(project_id, highlight_results)
+        print(f"[Pipeline] Highlight analysis complete: {len(highlight_results)} materials")
+
+        # Phase 3: L1 分析
+        print(f"[Pipeline] Phase 3: L1 analysis...")
+        await _run_material_l1_analysis_background(
+            project_id, all_materials, highlight_results
+        )
+
+    except Exception as e:
+        import traceback
+        print(f"[Pipeline] Error: {e}")
+        print(traceback.format_exc())
+        _material_analysis_progress[project_id]["status"] = "failed"
+        _material_analysis_progress[project_id]["errors"].append(str(e))
+
+
+@router.get("/pipeline/materials/{project_id}")
+async def get_project_materials(project_id: str):
+    """获取项目的所有材料"""
+    all_materials_dict = load_all_materials_for_project(project_id)
+
+    if not all_materials_dict:
+        return {
+            "project_id": project_id,
+            "total_materials": 0,
+            "exhibits": {}
+        }
+
+    exhibits = {}
+    total_materials = 0
+
+    for exhibit_id, materials in all_materials_dict.items():
+        exhibits[exhibit_id] = [m.to_dict() for m in materials]
+        total_materials += len(materials)
+
+    return {
+        "project_id": project_id,
+        "total_materials": total_materials,
+        "exhibits": exhibits
+    }
+
+
+@router.get("/pipeline/highlights/{project_id}")
+async def get_project_highlights(project_id: str, material_id: Optional[str] = None):
+    """获取项目的高光分析结果"""
+    if material_id:
+        result = load_highlight_result(project_id, material_id)
+        if not result:
+            raise HTTPException(status_code=404, detail=f"Highlight result not found for {material_id}")
+        return result.to_dict()
+
+    all_results = load_all_highlight_results(project_id)
+
+    if not all_results:
+        return {
+            "project_id": project_id,
+            "total": 0,
+            "results": {}
+        }
+
+    return {
+        "project_id": project_id,
+        "total": len(all_results),
+        "results": {k: v.to_dict() for k, v in all_results.items()}
+    }
 
