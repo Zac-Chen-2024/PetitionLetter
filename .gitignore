@@ -4,6 +4,12 @@
 backend/.env
 frontend/.env.local
 frontend/.env
+*.env
+
+# ===================
+# 开发文档 (不公开)
+# ===================
+docs/
 
 # ===================
 # Claude Code 配置
@@ -16,23 +22,33 @@ frontend/.env
 Reference/
 
 # ===================
-# 临时文件
-# ===================
-nul
-test_upload.txt
-
-# ===================
 # 数据库文件
 # ===================
 *.db
 *.sqlite
 *.sqlite3
+backend/*.db
 
 # ===================
 # 项目数据 (用户上传的文档)
 # ===================
 backend/data/
 data/
+
+# ===================
+# 日志文件
+# ===================
+*.log
+backend/server.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ===================
+# 调试文件
+# ===================
+backend/data/debug_*.json
 
 # ===================
 # Python
@@ -65,7 +81,9 @@ ENV/
 # Node.js / Frontend
 # ===================
 frontend/node_modules/
+node_modules/
 frontend/.next/
+.next/
 frontend/out/
 frontend/build/
 frontend/.pnp
@@ -97,21 +115,21 @@ Thumbs.db
 desktop.ini
 
 # ===================
-# Logs
+# 临时文件
 # ===================
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# ===================
-# Backup
-# ===================
+nul
+test_upload.txt
 backup/
 
 # ===================
-# Misc
+# 测试/调试脚本
+# ===================
+backend/test_*.py
+backend/run_*.py
+!backend/run.py
+
+# ===================
+# 安全相关
 # ===================
 *.pem
 *.key

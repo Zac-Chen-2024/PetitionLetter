@@ -6,7 +6,7 @@ BBox Matcher Service - Quote 到 BBox 的匹配服务
 - 返回匹配到的 BBox 坐标，用于前端高亮显示
 
 匹配策略:
-1. 归一化处理: 统一空白符、标点
+1. 归一化处理: 统一空白符、标点、去除 HTML 标签
 2. 精确子串匹配: quote 是否是某个 block 的子串
 3. 模糊匹配: 使用 difflib 计算相似度
 4. 跨块匹配: 合并相邻块进行匹配
@@ -14,6 +14,7 @@ BBox Matcher Service - Quote 到 BBox 的匹配服务
 
 import re
 import unicodedata
+from html import unescape
 from typing import List, Dict, Any, Optional, Tuple
 from difflib import SequenceMatcher
 from sqlalchemy.orm import Session
@@ -25,6 +26,8 @@ def normalize_text(text: str) -> str:
     """
     归一化文本，用于匹配比较
 
+    - 去除 HTML 标签
+    - 转换 HTML 实体
     - 转换为小写
     - 统一全角/半角字符
     - 去除多余空白
@@ -32,6 +35,12 @@ def normalize_text(text: str) -> str:
     """
     if not text:
         return ""
+
+    # 去除 HTML 标签 (将标签替换为空格，避免相邻文本黏连)
+    text = re.sub(r'<[^>]+>', ' ', text)
+
+    # 处理 HTML 实体 (&quot; &amp; &lt; &gt; etc.)
+    text = unescape(text)
 
     # Unicode 归一化 (NFKC: 兼容性分解后再组合)
     text = unicodedata.normalize('NFKC', text)

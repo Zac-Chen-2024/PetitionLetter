@@ -1522,8 +1522,15 @@ current_model = LLM_MODEL
 
 # ============== Stage 2: LLM1 Analysis ==============
 
-async def call_llm(prompt: str, model_override: str = None, max_retries: int = 3) -> dict:
-    """调用 LLM，支持本地模型和 OpenAI，带速率限制重试"""
+async def call_llm(prompt: str, model_override: str = None, max_retries: int = 3, json_schema: dict = None) -> dict:
+    """调用 LLM，支持本地模型和 OpenAI，带速率限制重试
+
+    Args:
+        prompt: 提示词
+        model_override: 覆盖默认模型
+        max_retries: 最大重试次数
+        json_schema: 可选的 JSON Schema，用于强制输出格式（Ollama 支持）
+    """
     import asyncio
     import re
 
@@ -1562,7 +1569,14 @@ async def call_llm(prompt: str, model_override: str = None, max_retries: int = 3
         request_body["temperature"] = 0.1
         request_body["max_tokens"] = 16000  # 增加到 16000 以容纳 Qwen3 思考模式
         # 本地模型可能不支持 response_format，但 vLLM 和 Ollama 支持
-        if LLM_PROVIDER == "ollama" or LLM_PROVIDER != "local" or "qwen" in model.lower() or "deepseek" in model.lower():
+        if LLM_PROVIDER == "ollama":
+            # Ollama 使用 format 参数支持 JSON Schema
+            if json_schema:
+                request_body["format"] = json_schema
+                print(f"[DEBUG call_llm] Using JSON Schema: {list(json_schema.get('properties', {}).keys())}")
+            else:
+                request_body["format"] = "json"
+        elif LLM_PROVIDER != "local" or "qwen" in model.lower() or "deepseek" in model.lower():
             request_body["response_format"] = {"type": "json_object"}
 
     last_error = None
@@ -1602,16 +1616,44 @@ async def call_llm(prompt: str, model_override: str = None, max_retries: int = 3
                 data = response.json()
                 message = data["choices"][0]["message"]
                 content = message.get("content", "")
+                reasoning = message.get("reasoning", "")
+                reasoning_content = message.get("reasoning_content", "")  # 某些模型使用这个字段
 
-                # Qwen3 思考模式：如果 content 为空，尝试从 reasoning 字段获取
-                if not content and "reasoning" in message:
-                    reasoning = message.get("reasoning", "")
-                    # 尝试找到 JSON 部分
-                    json_match = re.search(r'\{[\s\S]*\}', reasoning)
-                    if json_match:
-                        content = json_match.group()
-                    else:
-                        raise ValueError(f"Qwen3 reasoning mode returned no valid JSON. Reasoning: {reasoning[:500]}")
+                # 调试日志
+                content_len = len(content) if content else 0
+                reasoning_len = len(reasoning) if reasoning else 0
+                reasoning_content_len = len(reasoning_content) if reasoning_content else 0
+                print(f"[DEBUG call_llm] content={content_len}, reasoning={reasoning_len}, reasoning_content={reasoning_content_len}")
+
+                # 思考模式：如果 content 为空，尝试从思考字段获取
+                if not content:
+                    thinking_text = reasoning_content or reasoning
+
+                    if thinking_text:
+                        print(f"[DEBUG call_llm] Extracting from thinking ({len(thinking_text)} chars)")
+
+                        # 方法1: 找包含预期字段的 JSON（从后往前搜索）
+                        all_json_matches = list(re.finditer(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', thinking_text))
+                        for match in reversed(all_json_matches):
+                            try:
+                                candidate = match.group()
+                                parsed = json.loads(candidate)
+                                if any(key in parsed for key in ["paragraph_text", "document_type", "quotes", "key_quotes"]):
+                                    content = candidate
+                                    print(f"[DEBUG call_llm] Found JSON with expected fields")
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+
+                        # 方法2: 贪婪匹配（备用）
+                        if not content:
+                            json_match = re.search(r'\{[\s\S]*\}', thinking_text)
+                            if json_match:
+                                content = json_match.group()
+                                print(f"[DEBUG call_llm] Used fallback greedy match")
+
+                        if not content:
+                            raise ValueError(f"No JSON in thinking: {thinking_text[:500]}")
 
                 if not content:
                     raise ValueError("LLM returned empty content")
@@ -3268,6 +3310,21 @@ async def l1_write_section(
             print(f"  [{i+1}] {sq.get('value_types', [])} - {sq.get('quote', '')[:80]}...")
     print(f"{'='*60}\n")
 
+    # 保存完整证据到调试文件
+    debug_evidence = {
+        "section_type": section_type,
+        "primary_quotes": primary_quotes,
+        "supporting_quotes": supporting_quotes,
+        "unique_exhibits": unique_exhibits,
+        "data_types": data_types
+    }
+    debug_file = f"data/debug_l1write_{section_type}.json"
+    import os
+    os.makedirs("data", exist_ok=True)
+    with open(debug_file, "w", encoding="utf-8") as f:
+        json.dump(debug_evidence, f, indent=2, ensure_ascii=False)
+    print(f"[DEBUG] Evidence saved to: {debug_file}")
+
     prompt = f"""You are a Senior Immigration Attorney at a top-tier U.S. law firm specializing in L-1 visa petitions. Your task is to write a comprehensive, persuasive paragraph for an L-1 Petition Letter that will convince USCIS to approve the petition.
 
 ═══════════════════════════════════════════════════════════════
@@ -3362,6 +3419,28 @@ SECTION 5: AVAILABLE EVIDENCE (CROSS-STANDARD AGGREGATED)
 SECTION 6: EVIDENCE USAGE INSTRUCTIONS
 ═══════════════════════════════════════════════════════════════
 
+**CRITICAL: Logic-Building Principles (论证逻辑构建)**
+
+1. **Start from Conclusion** - First identify the core legal conclusion this paragraph must prove to the immigration officer (e.g., "The U.S. entity has the capacity to support an executive position within one year").
+
+2. **Build Evidence Triangles** - Do NOT simply list facts. For each core conclusion, construct an "evidence triangle" using at least:
+   - One CURRENT STATUS evidence (现状证据)
+   - One CAPABILITY evidence (能力证据)
+   - One FUTURE PLAN evidence (未来计划证据)
+
+   Example Triangle: To prove "capacity to support executive position":
+   - (Current) 3 existing employees handle daily operations [Exhibit A-3]
+   - (Capability) Company generates substantial revenue with active clients [Exhibit A-10]
+   - (Future) Business plan details the management team to be recruited under beneficiary's leadership in Year 1 [Exhibit B-2]
+
+3. **Explain, Don't Just Cite** - After citing evidence, add ONE sentence explaining WHY and HOW this evidence supports your legal argument.
+   Example: "...This provides the necessary organizational foundation for the beneficiary to manage a larger team in the future."
+
+4. **Proactively Address Weaknesses** - If evidence shows the company is small (e.g., only 3 employees), transform this into an argument ADVANTAGE:
+   - Frame as "early-stage expansion" (初创扩张期)
+   - Emphasize L-1 executive's role is precisely to BUILD teams and EXPAND operations
+   - Convert "weakness" into proof of "need" for executive leadership
+
 **Writing Strategy:**
 1. Use PRIMARY EVIDENCE to construct the core legal arguments and narrative
 2. Select 2-3 high-value items from SUPPORTING EVIDENCE to enrich the paragraph with:
@@ -3424,12 +3503,68 @@ Respond with a JSON object in this EXACT format:
 ☐ Follows the 5-layer structure
 """
 
-    global current_model
-    result = await call_llm(prompt, model_override=current_model)
+    # 定义 JSON Schema 强制输出格式
+    l1_write_schema = {
+        "type": "object",
+        "properties": {
+            "paragraph_text": {
+                "type": "string",
+                "description": "The complete legal paragraph text (200-400 words)"
+            },
+            "citations_used": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "exhibit_id": {"type": "string"},
+                        "exhibit_title": {"type": "string"},
+                        "quote_snippet": {"type": "string"},
+                        "fact_cited": {"type": "string"}
+                    },
+                    "required": ["exhibit_id", "exhibit_title", "fact_cited"]
+                },
+                "description": "List of citations used in the paragraph"
+            },
+            "word_count": {
+                "type": "integer",
+                "description": "Word count of the paragraph"
+            }
+        },
+        "required": ["paragraph_text", "citations_used"]
+    }
 
-    # 保存撰写结果
+    global current_model
+    result = await call_llm(prompt, model_override=current_model, json_schema=l1_write_schema)
+
+    # 调试日志：打印 LLM 返回结果的键
+    print(f"[DEBUG l1_write] Result keys: {list(result.keys()) if isinstance(result, dict) else type(result)}")
+    print(f"[DEBUG l1_write] Result preview: {str(result)[:500]}")
+
+    # 保存撰写结果 - 使用 Schema 强制的字段名，同时兼容旧格式
     text = result.get("paragraph_text", "")
     citations = result.get("citations_used", [])
+
+    # 兼容旧格式（如果 Schema 没生效）
+    if not text:
+        fallback_keys = ["legal_paragraph", "text", "content", "paragraph"]
+        for key in fallback_keys:
+            if key in result and isinstance(result[key], str) and len(result[key]) > 100:
+                text = result[key]
+                break
+        # 最后尝试找最长字符串
+        if not text:
+            for key, value in result.items():
+                if isinstance(value, str) and len(value) > len(text):
+                    text = value
+
+    if not citations:
+        fallback_keys = ["evidence_citations", "citations", "exhibits"]
+        for key in fallback_keys:
+            if key in result and isinstance(result[key], list):
+                citations = result[key]
+                break
+
+    print(f"[DEBUG l1_write] Extracted text length: {len(text)}, citations count: {len(citations)}")
     storage.save_writing(project_id, section_type, text, citations)
 
     return {

@@ -130,21 +130,33 @@ def list_relationship_versions(project_id: str):
 
 
 @router.get("/{project_id}/relationship")
-def get_latest_relationship(project_id: str):
-    """获取最新关系分析结果"""
+def get_latest_relationship(project_id: str, raw: bool = False):
+    """获取最新关系分析结果
+
+    Args:
+        raw: 如果为 True，返回原始格式；否则返回前端期望的格式
+    """
     result = storage.get_relationship(project_id)
     if not result:
         return {"version_id": None, "data": None}
-    return result
+    if raw:
+        return result
+    return storage.convert_relationship_to_frontend_format(result)
 
 
 @router.get("/{project_id}/relationship/{version_id}")
-def get_relationship_version(project_id: str, version_id: str):
-    """获取指定版本的关系分析结果"""
+def get_relationship_version(project_id: str, version_id: str, raw: bool = False):
+    """获取指定版本的关系分析结果
+
+    Args:
+        raw: 如果为 True，返回原始格式；否则返回前端期望的格式
+    """
     result = storage.get_relationship(project_id, version_id)
     if not result:
         raise HTTPException(status_code=404, detail="Relationship version not found")
-    return result
+    if raw:
+        return result
+    return storage.convert_relationship_to_frontend_format(result)
 
 
 # ==================== 写作历史 ====================

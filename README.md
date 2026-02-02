@@ -1,190 +1,219 @@
-# Petition Pipeline
+# PetitionLetter
 
-文档处理流水线系统：OCR → 分析 → 关系提取 → 文书撰写
+L-1 签证申请文书智能生成系统 | L-1 Visa Petition Letter AI Generator
 
-## 项目结构
+[English](#english) | [中文](#中文)
+
+---
+
+## English
+
+### Overview
+
+A 4-stage document processing pipeline for generating L-1 visa petition letters. The system processes supporting documents through OCR, analyzes content with LLM, extracts relationships, and generates professional petition paragraphs with proper exhibit citations.
+
+### Architecture
 
 ```
-petition-pipeline/
-├── backend/                 # FastAPI 后端
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Stage 1   │    │   Stage 2   │    │   Stage 3   │    │   Stage 4   │
+│     OCR     │ →  │  L1 Analyze │ →  │ L2 Relation │ →  │  L3 Write   │
+│   Extract   │    │   Content   │    │   Extract   │    │  Petition   │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+     ↓                   ↓                   ↓                   ↓
+  PDF/Image →      Entities &      →   Evidence      →   [Exhibit X]
+  to Text          Key Points          Chains            Citations
+```
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Backend** | FastAPI, SQLAlchemy, PyMuPDF, Pydantic |
+| **Frontend** | Next.js 16, React 19, Tailwind CSS 4, TypeScript |
+| **OCR** | DeepSeek-OCR (local model) |
+| **LLM** | Ollama + Qwen3:30b-a3b (local inference) |
+| **Database** | SQLite |
+
+### Quick Start (RunPod A100)
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/PetitionLetter.git
+cd PetitionLetter
+
+# One-click deployment
+chmod +x deploy.sh
+./deploy.sh
+```
+
+### External Access (Cloudflare Tunnel)
+
+For remote access to your RunPod instance:
+
+1. Install cloudflared:
+   ```bash
+   curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+   chmod +x cloudflared
+   ```
+
+2. Run tunnel with your token:
+   ```bash
+   ./cloudflared tunnel run --token <YOUR_TOKEN>
+   ```
+
+3. Configure frontend to use tunnel URL:
+   ```bash
+   # frontend/.env.local
+   NEXT_PUBLIC_API_BASE_URL=https://your-tunnel.domain.com
+   ```
+
+### Configuration
+
+This project runs **100% locally** with no cloud API dependencies.
+
+| Component | Default | Description |
+|-----------|---------|-------------|
+| OCR | DeepSeek-OCR | Local vision model |
+| LLM | Ollama + Qwen3 | Local language model |
+| Storage | SQLite + Files | Local database and file storage |
+
+### API Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/upload` | POST | Upload documents and run OCR |
+| `/api/documents/{project_id}` | GET | List project documents |
+| `/api/analyze/{document_id}` | POST | L1: Analyze document content |
+| `/api/analysis/{document_id}` | GET | Get analysis results |
+| `/api/relationship/{project_id}` | POST | L2: Extract relationships |
+| `/api/write/{project_id}` | POST | L3: Generate petition paragraphs |
+| `/api/health` | GET | Health check |
+
+### Project Structure
+
+```
+PetitionLetter/
+├── backend/                 # FastAPI backend
 │   ├── app/
-│   │   ├── core/           # 配置
-│   │   ├── db/             # 数据库
-│   │   ├── models/         # 数据模型
-│   │   ├── routers/        # API 路由
-│   │   ├── services/       # 业务逻辑
-│   │   └── main.py         # 入口
-│   ├── .env                # 配置文件 (需自行创建)
-│   ├── .env.example        # 配置模板
-│   ├── requirements.txt
-│   └── run.py
-├── frontend/               # Next.js 前端
+│   │   ├── core/           # Configuration
+│   │   ├── db/             # Database
+│   │   ├── models/         # Data models
+│   │   ├── routers/        # API routes
+│   │   ├── services/       # Business logic
+│   │   └── main.py         # Entry point
+│   ├── .env.example        # Config template
+│   └── requirements.txt
+├── frontend/               # Next.js frontend
 │   ├── src/
-│   ├── .env.local          # 前端配置 (需自行创建)
-│   ├── .env.example        # 配置模板
+│   ├── .env.example
 │   └── package.json
-├── start.bat               # Windows 一键启动
-├── start.sh                # Linux/Mac 一键启动
+├── deploy.sh               # One-click deployment (RunPod)
 └── README.md
 ```
 
 ---
 
-## 快速开始 (一键部署)
+## 中文
 
-### 前置要求
+### 项目概述
 
-- Python 3.10+
-- Node.js 18+
-- OpenAI API Key
-- 百度 OCR API Key ([申请地址](https://cloud.baidu.com/product/ocr))
+L-1 签证申请文书智能生成 4 阶段流水线。系统通过 OCR 处理证明材料，使用 LLM 分析内容、提取关系，最终生成带有规范证据引用的申请文书段落。
 
-### 第一步：配置环境变量
+### 系统架构
 
-#### Backend 配置
-
-```bash
-# 复制配置模板
-cp backend/.env.example backend/.env
-
-# 编辑配置文件，填入你的 API Key
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   第1阶段   │    │   第2阶段   │    │   第3阶段   │    │   第4阶段   │
+│     OCR     │ →  │  L1 分析    │ →  │  L2 关系    │ →  │  L3 撰写    │
+│   文字提取  │    │  内容分析   │    │  关系提取   │    │  文书生成   │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-**backend/.env** 必填项：
-```env
-OPENAI_API_KEY=sk-your-openai-key
-BAIDU_OCR_API_KEY=your-baidu-key
-BAIDU_OCR_SECRET_KEY=your-baidu-secret
-```
+### 技术栈
 
-#### Frontend 配置
-
-```bash
-# 复制配置模板
-cp frontend/.env.example frontend/.env.local
-```
-
-默认配置即可使用，无需修改。
-
-### 第二步：一键启动
-
-#### Windows
-
-双击运行 `start.bat` 或在命令行执行：
-```cmd
-start.bat
-```
-
-#### Linux / macOS
-
-```bash
-chmod +x start.sh
-./start.sh
-```
-
-### 第三步：访问系统
-
-- **前端界面**: http://localhost:3000
-- **后端 API**: http://localhost:8001
-- **API 文档**: http://localhost:8001/docs
-
----
-
-## 手动部署
-
-### Backend
-
-```bash
-cd backend
-
-# 创建虚拟环境 (推荐)
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 启动
-python run.py
-```
-
-### Frontend
-
-```bash
-cd frontend
-
-# 安装依赖
-npm install
-
-# 开发模式
-npm run dev
-
-# 或生产构建
-npm run build && npm start
-```
-
----
-
-## 配置说明
-
-### 配置文件位置
-
-| 文件 | 说明 |
+| 层级 | 技术 |
 |------|------|
-| `backend/.env` | **后端配置 (敏感！不要上传)** |
-| `frontend/.env.local` | 前端配置 |
+| **后端** | FastAPI, SQLAlchemy, PyMuPDF, Pydantic |
+| **前端** | Next.js 16, React 19, Tailwind CSS 4, TypeScript |
+| **OCR** | DeepSeek-OCR（本地模型） |
+| **LLM** | Ollama + Qwen3:30b-a3b（本地推理） |
+| **数据库** | SQLite |
 
-### 支持的 LLM Provider
+### 快速开始（RunPod A100 部署）
 
-在 `backend/.env` 中配置 `LLM_PROVIDER`:
+```bash
+# 克隆仓库
+git clone https://github.com/yourusername/PetitionLetter.git
+cd PetitionLetter
 
-| Provider | 配置值 | 需要的环境变量 |
-|----------|--------|----------------|
-| OpenAI | `openai` | `OPENAI_API_KEY` |
-| Azure OpenAI | `azure` | `AZURE_OPENAI_*` |
-| DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` |
-| Claude | `claude` | `CLAUDE_API_KEY` |
+# 一键部署
+chmod +x deploy.sh
+./deploy.sh
+```
 
----
+### 部署脚本选项
 
-## API 端点
+```bash
+./deploy.sh              # 完整部署（首次安装）
+./deploy.sh --start      # 仅启动服务
+./deploy.sh --check      # 检查环境状态
+./deploy.sh --update     # 更新代码和依赖
+```
+
+### 外网访问（Cloudflare Tunnel）
+
+通过 Cloudflare Tunnel 实现远程访问 RunPod 实例：
+
+1. 安装 cloudflared：
+   ```bash
+   curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+   chmod +x cloudflared
+   ```
+
+2. 使用你的 token 运行隧道：
+   ```bash
+   ./cloudflared tunnel run --token <YOUR_TOKEN>
+   ```
+
+3. 配置前端使用隧道地址：
+   ```bash
+   # frontend/.env.local
+   NEXT_PUBLIC_API_BASE_URL=https://your-tunnel.domain.com
+   ```
+
+Token 获取方式：
+1. 登录 https://one.dash.cloudflare.com/
+2. 进入 Networks > Tunnels
+3. 选择对应的 Tunnel，复制 token
+
+### 配置说明（纯本地，无云端 API）
+
+本项目 **100% 本地运行**，无需任何云端 API。
+
+| 组件 | 默认配置 | 说明 |
+|------|----------|------|
+| OCR | DeepSeek-OCR | 本地视觉模型 |
+| LLM | Ollama + Qwen3 | 本地语言模型 |
+| 存储 | SQLite + 文件 | 本地数据库和文件存储 |
+
+### API 文档
 
 | 端点 | 方法 | 描述 |
 |------|------|------|
 | `/api/upload` | POST | 上传文档并执行 OCR |
 | `/api/documents/{project_id}` | GET | 获取项目文档列表 |
-| `/api/analyze/{document_id}` | POST | LLM1 分析文档 |
+| `/api/analyze/{document_id}` | POST | L1：分析文档内容 |
 | `/api/analysis/{document_id}` | GET | 获取分析结果 |
-| `/api/relationship/{project_id}` | POST | LLM2 分析关系 |
-| `/api/write/{project_id}` | POST | LLM3 生成段落 |
+| `/api/relationship/{project_id}` | POST | L2：提取关系 |
+| `/api/write/{project_id}` | POST | L3：生成申请文书段落 |
 | `/api/health` | GET | 健康检查 |
 
----
+### 访问地址
 
-## 流水线阶段
-
-1. **Stage 1 - OCR**: 百度 OCR 高精度版，支持 PDF 和图片
-2. **Stage 2 - LLM1 分析**: 提取实体、标签、关键引用
-3. **Stage 3 - LLM2 关系**: 分析实体关系和证据链
-4. **Stage 4 - LLM3 撰写**: 生成带 `[Exhibit X]` 引用的段落
-
----
-
-## 常见问题
-
-### Q: 启动报错找不到模块？
-A: 确保已安装所有依赖：
-```bash
-cd backend && pip install -r requirements.txt
-cd frontend && npm install
-```
-
-### Q: OCR 不工作？
-A: 检查百度 OCR API Key 是否正确配置在 `backend/.env`
-
-### Q: 前端连不上后端？
-A: 确认 `frontend/.env.local` 中的 `NEXT_PUBLIC_API_BASE_URL` 指向正确的后端地址
+- **前端界面**: http://localhost:3000
+- **后端 API**: http://localhost:8000
+- **API 文档**: http://localhost:8000/docs
 
 ---
 
