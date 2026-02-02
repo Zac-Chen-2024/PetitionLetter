@@ -2061,6 +2061,372 @@ async def stream_relationship_progress(project_id: str):
     )
 
 
+# ============== 关系分析：去重、编辑、快照 ==============
+
+class DeduplicationAction(BaseModel):
+    """去重操作"""
+    type: str  # "merge" or "delete"
+    primary_id: Optional[str] = None
+    merge_ids: Optional[List[str]] = None
+    entity_id: Optional[str] = None
+
+
+class ApplyDeduplicationRequest(BaseModel):
+    """应用去重建议请求"""
+    actions: List[DeduplicationAction]
+
+
+class EntityUpdateRequest(BaseModel):
+    """实体更新请求"""
+    name: Optional[str] = None
+    type: Optional[str] = None
+
+
+class DeleteRelationRequest(BaseModel):
+    """删除关系请求"""
+    from_entity: str
+    to_entity: str
+    relation_type: str
+
+
+class MergeEntitiesRequest(BaseModel):
+    """合并实体请求"""
+    primary_id: str
+    merge_ids: List[str]
+
+
+class CreateSnapshotRequest(BaseModel):
+    """创建快照请求"""
+    label: str
+
+
+class RollbackRequest(BaseModel):
+    """回滚请求"""
+    snapshot_id: str
+
+
+@router.post("/relationship/deduplicate/{project_id}")
+async def deduplicate_analysis(project_id: str):
+    """
+    去重分析：使用 LLM 识别重复实体/关系
+
+    返回去重建议，不直接修改数据
+    """
+    from app.services.relationship_analyzer import run_deduplication_analysis
+
+    # 获取当前关系数据
+    rel_data = storage.get_relationship(project_id)
+    if not rel_data:
+        raise HTTPException(status_code=404, detail="No relationship data found")
+
+    data = rel_data.get("data", {})
+    entities = data.get("entities", [])
+    relations = data.get("relations", [])
+
+    if not entities:
+        return {
+            "success": True,
+            "project_id": project_id,
+            "suggestions": [],
+            "message": "No entities to analyze"
+        }
+
+    # 运行去重分析
+    suggestions = await run_deduplication_analysis(entities, relations)
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "suggestions": suggestions,
+        "entity_count": len(entities),
+        "relation_count": len(relations)
+    }
+
+
+@router.post("/relationship/apply-dedup/{project_id}")
+async def apply_deduplication(project_id: str, request: ApplyDeduplicationRequest):
+    """
+    应用去重建议
+
+    在执行前自动创建快照
+    """
+    from app.services.relationship_analyzer import (
+        merge_entities_in_graph,
+        delete_entity_from_graph
+    )
+
+    # 获取当前关系数据
+    rel_data = storage.get_relationship(project_id)
+    if not rel_data:
+        raise HTTPException(status_code=404, detail="No relationship data found")
+
+    data = rel_data.get("data", {})
+    entities = data.get("entities", [])
+    relations = data.get("relations", [])
+
+    # 创建快照（在去重前）
+    try:
+        current_snaps = storage.list_relationship_snapshots(project_id)
+        if not current_snaps:
+            # 第一次创建快照，标记为原始
+            storage.create_relationship_snapshot(project_id, "原始分析结果", is_original=True)
+    except Exception as e:
+        print(f"[Dedup] 创建快照失败: {e}")
+
+    # 统计
+    merged_count = 0
+    deleted_count = 0
+
+    # 执行去重操作
+    for action in request.actions:
+        if action.type == "merge" and action.primary_id and action.merge_ids:
+            entities, relations = merge_entities_in_graph(
+                entities, relations,
+                action.primary_id, action.merge_ids
+            )
+            merged_count += len(action.merge_ids)
+        elif action.type == "delete" and action.entity_id:
+            entities, relations, rel_deleted = delete_entity_from_graph(
+                entities, relations,
+                action.entity_id
+            )
+            deleted_count += 1
+
+    # 构建新数据
+    new_data = {
+        "entities": entities,
+        "relations": relations,
+        "l1_evidence": data.get("l1_evidence", []),
+        "quote_index_map": data.get("quote_index_map", {}),
+        "stats": {
+            **data.get("stats", {}),
+            "dedup_applied_at": datetime.now().isoformat(),
+            "merged_entities": merged_count,
+            "deleted_entities": deleted_count
+        }
+    }
+
+    # 保存新版本
+    version_id = storage.update_relationship_data(project_id, new_data)
+
+    # 创建去重后快照
+    try:
+        storage.create_relationship_snapshot(project_id, "去重检查后")
+    except Exception as e:
+        print(f"[Dedup] 创建去重后快照失败: {e}")
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "version_id": version_id,
+        "merged_count": merged_count,
+        "deleted_count": deleted_count,
+        "entity_count": len(entities),
+        "relation_count": len(relations)
+    }
+
+
+@router.patch("/relationship/entity/{project_id}/{entity_id}")
+async def update_entity(project_id: str, entity_id: str, request: EntityUpdateRequest):
+    """
+    更新实体（重命名/修改类型）
+    """
+    from app.services.relationship_analyzer import rename_entity_in_graph
+
+    # 获取当前关系数据
+    rel_data = storage.get_relationship(project_id)
+    if not rel_data:
+        raise HTTPException(status_code=404, detail="No relationship data found")
+
+    data = rel_data.get("data", {})
+    entities = data.get("entities", [])
+
+    # 检查实体是否存在
+    entity_found = False
+    for e in entities:
+        if e["id"] == entity_id:
+            entity_found = True
+            break
+
+    if not entity_found:
+        raise HTTPException(status_code=404, detail=f"Entity {entity_id} not found")
+
+    # 更新实体
+    if request.name:
+        entities = rename_entity_in_graph(entities, entity_id, request.name, request.type)
+
+    # 保存
+    new_data = {**data, "entities": entities}
+    version_id = storage.update_relationship_data(project_id, new_data)
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "entity_id": entity_id,
+        "version_id": version_id
+    }
+
+
+@router.delete("/relationship/entity/{project_id}/{entity_id}")
+async def delete_entity(project_id: str, entity_id: str):
+    """
+    删除实体及其相关关系
+    """
+    from app.services.relationship_analyzer import delete_entity_from_graph
+
+    # 获取当前关系数据
+    rel_data = storage.get_relationship(project_id)
+    if not rel_data:
+        raise HTTPException(status_code=404, detail="No relationship data found")
+
+    data = rel_data.get("data", {})
+    entities = data.get("entities", [])
+    relations = data.get("relations", [])
+
+    # 删除实体
+    new_entities, new_relations, deleted_relations = delete_entity_from_graph(
+        entities, relations, entity_id
+    )
+
+    if len(new_entities) == len(entities):
+        raise HTTPException(status_code=404, detail=f"Entity {entity_id} not found")
+
+    # 保存
+    new_data = {**data, "entities": new_entities, "relations": new_relations}
+    version_id = storage.update_relationship_data(project_id, new_data)
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "entity_id": entity_id,
+        "version_id": version_id,
+        "deleted_relations": deleted_relations
+    }
+
+
+@router.delete("/relationship/relation/{project_id}")
+async def delete_relation(project_id: str, request: DeleteRelationRequest):
+    """
+    删除关系
+    """
+    from app.services.relationship_analyzer import delete_relation_from_graph
+
+    # 获取当前关系数据
+    rel_data = storage.get_relationship(project_id)
+    if not rel_data:
+        raise HTTPException(status_code=404, detail="No relationship data found")
+
+    data = rel_data.get("data", {})
+    relations = data.get("relations", [])
+
+    # 删除关系
+    new_relations, found = delete_relation_from_graph(
+        relations, request.from_entity, request.to_entity, request.relation_type
+    )
+
+    if not found:
+        raise HTTPException(status_code=404, detail="Relation not found")
+
+    # 保存
+    new_data = {**data, "relations": new_relations}
+    version_id = storage.update_relationship_data(project_id, new_data)
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "version_id": version_id
+    }
+
+
+@router.post("/relationship/merge-entities/{project_id}")
+async def merge_entities(project_id: str, request: MergeEntitiesRequest):
+    """
+    手动合并实体
+    """
+    from app.services.relationship_analyzer import merge_entities_in_graph
+
+    # 获取当前关系数据
+    rel_data = storage.get_relationship(project_id)
+    if not rel_data:
+        raise HTTPException(status_code=404, detail="No relationship data found")
+
+    data = rel_data.get("data", {})
+    entities = data.get("entities", [])
+    relations = data.get("relations", [])
+
+    # 合并实体
+    try:
+        new_entities, new_relations = merge_entities_in_graph(
+            entities, relations,
+            request.primary_id, request.merge_ids
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # 保存
+    new_data = {**data, "entities": new_entities, "relations": new_relations}
+    version_id = storage.update_relationship_data(project_id, new_data)
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "version_id": version_id,
+        "merged_count": len(request.merge_ids),
+        "entity_count": len(new_entities),
+        "relation_count": len(new_relations)
+    }
+
+
+@router.get("/relationship/snapshots/{project_id}")
+async def list_snapshots(project_id: str):
+    """
+    获取快照列表
+    """
+    snapshots = storage.list_relationship_snapshots(project_id)
+    current_snap = storage.get_current_snapshot_id(project_id)
+
+    return {
+        "success": True,
+        "project_id": project_id,
+        "snapshots": snapshots,
+        "current_snap": current_snap
+    }
+
+
+@router.post("/relationship/snapshot/{project_id}")
+async def create_snapshot(project_id: str, request: CreateSnapshotRequest):
+    """
+    手动创建快照
+    """
+    try:
+        snapshot = storage.create_relationship_snapshot(project_id, request.label)
+        return {
+            "success": True,
+            "project_id": project_id,
+            "snapshot": snapshot
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/relationship/rollback/{project_id}")
+async def rollback_to_snapshot_endpoint(project_id: str, request: RollbackRequest):
+    """
+    回滚到指定快照
+    """
+    try:
+        result = storage.rollback_to_snapshot(project_id, request.snapshot_id)
+        return {
+            "success": True,
+            "project_id": project_id,
+            "rolled_back_to": request.snapshot_id,
+            "label": result.get("label"),
+            "version_id": result.get("version_id")
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ============== Stage 4: LLM3 Writing ==============
 
 @router.post("/write/{project_id}")
@@ -4616,3 +4982,5 @@ async def get_project_highlights(project_id: str, material_id: Optional[str] = N
         "results": {k: v.to_dict() for k, v in all_results.items()}
     }
 
+# Force reload Mon Feb  2 11:39:58 UTC 2026
+# reload Mon Feb  2 11:47:40 UTC 2026

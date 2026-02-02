@@ -257,6 +257,60 @@ def save_relationship(project_id: str, relationship_data: Dict) -> str:
     return version_id
 
 
+def save_quote_index_map(project_id: str, quote_index_map: Dict) -> str:
+    """保存引用索引映射（用于关系分析结果回溯到 bbox）
+
+    Args:
+        project_id: 项目 ID
+        quote_index_map: {idx: {exhibit_id, material_id, page, quote, standard_key, bbox}}
+
+    Returns:
+        version_id
+    """
+    project_dir = get_project_dir(project_id)
+    rel_dir = project_dir / "relationship"
+    rel_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now()
+    version_id = timestamp.strftime("%Y%m%d_%H%M%S")
+
+    data = {
+        "version_id": version_id,
+        "timestamp": timestamp.isoformat(),
+        "quote_count": len(quote_index_map),
+        "quotes": quote_index_map
+    }
+
+    filename = f"quote_index_map_{version_id}.json"
+    with open(rel_dir / filename, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    return version_id
+
+
+def load_quote_index_map(project_id: str, version_id: str = None) -> Optional[Dict]:
+    """加载引用索引映射"""
+    rel_dir = get_project_dir(project_id) / "relationship"
+    if not rel_dir.exists():
+        return None
+
+    if version_id:
+        filepath = rel_dir / f"quote_index_map_{version_id}.json"
+    else:
+        # 获取最新版本
+        files = sorted(rel_dir.glob("quote_index_map_*.json"), reverse=True)
+        if not files:
+            return None
+        filepath = files[0]
+
+    if not filepath.exists():
+        return None
+
+    with open(filepath, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        return data.get("quotes", {})
+
+
 def list_relationship_versions(project_id: str) -> List[Dict]:
     """列出所有关系分析版本"""
     rel_dir = get_project_dir(project_id) / "relationship"
@@ -287,7 +341,10 @@ def get_relationship(project_id: str, version_id: str = None) -> Optional[Dict]:
         filename = f"relationship_{version_id}.json"
         filepath = rel_dir / filename
     else:
-        files = sorted(rel_dir.glob("relationship_*.json"), reverse=True)
+        # 排除 snapshots 文件，只匹配时间戳格式的文件
+        files = [f for f in rel_dir.glob("relationship_*.json")
+                 if f.name != "relationship_snapshots.json"]
+        files = sorted(files, reverse=True)
         if not files:
             return None
         filepath = files[0]
@@ -297,6 +354,278 @@ def get_relationship(project_id: str, version_id: str = None) -> Optional[Dict]:
 
     with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
+
+
+# ==================== 关系图快照管理 ====================
+
+def get_snapshots_file(project_id: str) -> Path:
+    """获取快照元数据文件路径"""
+    rel_dir = get_project_dir(project_id) / "relationship"
+    rel_dir.mkdir(parents=True, exist_ok=True)
+    return rel_dir / "relationship_snapshots.json"
+
+
+def list_relationship_snapshots(project_id: str) -> List[Dict]:
+    """列出所有关系分析快照"""
+    snapshots_file = get_snapshots_file(project_id)
+    if not snapshots_file.exists():
+        return []
+
+    with open(snapshots_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        return data.get("snapshots", [])
+
+
+def get_current_snapshot_id(project_id: str) -> Optional[str]:
+    """获取当前活动快照 ID"""
+    snapshots_file = get_snapshots_file(project_id)
+    if not snapshots_file.exists():
+        return None
+
+    with open(snapshots_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        return data.get("current_snap")
+
+
+def create_relationship_snapshot(
+    project_id: str,
+    label: str,
+    is_original: bool = False,
+    parent_snap: Optional[str] = None
+) -> Dict:
+    """
+    创建新的关系分析快照
+
+    Args:
+        project_id: 项目 ID
+        label: 快照标签
+        is_original: 是否为原始分析结果
+        parent_snap: 父快照 ID
+
+    Returns:
+        创建的快照元数据
+    """
+    # 获取当前最新的关系分析数据
+    current_rel = get_relationship(project_id)
+    if not current_rel:
+        raise ValueError("No relationship data to snapshot")
+
+    # 生成快照 ID
+    timestamp = datetime.now()
+    snap_id = f"snap_{timestamp.strftime('%Y%m%d_%H%M%S')}"
+    version_id = current_rel.get("version_id")
+
+    # 创建快照元数据
+    snapshot = {
+        "id": snap_id,
+        "version_id": version_id,
+        "label": label,
+        "created_at": timestamp.isoformat(),
+        "is_original": is_original,
+        "parent_snap": parent_snap,
+        "stats": {
+            "entity_count": len(current_rel.get("data", {}).get("entities", [])),
+            "relation_count": len(current_rel.get("data", {}).get("relations", []))
+        }
+    }
+
+    # 加载或初始化快照列表
+    snapshots_file = get_snapshots_file(project_id)
+    if snapshots_file.exists():
+        with open(snapshots_file, 'r', encoding='utf-8') as f:
+            snapshots_data = json.load(f)
+    else:
+        snapshots_data = {"snapshots": [], "current_snap": None}
+
+    # 添加新快照
+    snapshots_data["snapshots"].append(snapshot)
+    snapshots_data["current_snap"] = snap_id
+
+    # 保存快照元数据
+    with open(snapshots_file, 'w', encoding='utf-8') as f:
+        json.dump(snapshots_data, f, ensure_ascii=False, indent=2)
+
+    return snapshot
+
+
+def rollback_to_snapshot(project_id: str, snapshot_id: str) -> Dict:
+    """
+    回滚到指定快照
+
+    Args:
+        project_id: 项目 ID
+        snapshot_id: 目标快照 ID
+
+    Returns:
+        回滚后的关系数据
+    """
+    # 加载快照列表
+    snapshots_file = get_snapshots_file(project_id)
+    if not snapshots_file.exists():
+        raise ValueError("No snapshots found")
+
+    with open(snapshots_file, 'r', encoding='utf-8') as f:
+        snapshots_data = json.load(f)
+
+    # 查找目标快照
+    target_snap = None
+    for snap in snapshots_data.get("snapshots", []):
+        if snap["id"] == snapshot_id:
+            target_snap = snap
+            break
+
+    if not target_snap:
+        raise ValueError(f"Snapshot {snapshot_id} not found")
+
+    # 获取快照对应的关系数据
+    version_id = target_snap["version_id"]
+    rel_data = get_relationship(project_id, version_id)
+
+    if not rel_data:
+        raise ValueError(f"Relationship data for version {version_id} not found")
+
+    # 保存为新版本（回滚操作本身也创建新版本）
+    new_version_id = save_relationship(project_id, rel_data.get("data", {}))
+
+    # 更新当前快照指针
+    snapshots_data["current_snap"] = snapshot_id
+
+    # 保存快照元数据
+    with open(snapshots_file, 'w', encoding='utf-8') as f:
+        json.dump(snapshots_data, f, ensure_ascii=False, indent=2)
+
+    return {
+        "snapshot_id": snapshot_id,
+        "version_id": new_version_id,
+        "label": target_snap.get("label"),
+        "data": rel_data.get("data", {})
+    }
+
+
+def update_relationship_data(project_id: str, new_data: Dict) -> str:
+    """
+    更新关系数据并保存为新版本
+
+    Args:
+        project_id: 项目 ID
+        new_data: 新的关系数据 {entities, relations, ...}
+
+    Returns:
+        新版本 ID
+    """
+    return save_relationship(project_id, new_data)
+
+
+def convert_relationship_to_frontend_format(raw_data: Dict) -> Dict:
+    """将后端关系分析结果转换为前端期望的格式
+
+    后端格式:
+        entities: [{id, name, type, aliases, quote_refs}]
+        relations: [{from_entity, to_entity, relation_type, quote_refs}]
+        l1_evidence: [{standard, quote_refs, strength}]
+        quote_index_map: {idx: {quote, standard_key, exhibit_id, page}}
+
+    前端格式:
+        entities: [{id, type, name, documents, attributes}]
+        relations: [{source_id, target_id, relation_type, evidence, description}]
+        evidence_chains: [{claim, documents, strength, reasoning}]
+    """
+    if not raw_data or "data" not in raw_data:
+        return raw_data
+
+    data = raw_data.get("data", {})
+    quote_map = data.get("quote_index_map", {})
+
+    # 辅助函数: quote_refs -> exhibit_id 列表
+    def refs_to_exhibits(refs: List[int]) -> List[str]:
+        exhibits = set()
+        for ref in refs:
+            ref_data = quote_map.get(str(ref), {})
+            exhibit_id = ref_data.get("exhibit_id", "")
+            if exhibit_id:
+                exhibits.add(exhibit_id)
+        return list(exhibits)
+
+    # L1 标准名称映射
+    standard_names = {
+        "qualifying_relationship": "Qualifying Corporate Relationship",
+        "qualifying_employment": "Qualifying Employment Abroad",
+        "qualifying_capacity": "Executive/Managerial Capacity",
+        "doing_business": "Active Business Operations"
+    }
+
+    # 转换 entities
+    frontend_entities = []
+    for e in data.get("entities", []):
+        frontend_entities.append({
+            "id": e.get("id", ""),
+            "type": e.get("type", "unknown"),
+            "name": e.get("name", ""),
+            "documents": refs_to_exhibits(e.get("quote_refs", [])),
+            "attributes": {
+                "aliases": e.get("aliases", [])
+            } if e.get("aliases") else {}
+        })
+
+    # 转换 relations
+    frontend_relations = []
+    for r in data.get("relations", []):
+        from_id = r.get("from_entity", "")
+        to_id = r.get("to_entity", "")
+        rel_type = r.get("relation_type", "related_to")
+
+        # 查找实体名称用于生成描述
+        from_name = ""
+        to_name = ""
+        for e in data.get("entities", []):
+            if e.get("id") == from_id:
+                from_name = e.get("name", "")
+            if e.get("id") == to_id:
+                to_name = e.get("name", "")
+
+        frontend_relations.append({
+            "source_id": from_id,
+            "target_id": to_id,
+            "relation_type": rel_type,
+            "evidence": refs_to_exhibits(r.get("quote_refs", [])),
+            "description": f"{from_name} {rel_type.replace('_', ' ')} {to_name}"
+        })
+
+    # 转换 l1_evidence -> evidence_chains
+    evidence_chains = []
+    for ev in data.get("l1_evidence", []):
+        standard_key = ev.get("standard", "")
+        refs = ev.get("quote_refs", [])
+        strength = ev.get("strength", "moderate")
+
+        # 收集该标准下的引用文本（用于 reasoning）
+        sample_quotes = []
+        for ref in refs[:3]:  # 最多取3条作为示例
+            ref_data = quote_map.get(str(ref), {})
+            quote_text = ref_data.get("quote", "")[:100]
+            if quote_text:
+                sample_quotes.append(quote_text)
+
+        evidence_chains.append({
+            "claim": standard_names.get(standard_key, standard_key),
+            "documents": refs_to_exhibits(refs),
+            "strength": strength,
+            "reasoning": f"Supported by {len(refs)} quotes from {len(refs_to_exhibits(refs))} exhibits. Examples: {'; '.join(sample_quotes)}" if sample_quotes else f"Based on {len(refs)} references."
+        })
+
+    # 返回前端格式
+    return {
+        "version_id": raw_data.get("version_id"),
+        "timestamp": raw_data.get("timestamp"),
+        "data": {
+            "entities": frontend_entities,
+            "relations": frontend_relations,
+            "evidence_chains": evidence_chains
+        },
+        # 保留原始数据供调试
+        "_raw_stats": data.get("stats", {}),
+        "_quote_index_map": quote_map
+    }
 
 
 # ==================== 写作生成 ====================
@@ -519,29 +848,54 @@ def load_l1_analysis(project_id: str, version_id: str = None) -> Optional[List[D
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                chunk_analyses = data.get("chunk_analyses", [])
 
-                for chunk in chunk_analyses:
+                # 支持新格式 (material_analyses) 和旧格式 (chunk_analyses)
+                analyses = data.get("material_analyses", []) or data.get("chunk_analyses", [])
+
+                for chunk in analyses:
+                    # 新格式用 exhibit_id 作为主键（材料级），旧格式用 document_id
+                    # 为了兼容关系分析，统一按 exhibit_id 分组
+                    exhibit_id = chunk.get("exhibit_id", "")
+                    material_id = chunk.get("material_id", "")
                     doc_id = chunk.get("document_id", "")
-                    if not doc_id:
+
+                    # 使用 exhibit_id 作为分组键
+                    group_key = exhibit_id or doc_id
+                    if not group_key:
                         continue
 
                     quotes = chunk.get("quotes", [])
-                    quote_count = len(quotes)
 
-                    # 比较：保留引用数量更多的版本
-                    if doc_id not in best_by_document:
-                        best_by_document[doc_id] = {
-                            "chunk": chunk,
-                            "quote_count": quote_count
+                    # 新格式：按 exhibit_id 聚合所有材料的引用
+                    if group_key not in best_by_document:
+                        best_by_document[group_key] = {
+                            "chunk": {
+                                "exhibit_id": exhibit_id,
+                                "document_id": doc_id,
+                                "file_name": chunk.get("file_name", f"Exhibit {exhibit_id}.pdf"),
+                                "quotes": [],
+                                "materials": []
+                            },
+                            "quote_count": 0
                         }
-                    elif quote_count > best_by_document[doc_id]["quote_count"]:
-                        best_by_document[doc_id] = {
-                            "chunk": chunk,
-                            "quote_count": quote_count
-                        }
+
+                    # 聚合引用（去重）
+                    existing_quotes = {q.get("quote", "")[:100] for q in best_by_document[group_key]["chunk"]["quotes"]}
+                    for q in quotes:
+                        quote_text = q.get("quote", "")[:100]
+                        if quote_text not in existing_quotes:
+                            best_by_document[group_key]["chunk"]["quotes"].append(q)
+                            existing_quotes.add(quote_text)
+
+                    best_by_document[group_key]["quote_count"] = len(best_by_document[group_key]["chunk"]["quotes"])
+
+                    # 记录材料来源
+                    if material_id:
+                        best_by_document[group_key]["chunk"]["materials"].append(material_id)
+
         except Exception as e:
             # 跳过无法读取的文件
+            print(f"[Storage] Warning: Failed to read {filepath}: {e}")
             continue
 
     # 组装合并后的结果
