@@ -12,6 +12,7 @@ from app.routers.provenance import router as provenance_router
 from app.routers.data import router as data_router
 from app.routers.analysis import router as analysis_router
 from app.routers.documents import router as documents_router
+from app.routers.arguments import router as arguments_router
 from app.models.document import Document, OCRStatus
 from app.services import storage
 from app.services.model_preloader import preload_models_async, get_preload_state
@@ -117,6 +118,7 @@ app.include_router(provenance_router)
 app.include_router(data_router)
 app.include_router(analysis_router)
 app.include_router(documents_router)
+app.include_router(arguments_router)
 
 
 @app.get("/")
