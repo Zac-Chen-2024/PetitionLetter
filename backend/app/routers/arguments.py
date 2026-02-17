@@ -18,6 +18,10 @@ from ..services.argument_generator import (
     ArgumentGenerator,
     generate_arguments_for_project
 )
+from ..services.argument_qualifier import (
+    qualify_all_arguments,
+    get_qualification_summary
+)
 
 router = APIRouter(prefix="/api/arguments", tags=["arguments"])
 
@@ -139,9 +143,13 @@ async def get_generation_status(project_id: str):
 # ============================================
 
 @router.get("/{project_id}")
-async def get_arguments(project_id: str):
+async def get_arguments(project_id: str, include_qualification: bool = False):
     """
     获取生成的论据列表
+
+    Args:
+        project_id: 项目 ID
+        include_qualification: 是否包含资格检查结果
     """
     generator = ArgumentGenerator(project_id)
     result = generator.load_generated_arguments()
@@ -154,12 +162,24 @@ async def get_arguments(project_id: str):
             "generated_at": None
         }
 
+    arguments = result.get("arguments", [])
+
+    # 如果需要包含资格检查
+    if include_qualification:
+        # 加载 snippets
+        snippets = generator.load_snippets()
+        arguments = qualify_all_arguments(arguments, snippets)
+        qual_summary = get_qualification_summary(arguments)
+    else:
+        qual_summary = None
+
     return {
         "project_id": project_id,
-        "arguments": result.get("arguments", []),
+        "arguments": arguments,
         "main_subject": result.get("main_subject"),
         "generated_at": result.get("generated_at"),
-        "stats": result.get("stats", {})
+        "stats": result.get("stats", {}),
+        "qualification_summary": qual_summary
     }
 
 

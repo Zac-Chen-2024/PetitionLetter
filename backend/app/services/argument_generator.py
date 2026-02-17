@@ -713,6 +713,17 @@ class ArgumentGenerator:
                 return json.load(f)
         return None
 
+    def load_snippets(self) -> List[Dict]:
+        """Load all snippets from extraction files"""
+        snippets = []
+        extraction_dir = self.project_dir / "extraction"
+        if extraction_dir.exists():
+            for f in extraction_dir.glob("*_extraction.json"):
+                with open(f, 'r', encoding='utf-8') as fp:
+                    data = json.load(fp)
+                    snippets.extend(data.get("snippets", []))
+        return snippets
+
     def get_generation_status(self) -> Dict:
         """Get current generation status"""
         has_relationship = self.has_relationship_analysis()
