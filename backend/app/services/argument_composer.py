@@ -37,6 +37,64 @@ STANDARD_FORMAL_NAMES = {
     "awards": "Nationally/Internationally Recognized Awards",
 }
 
+# ============================================
+# P0: 媒体名称映射 (Exhibit → Media Name)
+# ============================================
+EXHIBIT_TO_MEDIA = {
+    # The Jakarta Post (D1-D4)
+    "D1": "The Jakarta Post",
+    "D2": "The Jakarta Post",
+    "D3": "The Jakarta Post",
+    "D4": "The Jakarta Post",
+    # China Sports Daily (D5-D8)
+    "D5": "China Sports Daily",
+    "D6": "China Sports Daily",
+    "D7": "China Sports Daily",
+    "D8": "China Sports Daily",
+    # Sixth Tone (D9-D13)
+    "D9": "Sixth Tone",
+    "D10": "Sixth Tone",
+    "D11": "Sixth Tone",
+    "D12": "Sixth Tone",
+    "D13": "Sixth Tone",
+}
+
+# ============================================
+# P1: Membership 资格过滤规则
+# ============================================
+# 这些协会只是普通会员资格，不满足 "outstanding achievements" 要求
+DISQUALIFIED_MEMBERSHIPS = {
+    "usa weightlifting",
+    "nsca",
+    "national strength and conditioning association",
+}
+
+# 合格的协会（有选择性要求）
+QUALIFIED_MEMBERSHIPS = {
+    "shanghai fitness bodybuilding association": "Shanghai Fitness Bodybuilding Association",
+    "china weightlifting association": "China Weightlifting Association",
+}
+
+# ============================================
+# P2: Leading Role 组织修正规则
+# ============================================
+# 申请人名字变体（不应作为组织名）
+APPLICANT_NAME_VARIANTS = {
+    "yaruo qu", "ms. qu", "gaby", "gabriella", "coach gaby", "ms. yaruo qu",
+}
+
+# 组织合并规则 (源 → 目标)
+ORGANIZATION_MERGE = {
+    "venus weightlifting": "Shanghai Yiqing Fitness Management Co., Ltd.",
+    "venus weightlifting club": "Shanghai Yiqing Fitness Management Co., Ltd.",
+}
+
+# 合格的组织
+QUALIFIED_ORGANIZATIONS = {
+    "shanghai yiqing": "Shanghai Yiqing Fitness Management Co., Ltd.",
+    "ishtar health": "ISHTAR Health Pte. Ltd.",
+}
+
 
 @dataclass
 class EvidenceItem:
@@ -128,21 +186,21 @@ class ArgumentComposer:
             ]
 
     def _group_by_entity(self, snippets: List[Dict], standard: str) -> Dict[str, List[Dict]]:
-        """按核心实体分组"""
+        """按核心实体分组 - 过滤不合格实体"""
         groups = defaultdict(list)
 
         for snp in snippets:
-            text = snp.get("text", "").lower()
+            text = snp.get("text", "")
             subject = snp.get("subject", "")
 
             if standard == "membership":
-                # 按协会分组
+                # 按协会分组 - P1: 过滤不合格会员
                 group_key = self._extract_association_name(text, subject)
             elif standard == "published_material":
-                # 按媒体分组
+                # 按媒体分组 - P0: 使用 Exhibit 映射
                 group_key = self._extract_media_name(text, snp.get("exhibit_id", ""))
             elif standard == "leading_role":
-                # 按组织分组
+                # 按组织分组 - P2: 排除申请人名，合并组织
                 group_key = self._extract_organization_name(text, subject)
             elif standard == "awards":
                 # 按奖项分组
@@ -150,54 +208,79 @@ class ArgumentComposer:
             else:
                 group_key = "default"
 
-            groups[group_key].append(snp)
+            # 只有合格的实体才加入分组 (group_key 不为 None)
+            if group_key is not None:
+                groups[group_key].append(snp)
 
         return groups
 
     def _extract_association_name(self, text: str, subject: str) -> str:
-        """提取协会名称"""
-        patterns = [
-            r"shanghai fitness bodybuilding association",
-            r"china weightlifting association",
-            r"usa weightlifting",
-            r"nsca",
-            r"singapore weightlifting",
-        ]
-        for p in patterns:
-            if re.search(p, text, re.IGNORECASE):
-                return p.title().replace("Usa", "USA").replace("Nsca", "NSCA")
-        return "Professional Association"
+        """提取协会名称 - P1: 过滤不合格会员"""
+        text_lower = text.lower()
+
+        # 检查是否是不合格会员 (普通专业认证)
+        for disqualified in DISQUALIFIED_MEMBERSHIPS:
+            if disqualified in text_lower:
+                return None  # 返回 None 表示应该被过滤
+
+        # 检查是否是合格会员
+        for pattern, formal_name in QUALIFIED_MEMBERSHIPS.items():
+            if pattern in text_lower:
+                return formal_name
+
+        # 其他协会 - 检查是否有选择性证据
+        # 如果没有明确识别，也返回 None 以避免碎片化
+        return None
 
     def _extract_media_name(self, text: str, exhibit_id: str) -> str:
-        """提取媒体名称"""
+        """提取媒体名称 - 使用 Exhibit 映射表"""
+        # P0: 只有 D 系列 Exhibit 才是 Published Material
+        # 其他系列 (C, E, F, G) 应该被过滤
+        if not exhibit_id.startswith("D"):
+            return None  # 返回 None 表示不属于 Published Material
+
+        # P0: 使用 Exhibit → Media 映射
+        if exhibit_id in EXHIBIT_TO_MEDIA:
+            return EXHIBIT_TO_MEDIA[exhibit_id]
+
+        # 备用：从文本中识别
         media_patterns = {
             "jakarta post": "The Jakarta Post",
             "china sports daily": "China Sports Daily",
             "sixth tone": "Sixth Tone",
-            "the paper": "The Paper",
+            "the paper": "Sixth Tone",  # The Paper 是 Sixth Tone 的中文版
+            "titan sports": "China Sports Daily",  # 体坛周报属于同一集团
         }
         for pattern, name in media_patterns.items():
             if pattern in text.lower():
                 return name
-        # 根据 exhibit ID 推断
-        if exhibit_id.startswith("D"):
-            return f"Media Coverage ({exhibit_id})"
-        return "Media Publication"
+
+        # D 系列但未识别的媒体
+        return "Other Media"
 
     def _extract_organization_name(self, text: str, subject: str) -> str:
-        """提取组织名称"""
-        patterns = {
-            "venus weightlifting": "Venus Weightlifting Club",
-            "shanghai yiqing": "Shanghai Yiqing",
-            "ishtar health": "ISHTAR Health",
-            "onefit": "OneFit",
-        }
-        for pattern, name in patterns.items():
-            if pattern in text.lower():
-                return name
-        if subject and "organization" not in subject.lower():
-            return subject
-        return "Organization"
+        """提取组织名称 - P2: 排除申请人名，合并组织"""
+        text_lower = text.lower()
+        subject_lower = subject.lower() if subject else ""
+
+        # P2: 排除申请人名字作为组织名
+        for name_variant in APPLICANT_NAME_VARIANTS:
+            if name_variant in subject_lower:
+                subject = None  # 清除申请人名作为 subject
+                break
+
+        # P2: 检查是否需要合并
+        for pattern, target in ORGANIZATION_MERGE.items():
+            if pattern in text_lower:
+                return target
+
+        # 检查合格组织
+        for pattern, formal_name in QUALIFIED_ORGANIZATIONS.items():
+            if pattern in text_lower:
+                return formal_name
+
+        # 如果没有识别到合格组织，返回 None
+        return None
 
     def _extract_award_name(self, text: str) -> str:
         """提取奖项名称"""
