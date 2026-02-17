@@ -3,15 +3,13 @@ Argument Generator Service - AI-powered argument assembly from extracted snippet
 
 核心概念区分：
 - L0 OCR Blocks (registry.json): 原始文本块，不使用
-- L1 Snippets (extracted_snippets.json): LLM 提取的证据片段 ← 输入
+- L1 Snippets: 统一提取的证据片段（已包含 subject, evidence_type, is_applicant_achievement）
 - L2 Arguments (generated_arguments.json): 组装后的论据 ← 输出
 
-流程：
-1. 加载 L1 Snippets (extracted_snippets.json)
-2. 运行关系分析：提取实体、识别主体、判断归属
-3. 只保留归属于申请人的 snippets
-4. 按 standard_key 分组生成 Arguments
-5. 自动映射到 EB-1A Standards
+流程（已更新使用统一提取数据）：
+1. 加载统一提取的 Snippets (combined_extraction.json)
+2. 按 evidence_type 分组，只保留 is_applicant_achievement=True 的
+3. 生成 Arguments（自动映射 standard_key）
 """
 
 import json
@@ -23,8 +21,9 @@ from pathlib import Path
 from collections import defaultdict
 import uuid
 
-from .snippet_extractor import load_extracted_snippets, EB1A_STANDARDS
+from .snippet_extractor import load_extracted_snippets
 from .relationship_analyzer import analyze_relationships
+from .unified_extractor import load_combined_extraction
 
 # Data storage root directory
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
@@ -38,7 +37,7 @@ class GeneratedArgument:
     title: str
     subject: str
     snippet_ids: List[str]
-    standard_key: str
+    standard_key: str  # Empty by default - user maps to standard manually
     confidence: float
     created_at: str
     is_ai_generated: bool = True
@@ -97,12 +96,10 @@ class ArgumentGenerator:
         """
         Main entry point: Generate arguments from extracted snippets
 
-        Pipeline:
-        1. Load L1 Snippets (extracted_snippets.json)
-        2. Run relationship analysis (using OpenAI API)
-        3. Filter to only applicant's snippets
-        4. Group by standard_key
-        5. Create arguments
+        Pipeline (updated to use unified extraction):
+        1. Try to load unified extraction data (has subject attribution)
+        2. If not available, fall back to legacy relationship analysis
+        3. Group by evidence_type and create arguments
 
         Args:
             progress_callback: Optional callback (current, total, message)
@@ -117,6 +114,161 @@ class ArgumentGenerator:
                 "stats": {...}
             }
         """
+        # Try unified extraction first (has subject, evidence_type, is_applicant_achievement)
+        unified_data = load_combined_extraction(self.project_id)
+
+        if unified_data and unified_data.get('snippets'):
+            return await self._generate_from_unified(
+                unified_data,
+                applicant_name,
+                progress_callback
+            )
+
+        # Fall back to legacy pipeline
+        return await self._generate_from_legacy(
+            force_reanalyze,
+            applicant_name,
+            progress_callback
+        )
+
+    async def _generate_from_unified(
+        self,
+        unified_data: Dict,
+        applicant_name: Optional[str],
+        progress_callback
+    ) -> Dict:
+        """Generate arguments from unified extraction data (with subject attribution)"""
+        snippets = unified_data.get('snippets', [])
+        entities = unified_data.get('entities', [])
+        relations = unified_data.get('relations', [])
+
+        print(f"[ArgumentGenerator] Using unified extraction: {len(snippets)} snippets")
+
+        if progress_callback:
+            progress_callback(30, 100, "Filtering applicant snippets...")
+
+        # Filter to only applicant's achievements
+        applicant_snippets = [s for s in snippets if s.get('is_applicant_achievement', False)]
+        skipped_count = len(snippets) - len(applicant_snippets)
+
+        print(f"[ArgumentGenerator] Filtered: {skipped_count} non-applicant snippets skipped")
+        print(f"[ArgumentGenerator] {len(applicant_snippets)} applicant snippets remaining")
+
+        # Determine main subject
+        if applicant_name:
+            main_subject = applicant_name
+        else:
+            # Try to get from snippets
+            subjects = [s.get('subject', '') for s in applicant_snippets if s.get('subject')]
+            main_subject = max(set(subjects), key=subjects.count) if subjects else "Applicant"
+
+        if progress_callback:
+            progress_callback(50, 100, "Grouping by evidence type...")
+
+        # Group by evidence_type
+        by_evidence_type = defaultdict(list)
+        for s in applicant_snippets:
+            evidence_type = s.get('evidence_type', 'other')
+            by_evidence_type[evidence_type].append(s)
+
+        if progress_callback:
+            progress_callback(70, 100, "Generating arguments...")
+
+        # Evidence type to standard_key mapping
+        evidence_to_standard = {
+            'award': 'awards',
+            'awards': 'awards',
+            'membership': 'membership',
+            'publication': 'scholarly_articles',
+            'publications': 'scholarly_articles',
+            'scholarly_article': 'scholarly_articles',
+            'contribution': 'original_contribution',
+            'original_contribution': 'original_contribution',
+            'judging': 'judging',
+            'leadership': 'leading_role',
+            'leading_role': 'leading_role',
+            'high_salary': 'high_salary',
+            'salary': 'high_salary',
+            'media': 'published_material',
+            'press': 'published_material',
+            'exhibition': 'exhibitions',
+            'exhibitions': 'exhibitions',
+            'commercial': 'commercial_success',
+        }
+
+        # Create an argument for each evidence type
+        arguments = []
+
+        for evidence_type, type_snippets in by_evidence_type.items():
+            if not type_snippets:
+                continue
+
+            snippet_ids = [s.get('snippet_id', s.get('block_id', '')) for s in type_snippets]
+
+            # Map to standard
+            standard_key = evidence_to_standard.get(evidence_type.lower(), '')
+
+            # Create readable title
+            type_display = evidence_type.replace('_', ' ').title()
+            title = f"{main_subject} - {type_display}"
+
+            # Calculate confidence
+            confidences = [s.get('confidence', 0.5) for s in type_snippets]
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0.5
+
+            argument = GeneratedArgument(
+                id=f"arg-{uuid.uuid4().hex[:8]}",
+                title=title,
+                subject=main_subject,
+                snippet_ids=snippet_ids,
+                standard_key=standard_key,
+                confidence=round(avg_confidence, 2),
+                created_at=datetime.now().isoformat(),
+                is_ai_generated=True
+            )
+            arguments.append(argument)
+
+        # Sort by number of snippets (most evidence first)
+        arguments.sort(key=lambda a: len(a.snippet_ids), reverse=True)
+
+        if progress_callback:
+            progress_callback(90, 100, "Saving results...")
+
+        # Save results
+        result = {
+            "success": True,
+            "generated_at": datetime.now().isoformat(),
+            "main_subject": main_subject,
+            "arguments": [asdict(a) for a in arguments],
+            "stats": {
+                "total_snippets": len(snippets),
+                "applicant_snippets": len(applicant_snippets),
+                "skipped_snippets": skipped_count,
+                "entity_count": len(entities),
+                "relation_count": len(relations),
+                "argument_count": len(arguments),
+                "evidence_types": list(by_evidence_type.keys()),
+            }
+        }
+
+        args_file = self.get_arguments_file()
+        with open(args_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+
+        if progress_callback:
+            progress_callback(100, 100, "Done!")
+
+        print(f"[ArgumentGenerator] Generated {len(arguments)} arguments for {main_subject}")
+        print(f"[ArgumentGenerator] Evidence types: {list(by_evidence_type.keys())}")
+        return result
+
+    async def _generate_from_legacy(
+        self,
+        force_reanalyze: bool,
+        applicant_name: Optional[str],
+        progress_callback
+    ) -> Dict:
+        """Legacy pipeline using relationship_analyzer (fallback)"""
         # Step 1: Load L1 Snippets
         snippets = load_extracted_snippets(self.project_id)
         if not snippets:
@@ -126,7 +278,7 @@ class ArgumentGenerator:
                 "arguments": [],
             }
 
-        print(f"[ArgumentGenerator] Loaded {len(snippets)} extracted snippets")
+        print(f"[ArgumentGenerator] Using legacy pipeline: {len(snippets)} snippets")
         if applicant_name:
             print(f"[ArgumentGenerator] Using provided applicant name: {applicant_name}")
 
@@ -175,19 +327,15 @@ class ArgumentGenerator:
         # Step 3: Build attribution map
         attribution_map = {a['snippet_id']: a for a in attributions}
 
-        # Step 4: Group snippets by standard_key (only applicant's)
+        # Step 4: Filter to only applicant's snippets
         if progress_callback:
-            progress_callback(80, 100, "Grouping snippets...")
+            progress_callback(80, 100, "Filtering applicant snippets...")
 
-        standard_groups = defaultdict(list)
+        applicant_snippets = []
         skipped_count = 0
 
         for s in snippets:
             snippet_id = s.get('snippet_id', '')
-            standard_key = s.get('standard_key', '')
-
-            if not standard_key or standard_key not in EB1A_STANDARDS:
-                continue
 
             # Check attribution - only include applicant's snippets
             attr = attribution_map.get(snippet_id)
@@ -195,28 +343,24 @@ class ArgumentGenerator:
                 skipped_count += 1
                 continue
 
-            standard_groups[standard_key].append(s)
+            applicant_snippets.append(s)
 
         print(f"[ArgumentGenerator] Filtered: {skipped_count} non-applicant snippets skipped")
+        print(f"[ArgumentGenerator] {len(applicant_snippets)} applicant snippets remaining")
 
         if progress_callback:
             progress_callback(90, 100, "Generating arguments...")
 
-        # Step 5: Generate arguments
+        # Step 5: Generate one argument with all applicant's snippets
+        # User will manually map to standards and split if needed
         arguments = []
 
-        for standard_key, group_snippets in standard_groups.items():
-            if not group_snippets:
-                continue
+        if applicant_snippets:
+            snippet_ids = [s['snippet_id'] for s in applicant_snippets]
 
-            standard_info = EB1A_STANDARDS.get(standard_key, {})
-            standard_name = standard_info.get('name', standard_key)
+            title = f"{main_subject or 'Applicant'}'s Evidence"
 
-            snippet_ids = [s['snippet_id'] for s in group_snippets]
-
-            title = f"{main_subject or 'Applicant'}'s {standard_name}"
-
-            confidences = [s.get('confidence', 0.5) for s in group_snippets]
+            confidences = [s.get('confidence', 0.5) for s in applicant_snippets]
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.5
 
             argument = GeneratedArgument(
@@ -224,7 +368,7 @@ class ArgumentGenerator:
                 title=title,
                 subject=main_subject or "Unknown",
                 snippet_ids=snippet_ids,
-                standard_key=standard_key,
+                standard_key="",  # Empty - user maps to standard manually
                 confidence=round(avg_confidence, 2),
                 created_at=datetime.now().isoformat(),
                 is_ai_generated=True
@@ -239,12 +383,11 @@ class ArgumentGenerator:
             "arguments": [asdict(a) for a in arguments],
             "stats": {
                 "total_snippets": len(snippets),
-                "applicant_snippets": len(snippets) - skipped_count,
+                "applicant_snippets": len(applicant_snippets),
                 "skipped_snippets": skipped_count,
                 "entity_count": len(entities),
                 "relation_count": len(relations),
                 "argument_count": len(arguments),
-                "by_standard": {k: len(v) for k, v in standard_groups.items()}
             }
         }
 

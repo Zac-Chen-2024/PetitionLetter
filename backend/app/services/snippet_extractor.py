@@ -25,23 +25,12 @@ EXTRACTION_SYSTEM_PROMPT = """You are an expert immigration attorney assistant s
 
 Your task is to extract meaningful evidence snippets from document text blocks that can support an EB-1A petition.
 
-EB-1A requires demonstrating extraordinary ability in one of these 8 categories:
-1. awards - Receipt of nationally/internationally recognized prizes or awards for excellence
-2. membership - Membership in associations requiring outstanding achievements of members
-3. published_material - Published material about the beneficiary in professional/major media
-4. judging - Participation as a judge of others' work in the field
-5. original_contribution - Original scientific/scholarly/artistic contributions of major significance
-6. scholarly_articles - Authorship of scholarly articles in professional publications
-7. exhibitions - Display of work at artistic exhibitions or showcases
-8. leading_role - Leading or critical role for distinguished organizations
-
 IMPORTANT RULES:
 - Only extract text that constitutes actual EVIDENCE (achievements, recognition, contributions, specific accomplishments)
 - DO NOT extract: contact info, addresses, signatures, generic greetings, pleasantries, formatting artifacts, section titles
 - Each snippet should reference a specific block_id from the input
 - You can extract multiple snippets from the same block if it contains multiple pieces of evidence
-- Assign the MOST APPROPRIATE standard_key based on the actual meaning and context
-- Confidence should reflect how strongly this evidence supports the claimed standard (0.5-1.0)
+- Confidence should reflect how well this text serves as evidence (0.5-1.0)
 - Prefer fewer, higher-quality snippets over many low-quality ones
 """
 
@@ -56,9 +45,8 @@ Text blocks (each with a unique block_id in format p{{page}}_{{original_id}}):
 For each piece of evidence found, provide:
 - block_id: The ID of the block containing this evidence (MUST be one of the block_ids above, format: p{{page}}_{{id}})
 - text: The exact evidence text (can be the full block text or a key excerpt)
-- standard_key: The EB-1A category this evidence supports
-- confidence: How strongly this supports the standard (0.5-1.0)
-- reasoning: Brief explanation (1 sentence) of why this is evidence for this standard
+- confidence: How well this text serves as evidence (0.5-1.0)
+- reasoning: Brief explanation (1 sentence) of why this is useful evidence
 
 Return JSON format:
 {{"snippets": [...]}}
@@ -66,7 +54,7 @@ Return JSON format:
 If no meaningful evidence is found, return {{"snippets": []}}
 """
 
-# JSON Schema for structured output
+# JSON Schema for structured output (no standard_key - classification happens at Argument level)
 EXTRACTION_SCHEMA = {
     "type": "object",
     "required": ["snippets"],
@@ -75,15 +63,10 @@ EXTRACTION_SCHEMA = {
             "type": "array",
             "items": {
                 "type": "object",
-                "required": ["block_id", "text", "standard_key", "confidence", "reasoning"],
+                "required": ["block_id", "text", "confidence", "reasoning"],
                 "properties": {
                     "block_id": {"type": "string"},
                     "text": {"type": "string"},
-                    "standard_key": {
-                        "type": "string",
-                        "enum": ["awards", "membership", "published_material", "judging",
-                                "original_contribution", "scholarly_articles", "exhibitions", "leading_role"]
-                    },
                     "confidence": {"type": "number"},
                     "reasoning": {"type": "string"}
                 },
@@ -272,7 +255,7 @@ async def extract_snippets_for_exhibit(
                 "page": page_num,  # 从 composite_id 提取的页码
                 "bbox": block.get("bbox"),  # 使用原始 block 的精确 bbox
                 "block_id": original_block_id,  # 保留原始 block_id（不含页码前缀）
-                "standard_key": item.get("standard_key", ""),
+                # NOTE: standard_key removed - classification happens at Argument level
                 "confidence": item.get("confidence", 0.5),
                 "reasoning": item.get("reasoning", ""),
                 "is_ai_suggested": True,
@@ -347,23 +330,16 @@ async def extract_all_snippets(
 
     print(f"[Extract] Skipped {skipped} exhibits, extracted {extracted} new exhibits")
 
-    by_standard = {}
-    for s in all_snippets:
-        std = s.get("standard_key", "unclassified")
-        by_standard[std] = by_standard.get(std, 0) + 1
-
     save_extracted_snippets(project_id, all_snippets)
     update_project_pipeline_stage(project_id, "snippets_ready")
 
     print(f"[Extract] Completed: {len(all_snippets)} total snippets")
-    print(f"[Extract] By standard: {by_standard}")
 
     return {
         "success": True,
         "snippet_count": len(all_snippets),
         "skipped_count": skipped,      # 跳过的文档数
         "extracted_count": extracted,  # 新提取的文档数
-        "by_standard": by_standard,
         "snippets": all_snippets
     }
 
@@ -433,13 +409,4 @@ def load_extracted_snippets(project_id: str) -> List[Dict]:
     return data.get("snippets", [])
 
 
-def get_snippets_by_standard(project_id: str, standard_key: str) -> List[Dict]:
-    """获取指定标准的 snippets"""
-    snippets = load_extracted_snippets(project_id)
-    return [s for s in snippets if s.get("standard_key") == standard_key]
-
-
-def get_unclassified_snippets(project_id: str) -> List[Dict]:
-    """获取未分类的 snippets"""
-    snippets = load_extracted_snippets(project_id)
-    return [s for s in snippets if not s.get("standard_key")]
+# NOTE: get_snippets_by_standard removed - classification happens at Argument level
