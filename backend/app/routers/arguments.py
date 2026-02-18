@@ -40,6 +40,7 @@ router = APIRouter(prefix="/api/arguments", tags=["arguments"])
 class GenerateRequest(BaseModel):
     force_reanalyze: bool = False
     applicant_name: Optional[str] = None
+    provider: str = "deepseek"  # LLM provider: "deepseek" or "openai"
 
 
 class ArgumentResponse(BaseModel):
@@ -104,7 +105,8 @@ async def generate_arguments(
         result = await generate_arguments_for_project(
             project_id=project_id,
             force_reanalyze=request.force_reanalyze,
-            applicant_name=request.applicant_name
+            applicant_name=request.applicant_name,
+            provider=request.provider
         )
 
         if not result.get("success"):

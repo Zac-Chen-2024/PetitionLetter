@@ -538,7 +538,8 @@ def get_entities_dir(project_id: str) -> Path:
 async def extract_exhibit_unified(
     project_id: str,
     exhibit_id: str,
-    applicant_name: str
+    applicant_name: str,
+    provider: str = "deepseek"
 ) -> Dict:
     """
     统一提取单个 exhibit 的 snippets + entities + relations
@@ -547,6 +548,7 @@ async def extract_exhibit_unified(
         project_id: 项目 ID
         exhibit_id: Exhibit ID
         applicant_name: 申请人姓名
+        provider: LLM 提供商 ("deepseek" 或 "openai")
 
     Returns:
         提取结果 dict
@@ -588,13 +590,12 @@ async def extract_exhibit_unified(
     )
 
     # 4. 调用 LLM
-    model = getattr(settings, 'openai_model', 'gpt-4o')
-    print(f"[UnifiedExtractor] Calling LLM ({model}) for {exhibit_id}...")
+    print(f"[UnifiedExtractor] Calling LLM ({provider}) for {exhibit_id}...")
 
     try:
         result = await call_llm(
             prompt=user_prompt,
-            model=model,
+            provider=provider,
             system_prompt=system_prompt,
             json_schema=UNIFIED_EXTRACTION_SCHEMA,
             temperature=0.2,   # 提高到 0.2：允许更多变化，更好地识别上下文
@@ -748,6 +749,7 @@ async def extract_exhibit_unified(
 async def extract_all_unified(
     project_id: str,
     applicant_name: str,
+    provider: str = "deepseek",
     progress_callback=None
 ) -> Dict:
     """
@@ -756,6 +758,7 @@ async def extract_all_unified(
     Args:
         project_id: 项目 ID
         applicant_name: 申请人姓名
+        provider: LLM 提供商 ("deepseek" 或 "openai")
         progress_callback: 进度回调 (current, total, message)
 
     Returns:
@@ -788,7 +791,7 @@ async def extract_all_unified(
             progress_callback(idx, total_exhibits, f"Extracting {exhibit_id}...")
 
         try:
-            result = await extract_exhibit_unified(project_id, exhibit_id, applicant_name)
+            result = await extract_exhibit_unified(project_id, exhibit_id, applicant_name, provider=provider)
 
             if result.get("success"):
                 successful += 1

@@ -177,7 +177,8 @@ class ArgumentGenerator:
         evidence_type: str,
         entities: List[Dict],
         relations: List[Dict],
-        applicant_name: str
+        applicant_name: str,
+        provider: str = "deepseek"
     ) -> List[GeneratedArgument]:
         """
         Use LLM to intelligently group snippets into fine-grained arguments
@@ -188,6 +189,7 @@ class ArgumentGenerator:
             entities: All entities from unified extraction
             relations: All relations from unified extraction
             applicant_name: Name of the applicant
+            provider: LLM provider ("deepseek" or "openai")
 
         Returns:
             List of GeneratedArgument with fine-grained grouping
@@ -251,7 +253,7 @@ class ArgumentGenerator:
         try:
             result = await call_llm(
                 prompt=user_prompt_with_ids,
-                model="gpt-4o-mini",
+                provider=provider,
                 system_prompt=SMART_GROUPING_SYSTEM_PROMPT,
                 temperature=0.1,
                 max_tokens=4000
@@ -400,7 +402,8 @@ class ArgumentGenerator:
         self,
         progress_callback=None,
         force_reanalyze: bool = False,
-        applicant_name: Optional[str] = None
+        applicant_name: Optional[str] = None,
+        provider: str = "deepseek"
     ) -> Dict:
         """
         Main entry point: Generate arguments from extracted snippets
@@ -414,6 +417,7 @@ class ArgumentGenerator:
             progress_callback: Optional callback (current, total, message)
             force_reanalyze: If True, re-run relationship analysis
             applicant_name: Known applicant name (for accurate identification)
+            provider: LLM provider ("deepseek" or "openai")
 
         Returns:
             {
@@ -524,7 +528,8 @@ class ArgumentGenerator:
                     evidence_type,
                     entities,
                     relations,
-                    main_subject
+                    main_subject,
+                    provider=provider
                 )
 
             arguments.extend(type_arguments)
@@ -743,7 +748,8 @@ async def generate_arguments_for_project(
     project_id: str,
     progress_callback=None,
     force_reanalyze: bool = False,
-    applicant_name: Optional[str] = None
+    applicant_name: Optional[str] = None,
+    provider: str = "deepseek"
 ) -> Dict:
     """
     Generate arguments for a project
@@ -753,6 +759,7 @@ async def generate_arguments_for_project(
         progress_callback: Optional callback (current, total, message)
         force_reanalyze: If True, re-run relationship analysis
         applicant_name: Known applicant name (for accurate attribution)
+        provider: LLM provider ("deepseek" or "openai")
 
     Returns:
         Generation result with arguments
@@ -761,5 +768,6 @@ async def generate_arguments_for_project(
     return await generator.generate_arguments(
         progress_callback=progress_callback,
         force_reanalyze=force_reanalyze,
-        applicant_name=applicant_name
+        applicant_name=applicant_name,
+        provider=provider
     )

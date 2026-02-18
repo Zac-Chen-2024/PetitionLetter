@@ -138,7 +138,8 @@ MERGE_SUGGESTION_SCHEMA = {
 
 async def suggest_entity_merges(
     project_id: str,
-    applicant_name: str
+    applicant_name: str,
+    provider: str = "deepseek"
 ) -> List[Dict]:
     """
     生成实体合并建议
@@ -146,6 +147,7 @@ async def suggest_entity_merges(
     Args:
         project_id: 项目 ID
         applicant_name: 申请人姓名
+        provider: LLM 提供商 ("deepseek" 或 "openai")
 
     Returns:
         合并建议列表
@@ -188,12 +190,12 @@ async def suggest_entity_merges(
     system_prompt = MERGE_SUGGESTION_SYSTEM_PROMPT.format(applicant_name=applicant_name)
     user_prompt = MERGE_SUGGESTION_USER_PROMPT.format(entities_text=entities_text)
 
-    model = getattr(settings, 'openai_model', 'gpt-4o-mini')
+    print(f"[EntityMerger] Calling LLM ({provider}) for merge suggestions...")
 
     try:
         result = await call_llm(
             prompt=user_prompt,
-            model=model,
+            provider=provider,
             system_prompt=system_prompt,
             json_schema=MERGE_SUGGESTION_SCHEMA,
             temperature=0.1,

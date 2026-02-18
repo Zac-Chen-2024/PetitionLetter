@@ -39,6 +39,7 @@ router = APIRouter(prefix="/api/extraction", tags=["extraction"])
 
 class ExtractionRequest(BaseModel):
     applicant_name: str
+    provider: str = "deepseek"  # LLM provider: "deepseek" or "openai"
 
 
 class MergeConfirmation(BaseModel):
@@ -65,6 +66,7 @@ async def extract_project(
     一次性提取所有 exhibits 的 snippets + entities + relations
     """
     applicant_name = request.applicant_name
+    provider = request.provider
 
     if not applicant_name:
         raise HTTPException(status_code=400, detail="applicant_name is required")
@@ -72,7 +74,8 @@ async def extract_project(
     try:
         result = await extract_all_unified(
             project_id=project_id,
-            applicant_name=applicant_name
+            applicant_name=applicant_name,
+            provider=provider
         )
 
         if not result.get("success"):
@@ -94,6 +97,7 @@ async def extract_exhibit(
     提取单个 exhibit
     """
     applicant_name = request.applicant_name
+    provider = request.provider
 
     if not applicant_name:
         raise HTTPException(status_code=400, detail="applicant_name is required")
@@ -102,7 +106,8 @@ async def extract_exhibit(
         result = await extract_exhibit_unified(
             project_id=project_id,
             exhibit_id=exhibit_id,
-            applicant_name=applicant_name
+            applicant_name=applicant_name,
+            provider=provider
         )
 
         if not result.get("success"):
@@ -226,6 +231,7 @@ async def generate_merge_suggestions(
     生成实体合并建议
     """
     applicant_name = request.applicant_name
+    provider = request.provider
 
     if not applicant_name:
         raise HTTPException(status_code=400, detail="applicant_name is required")
@@ -233,7 +239,8 @@ async def generate_merge_suggestions(
     try:
         suggestions = await suggest_entity_merges(
             project_id=project_id,
-            applicant_name=applicant_name
+            applicant_name=applicant_name,
+            provider=provider
         )
 
         return {
