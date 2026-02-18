@@ -20,7 +20,7 @@ from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, asdict
 
-from .llm_client import call_openai
+from .llm_client import call_llm
 from .unified_extractor import (
     get_extraction_dir,
     get_entities_dir,
@@ -191,7 +191,7 @@ async def suggest_entity_merges(
     model = getattr(settings, 'openai_model', 'gpt-4o-mini')
 
     try:
-        result = await call_openai(
+        result = await call_llm(
             prompt=user_prompt,
             model=model,
             system_prompt=system_prompt,

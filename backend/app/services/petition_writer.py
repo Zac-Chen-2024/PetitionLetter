@@ -15,7 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 from datetime import datetime
 
-from .llm_client import call_openai_text, call_openai
+from .llm_client import call_llm_text, call_llm
 from .snippet_registry import load_registry
 from .snippet_linker import load_links
 
@@ -104,9 +104,8 @@ Requirements:
 Your writing is precise, persuasive, and follows legal drafting conventions.
 You focus on demonstrating how the evidence meets USCIS requirements."""
 
-    result = await call_openai_text(
+    result = await call_llm_text(
         prompt=prompt,
-        model="gpt-4o",
         system_prompt=system_prompt,
         temperature=0.7
     )
@@ -193,9 +192,8 @@ Rules:
         "additionalProperties": False
     }
 
-    result = await call_openai(
+    result = await call_llm(
         prompt=prompt,
-        model="gpt-4o-mini",
         json_schema=schema,
         temperature=0.1
     )

@@ -16,7 +16,7 @@ from typing import List, Dict, Optional
 from pathlib import Path
 from datetime import datetime
 
-from .llm_client import call_openai
+from .llm_client import call_llm
 from ..core.config import settings
 
 # ==================== LLM Prompts ====================
@@ -218,7 +218,7 @@ async def extract_snippets_for_exhibit(
         model = getattr(settings, 'openai_model', 'gpt-4o')
         print(f"[LLM] Extracting from {exhibit_id} ({len(pages)} pages) using {model}...")
 
-        result = await call_openai(
+        result = await call_llm(
             prompt=prompt,
             model=model,
             system_prompt=EXTRACTION_SYSTEM_PROMPT,

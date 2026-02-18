@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
 
-from .llm_client import call_openai
+from .llm_client import call_llm
 
 
 # 实体类型
@@ -275,7 +275,7 @@ Important:
 - Pay special attention to recommendation letter relationships"""
 
         try:
-            result = await call_openai(
+            result = await call_llm(
                 prompt=prompt,
                 model=self.model,
                 system_prompt="You are an expert at analyzing visa petition evidence. Extract entities and relationships precisely.",
@@ -496,7 +496,7 @@ The applicant is typically:
 - NOT the letter writer or reference"""
 
         try:
-            result = await call_openai(
+            result = await call_llm(
                 prompt=prompt,
                 model=self.model,
                 system_prompt="Identify the main applicant in a visa petition.",
@@ -578,7 +578,7 @@ Rules:
 - confidence = how certain you are (0.0-1.0)"""
 
         try:
-            result = await call_openai(
+            result = await call_llm(
                 prompt=prompt,
                 model=self.model,
                 system_prompt="Determine who each piece of evidence describes.",

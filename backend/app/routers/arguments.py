@@ -22,6 +22,13 @@ from ..services.argument_qualifier import (
     qualify_all_arguments,
     get_qualification_summary
 )
+from ..services.argument_composer import (
+    compose_project_arguments,
+    ArgumentComposer
+)
+from dataclasses import asdict
+import json
+from datetime import datetime
 
 router = APIRouter(prefix="/api/arguments", tags=["arguments"])
 
@@ -333,5 +340,74 @@ async def run_relationship_analysis(project_id: str, force: bool = False):
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================
+# Composed Arguments Endpoint (律师风格组合)
+# ============================================
+
+@router.get("/{project_id}/composed")
+async def get_composed_arguments(project_id: str, applicant_name: str = "Ms. Qu"):
+    """
+    获取律师风格组合论点
+
+    使用 argument_composer 将碎片化的 snippets 组合成结构化论点:
+    - Membership: 按协会分组，过滤普通会员
+    - Published Material: 按媒体分组
+    - Original Contribution: 合并成整体
+    - Leading Role: 按组织分组，合并变体
+    - Awards: 合并成整体
+
+    每个论点包含: Claim + Proof + Significance + Context + Conclusion
+    """
+    try:
+        result = compose_project_arguments(project_id, applicant_name)
+
+        # 转换成前端友好的格式 (flat list with standard_key)
+        arguments = []
+        for standard, args in result.get("composed", {}).items():
+            for idx, arg in enumerate(args):
+                # 生成唯一 ID
+                arg_id = f"{standard}_{idx}"
+
+                # 收集所有 snippet_ids
+                snippet_ids = []
+                for layer in ["claim", "proof", "significance", "context"]:
+                    for item in arg.get(layer, []):
+                        if item.get("snippet_id"):
+                            snippet_ids.append(item["snippet_id"])
+
+                arguments.append({
+                    "id": arg_id,
+                    "title": arg.get("title", ""),
+                    "subject": arg.get("group_key", ""),
+                    "standard_key": standard,
+                    "snippet_ids": snippet_ids,
+                    "exhibits": arg.get("exhibits", []),
+                    "confidence": arg.get("completeness", {}).get("score", 0) / 100.0,
+                    "is_ai_generated": True,
+                    "created_at": datetime.now().isoformat(),
+                    # 新增：律师风格结构
+                    "layers": {
+                        "claim": arg.get("claim", []),
+                        "proof": arg.get("proof", []),
+                        "significance": arg.get("significance", []),
+                        "context": arg.get("context", [])
+                    },
+                    "conclusion": arg.get("conclusion", ""),
+                    "completeness": arg.get("completeness", {})
+                })
+
+        return {
+            "project_id": project_id,
+            "arguments": arguments,
+            "main_subject": applicant_name,
+            "generated_at": datetime.now().isoformat(),
+            "stats": result.get("statistics", {}),
+            "lawyer_output": result.get("lawyer_output", "")
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

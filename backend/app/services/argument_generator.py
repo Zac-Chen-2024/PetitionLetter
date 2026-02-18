@@ -24,7 +24,7 @@ import uuid
 from .snippet_extractor import load_extracted_snippets
 from .relationship_analyzer import analyze_relationships
 from .unified_extractor import load_combined_extraction
-from .llm_client import call_openai
+from .llm_client import call_llm
 
 
 # ==================== Prompt Templates ====================
@@ -249,7 +249,7 @@ class ArgumentGenerator:
         user_prompt_with_ids = user_prompt + f"\n\nAVAILABLE SNIPPET IDS: {simple_id_list}\nYou MUST use these exact IDs. Assign ALL of them."
 
         try:
-            result = await call_openai(
+            result = await call_llm(
                 prompt=user_prompt_with_ids,
                 model="gpt-4o-mini",
                 system_prompt=SMART_GROUPING_SYSTEM_PROMPT,

@@ -20,7 +20,7 @@ from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, asdict
 
-from .llm_client import call_openai
+from .llm_client import call_llm
 from ..core.config import settings
 
 # 数据目录
@@ -592,7 +592,7 @@ async def extract_exhibit_unified(
     print(f"[UnifiedExtractor] Calling LLM ({model}) for {exhibit_id}...")
 
     try:
-        result = await call_openai(
+        result = await call_llm(
             prompt=user_prompt,
             model=model,
             system_prompt=system_prompt,
