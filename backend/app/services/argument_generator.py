@@ -42,7 +42,7 @@ For MEMBERSHIP evidence:
 
 For PUBLISHED_MATERIAL or PUBLICATION evidence:
 - media_coverage: For each media outlet, combine article content + media credentials into ONE argument
-  Example: "The Jakarta Post Coverage" should include both the article about the applicant AND
+  Example: "[Media Name] Coverage" should include both the article about the applicant AND
   the media outlet's credentials (circulation, awards, etc.)
 - Group by MEDIA OUTLET, not by article vs credential
 
@@ -69,7 +69,7 @@ RULES:
 1. GROUP BY LOGICAL UNIT: Combine snippets about the same person/organization/media outlet
 2. AVOID FRAGMENTATION: Prefer 3-7 arguments over 10+ tiny ones
 3. Each argument should have 2-5 snippets ideally (unless only 1 exists)
-4. Use entity names in titles (e.g., "Tom Liaw's Endorsement", "The Jakarta Post Coverage")
+4. Use entity names in titles (e.g., "[Expert Name]'s Endorsement", "[Media Name] Coverage")
 5. CRITICAL: You MUST assign ALL snippets to arguments. Every snippet_id must appear in exactly one argument.
 6. Copy snippet_ids EXACTLY as provided - do not modify or abbreviate them."""
 

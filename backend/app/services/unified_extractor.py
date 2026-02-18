@@ -138,10 +138,10 @@ Your task is to analyze a document and extract THREE types of information:
 CRITICAL RULES:
 - The applicant for this petition is: {applicant_name}
 - NAME ALIASES: The applicant may appear under DIFFERENT NAMES in documents:
-  * English name vs Chinese name (e.g., "Gabriella Qu" = "Yaruo Qu")
+  * English name vs Chinese name (e.g., "John Smith" = "约翰·史密斯")
   * First name only, last name only, or nickname
   * If document is ABOUT someone with SAME SURNAME as applicant and matching context, treat as applicant
-  * Example: "Gabriella Qu founded Venus Weightlifting" in a media article = Yaruo Qu's achievement
+  * Example: If applicant is "John Smith", then "John founded XYZ Company" in a media article = applicant's achievement
 - DOCUMENT CONTEXT MATTERS: A media article about the applicant = applicant's achievement evidence
 - A recommendation letter confirming "applicant did X" = applicant achievement (recommender confirms it)
 - Recommender's OWN credentials ("I have PhD from Harvard") = NOT applicant achievement
@@ -205,8 +205,8 @@ MUST EXTRACT these patterns:
 4. MEDIA CREDENTIALS (credibility_proof):
    - Circulation data: "circulation of 40,000", "200,000 weekly copies"
    - Media awards: "won journalism award", "received press award"
-   - Media ownership: "owned by Shanghai United Media Group", "subsidiary of"
-   - Media reputation: "leading newspaper", "Indonesia's largest English daily"
+   - Media ownership: "owned by [parent media group]", "subsidiary of [corporation]"
+   - Media reputation: "leading newspaper", "largest English daily", "national publication"
    Pattern: Look for circulation numbers, media awards, ownership info, "leading"/"largest"
 
 IMPORTANT: Extract BOTH direct evidence AND supporting evidence that proves WHY the direct evidence matters!
@@ -226,8 +226,8 @@ First, determine: What is the PRIMARY PURPOSE of this document?
 
 IMPORTANT - Check for NAME ALIASES:
 - The applicant "{applicant_name}" may appear under DIFFERENT NAMES:
-  * English name (e.g., "Gabriella", "Michael") vs Chinese name
-  * Abbreviated name or nickname
+  * English name vs Chinese name (or other language variations)
+  * Abbreviated name, nickname, or title (Dr., Prof., Coach, etc.)
   * Same surname with similar context = likely the applicant
 - If document is about someone with SAME SURNAME as "{applicant_name}" and the document is exhibit evidence for this applicant, treat that person AS the applicant.
 
@@ -270,7 +270,7 @@ CRITICAL EXAMPLES:
 2. NOT APPLICANT - Recommender says "I (Dr. Smith) have 20 years at Stanford":
    → subject="Dr. Smith", is_applicant_achievement=FALSE (recommender's own background)
 
-3. DIRECT PROOF - News article says "{applicant_name} founded Venus Club":
+3. DIRECT PROOF - News article says "{applicant_name} founded [company/organization]":
    → subject="{applicant_name}", is_applicant_achievement=TRUE, evidence_type="media_coverage", evidence_purpose="direct_proof"
 
 4. SELECTIVITY PROOF - Membership document says "Other members include Olympic gold medalist Ping Zhang":
@@ -280,8 +280,8 @@ CRITICAL EXAMPLES:
 5. SELECTIVITY PROOF - "Membership requires 10 years experience and outstanding achievements":
    → subject="the association", is_applicant_achievement=TRUE, evidence_type="membership_criteria", evidence_purpose="selectivity_proof"
 
-6. CREDIBILITY PROOF - "The Jakarta Post has circulation of 40,000 and won Adam Malik Award":
-   → subject="The Jakarta Post", is_applicant_achievement=TRUE, evidence_type="source_credibility", evidence_purpose="credibility_proof"
+6. CREDIBILITY PROOF - "[Publication name] has circulation of X and won [journalism award]":
+   → subject="[publication]", is_applicant_achievement=TRUE, evidence_type="source_credibility", evidence_purpose="credibility_proof"
    → This PROVES the publication is "major media", which supports applicant's media coverage!
 
 7. IMPACT PROOF - "The courses received 100,000 page views and trained 200,000 coaches":

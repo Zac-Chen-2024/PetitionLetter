@@ -360,7 +360,7 @@ Important:
         """
         合并申请人的不同名称变体到一个实体
 
-        例如: "Yaruo Qu", "Coach Gaby", "Ms. Qu", "Gaby Qu" -> "Yaruo Qu"
+        例如: "John Smith", "Coach John", "Dr. Smith", "Johnny" -> "John Smith"
         """
         # 生成可能的名称变体
         name_parts = main_subject.split()

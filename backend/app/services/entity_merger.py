@@ -69,7 +69,7 @@ RULES:
    - Name variations (formal vs informal): "Dr. John Smith" = "John Smith" = "J. Smith"
    - Abbreviations: "Massachusetts Institute of Technology" = "MIT"
    - Titles: "Professor John Smith" = "Dr. John Smith" = "John Smith"
-   - Nicknames: "Yaruo Qu" = "Gaby Qu" = "Coach Qu"
+   - Nicknames: "[Full Name]" = "[Nickname]" = "Coach [Name]"
 3. DO NOT merge:
    - Different people with similar names
    - Parent and child organizations
