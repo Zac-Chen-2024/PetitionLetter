@@ -641,3 +641,327 @@ async def analyze_relationships(
     """
     analyzer = RelationshipAnalyzer(model=model)
     return await analyzer.analyze_snippets(snippets, applicant_name, progress_callback)
+
+
+# ==================== EB-1A Specific Relationship Analysis ====================
+
+# EB-1A 关键关系类型 (用于区分领导角色 vs 邀请 vs 合作)
+EB1A_RELATIONSHIP_TYPES = {
+    "founder_of": "申请人创立/创办了该组织 → Leading Role 证据",
+    "executive_at": "申请人在该组织担任高管 (CEO/Director/法定代表人) → Leading Role 证据",
+    "employee_at": "申请人在该组织工作 (非领导职位) → 可能是 Leading Role (需看具体职位)",
+    "member_of": "申请人是该协会/组织的会员 → Membership 证据",
+    "featured_in": "申请人被该媒体报道 → Published Material 证据",
+    "invited_by": "申请人被该组织邀请 (演讲/参加活动) → NOT Leading Role",
+    "partner_with": "申请人与该组织合作/建立合作关系 → NOT Leading Role",
+    "awarded_by": "申请人从该组织获得奖项 → Awards 证据",
+    "contributed_to": "申请人对该领域/组织有贡献 → Original Contribution 证据",
+    "recommended_by": "该组织/专家为申请人写推荐信 → 支持证据",
+}
+
+# EB-1A 关系分析的 JSON Schema
+EB1A_RELATIONSHIP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "relationships": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "entity_name": {
+                        "type": "string",
+                        "description": "组织/媒体/协会的名称"
+                    },
+                    "entity_type": {
+                        "type": "string",
+                        "enum": ["organization", "media", "association", "event", "person"],
+                        "description": "实体类型"
+                    },
+                    "relationship_type": {
+                        "type": "string",
+                        "enum": list(EB1A_RELATIONSHIP_TYPES.keys()),
+                        "description": "申请人与该实体的关系类型"
+                    },
+                    "evidence_snippets": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "支持该关系的 snippet IDs"
+                    },
+                    "confidence": {
+                        "type": "number",
+                        "description": "置信度 0-1"
+                    },
+                    "reasoning": {
+                        "type": "string",
+                        "description": "判断依据"
+                    }
+                },
+                "required": ["entity_name", "entity_type", "relationship_type", "confidence", "reasoning"]
+            }
+        }
+    },
+    "required": ["relationships"]
+}
+
+EB1A_RELATIONSHIP_SYSTEM_PROMPT = """You are an expert immigration attorney analyzing evidence for an EB-1A visa petition.
+
+Your task is to analyze the relationship between the applicant and each organization/entity mentioned in the evidence.
+
+CRITICAL DISTINCTIONS for EB-1A:
+
+1. **LEADERSHIP RELATIONSHIPS** (qualify for Leading Role criterion):
+   - founder_of: Applicant FOUNDED/CREATED the organization
+   - executive_at: Applicant holds executive position (CEO, Director, Legal Representative, Chairman)
+
+2. **NON-LEADERSHIP RELATIONSHIPS** (do NOT qualify for Leading Role):
+   - invited_by: Applicant was INVITED to speak/participate (keynote speaker, guest speaker, invited expert)
+   - partner_with: Applicant has PARTNERSHIP/COOPERATION agreement (not employed or leading)
+
+3. **OTHER RELATIONSHIPS**:
+   - member_of: Membership in association → Membership criterion
+   - featured_in: Media coverage → Published Material criterion
+   - awarded_by: Received award → Awards criterion
+   - contributed_to: Made contributions → Original Contribution criterion
+
+IMPORTANT RULES:
+- Being invited to speak at an organization's event ≠ Leading that organization
+- Having a partnership/cooperation agreement ≠ Leading that organization
+- Being featured in media ≠ Working for that media
+- Carefully read the context to determine the TRUE relationship"""
+
+EB1A_RELATIONSHIP_USER_PROMPT = """Analyze the relationships between the applicant "{applicant_name}" and the entities mentioned below.
+
+ENTITIES TO ANALYZE:
+{entities_list}
+
+EVIDENCE SNIPPETS:
+{snippets_text}
+
+For each entity where the applicant has a relationship, determine:
+1. relationship_type: One of [founder_of, executive_at, employee_at, member_of, featured_in, invited_by, partner_with, awarded_by, contributed_to, recommended_by]
+2. evidence_snippets: List of snippet IDs that support this relationship
+3. confidence: 0.0 to 1.0
+4. reasoning: Brief explanation
+
+CRITICAL DISTINCTIONS:
+- "invited to speak at X" → relationship_type: "invited_by" (NOT leadership)
+- "partnership with X" or "cooperation with X" → relationship_type: "partner_with" (NOT leadership)
+- "founded X" or "created X" → relationship_type: "founder_of" (IS leadership)
+- "CEO/Director/Legal Representative of X" → relationship_type: "executive_at" (IS leadership)
+
+Return your analysis as a JSON object with EXACTLY this structure:
+{{
+  "relationships": [
+    {{
+      "entity_name": "Organization Name",
+      "entity_type": "organization",
+      "relationship_type": "founder_of",
+      "evidence_snippets": ["snp_1", "snp_2"],
+      "confidence": 0.9,
+      "reasoning": "Evidence shows applicant founded this organization"
+    }}
+  ]
+}}
+
+IMPORTANT: The root object MUST have a "relationships" array."""
+
+
+@dataclass
+class ApplicantRelationship:
+    """申请人与实体的关系"""
+    entity_name: str
+    entity_type: str  # organization, media, association, event, person
+    relationship_type: str  # founder_of, executive_at, invited_by, partner_with, etc.
+    evidence_snippets: List[str]
+    confidence: float
+    reasoning: str
+
+    # EB-1A 相关标记
+    qualifies_for_leadership: bool = False  # 是否可用于 Leading Role criterion
+    qualifies_for_membership: bool = False  # 是否可用于 Membership criterion
+    qualifies_for_media: bool = False  # 是否可用于 Published Material criterion
+
+    def __post_init__(self):
+        """根据关系类型自动设置 EB-1A 资格标记"""
+        if self.relationship_type in ["founder_of", "executive_at"]:
+            self.qualifies_for_leadership = True
+        elif self.relationship_type == "member_of":
+            self.qualifies_for_membership = True
+        elif self.relationship_type == "featured_in":
+            self.qualifies_for_media = True
+
+
+async def analyze_applicant_relationships(
+    snippets: List[Dict],
+    entities: List[Dict],
+    applicant_name: str,
+    provider: str = "deepseek"
+) -> Dict[str, Any]:
+    """
+    分析申请人与每个实体的关系类型 (EB-1A 专用)
+
+    这是 Full LLM Multi-Agent Pipeline 的核心组件，用于区分：
+    - Leadership 关系 (founder_of, executive_at) → 可用于 Leading Role
+    - Invitation 关系 (invited_by) → 不可用于 Leading Role
+    - Partnership 关系 (partner_with) → 不可用于 Leading Role
+
+    Args:
+        snippets: 带上下文的 snippets
+        entities: 实体列表
+        applicant_name: 申请人姓名
+        provider: LLM 提供商
+
+    Returns:
+        {
+            "relationships": [ApplicantRelationship, ...],
+            "leadership_entities": [...],  # 可用于 Leading Role 的实体
+            "non_leadership_entities": [...],  # 不可用于 Leading Role 的实体
+            "stats": {...}
+        }
+    """
+    print(f"[EB1A-RelationshipAnalyzer] Analyzing relationships for {applicant_name}...")
+    print(f"[EB1A-RelationshipAnalyzer] {len(snippets)} snippets, {len(entities)} entities")
+
+    # 过滤出组织类实体 (用于分析 leadership/invitation/partnership)
+    org_entities = [
+        e for e in entities
+        if e.get("type", "").lower() in ["organization", "company", "association", "club", "federation", "media"]
+    ]
+
+    if not org_entities:
+        print("[EB1A-RelationshipAnalyzer] No organization entities found")
+        return {
+            "relationships": [],
+            "leadership_entities": [],
+            "non_leadership_entities": [],
+            "stats": {"total_entities": 0, "analyzed": 0}
+        }
+
+    # 准备 snippets 文本 (包含上下文)
+    snippets_text = []
+    for i, s in enumerate(snippets[:50]):  # 限制数量避免 token 过多
+        text = s.get("text", "")
+        context = s.get("context", {})
+        full_context = context.get("full_context", "") if context else ""
+        snippet_id = s.get("snippet_id", f"snp_{i}")
+
+        if full_context:
+            snippets_text.append(f"[{snippet_id}] {full_context[:500]}")
+        else:
+            snippets_text.append(f"[{snippet_id}] {text[:300]}")
+
+    # 准备实体列表
+    entities_list = "\n".join([
+        f"- {e.get('name', '')} ({e.get('type', '')})"
+        for e in org_entities[:30]  # 限制数量
+    ])
+
+    # 构建 prompt
+    user_prompt = EB1A_RELATIONSHIP_USER_PROMPT.format(
+        applicant_name=applicant_name,
+        entities_list=entities_list,
+        snippets_text="\n\n".join(snippets_text)
+    )
+
+    try:
+        result = await call_llm(
+            prompt=user_prompt,
+            provider=provider,
+            system_prompt=EB1A_RELATIONSHIP_SYSTEM_PROMPT,
+            json_schema=EB1A_RELATIONSHIP_SCHEMA,
+            temperature=0.1,
+            max_tokens=3000
+        )
+
+        # 调试输出
+        print(f"[EB1A-RelationshipAnalyzer] Raw result type: {type(result)}")
+        print(f"[EB1A-RelationshipAnalyzer] Raw result keys: {result.keys() if isinstance(result, dict) else 'N/A'}")
+
+        # 解析结果 - 处理多种可能的响应格式
+        relationships = []
+        leadership_entities = []
+        non_leadership_entities = []
+
+        # 尝试获取 relationships 数组
+        raw_relationships = result.get("relationships", [])
+
+        # 如果没有 relationships 键，尝试从其他格式转换
+        if not raw_relationships and isinstance(result, dict):
+            # 可能是 {entity_name: relationship_info} 格式
+            for key, value in result.items():
+                if key == "relationships":
+                    continue
+                if isinstance(value, dict):
+                    # 转换为标准格式
+                    raw_relationships.append({
+                        "entity_name": key,
+                        "entity_type": value.get("entity_type", "organization"),
+                        "relationship_type": value.get("relationship_type", value.get("type", "unknown")),
+                        "evidence_snippets": value.get("evidence_snippets", value.get("snippets", [])),
+                        "confidence": value.get("confidence", 0.5),
+                        "reasoning": value.get("reasoning", value.get("reason", ""))
+                    })
+                elif isinstance(value, str):
+                    # 简化格式: {entity_name: relationship_type}
+                    raw_relationships.append({
+                        "entity_name": key,
+                        "entity_type": "organization",
+                        "relationship_type": value,
+                        "evidence_snippets": [],
+                        "confidence": 0.5,
+                        "reasoning": ""
+                    })
+
+        print(f"[EB1A-RelationshipAnalyzer] Parsed relationships count: {len(raw_relationships)}")
+
+        for r in raw_relationships:
+            rel = ApplicantRelationship(
+                entity_name=r.get("entity_name", ""),
+                entity_type=r.get("entity_type", "organization"),
+                relationship_type=r.get("relationship_type", "unknown"),
+                evidence_snippets=r.get("evidence_snippets", []),
+                confidence=r.get("confidence", 0.5),
+                reasoning=r.get("reasoning", "")
+            )
+            relationships.append(rel)
+
+            # 分类
+            if rel.qualifies_for_leadership:
+                leadership_entities.append({
+                    "name": rel.entity_name,
+                    "relationship": rel.relationship_type,
+                    "confidence": rel.confidence,
+                    "reasoning": rel.reasoning
+                })
+            elif rel.relationship_type in ["invited_by", "partner_with"]:
+                non_leadership_entities.append({
+                    "name": rel.entity_name,
+                    "relationship": rel.relationship_type,
+                    "confidence": rel.confidence,
+                    "reasoning": rel.reasoning
+                })
+
+        print(f"[EB1A-RelationshipAnalyzer] Found {len(relationships)} relationships")
+        print(f"[EB1A-RelationshipAnalyzer] Leadership entities: {len(leadership_entities)}")
+        print(f"[EB1A-RelationshipAnalyzer] Non-leadership entities: {len(non_leadership_entities)}")
+
+        return {
+            "relationships": [asdict(r) for r in relationships],
+            "leadership_entities": leadership_entities,
+            "non_leadership_entities": non_leadership_entities,
+            "stats": {
+                "total_entities": len(org_entities),
+                "analyzed": len(relationships),
+                "leadership_count": len(leadership_entities),
+                "non_leadership_count": len(non_leadership_entities)
+            }
+        }
+
+    except Exception as e:
+        print(f"[EB1A-RelationshipAnalyzer] Error: {e}")
+        return {
+            "relationships": [],
+            "leadership_entities": [],
+            "non_leadership_entities": [],
+            "stats": {"error": str(e)}
+        }
