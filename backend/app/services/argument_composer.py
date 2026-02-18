@@ -58,6 +58,8 @@ class EvidenceItem:
     exhibit_id: str
     purpose: str  # direct_proof, selectivity_proof, credibility_proof, impact_proof
     snippet_id: str = ""
+    context_before: str = ""  # 前文上下文 (来自 Context Enrichment)
+    context_after: str = ""   # 后文上下文
 
 
 @dataclass
@@ -471,11 +473,16 @@ class ArgumentComposer:
             if layer not in layers:
                 layer = "claim"
 
+            # 提取上下文 (来自 Context Enrichment)
+            context_data = snp.get("context", {}) or {}
+
             item = EvidenceItem(
                 text=snp.get("text", "")[:500],
                 exhibit_id=snp.get("exhibit_id", ""),
                 purpose=snp.get("evidence_purpose", "direct_proof"),
-                snippet_id=snp.get("snippet_id", "")
+                snippet_id=snp.get("snippet_id", ""),
+                context_before=context_data.get("before", "")[:200] if context_data else "",
+                context_after=context_data.get("after", "")[:200] if context_data else ""
             )
             layers[layer].append(item)
             exhibits.add(snp.get("exhibit_id", ""))
@@ -644,7 +651,8 @@ def compose_project_arguments(
     project_id: str,
     applicant_name: str = "the applicant",
     metadata: Optional[Dict] = None,
-    use_entity_validator: bool = True
+    use_entity_validator: bool = True,
+    use_context_enrichment: bool = True
 ) -> Dict[str, Any]:
     """
     组合项目论点
@@ -654,18 +662,33 @@ def compose_project_arguments(
         applicant_name: 申请人姓名
         metadata: project_metadata 配置 (如果为 None 则从文件加载)
         use_entity_validator: 是否使用 EntityValidator 验证实体 (推荐开启)
+        use_context_enrichment: 是否使用 Context Enrichment 添加上下文 (推荐开启)
     """
     projects_dir = Path(__file__).parent.parent.parent / "data" / "projects"
     project_dir = projects_dir / project_id
 
     # 加载 snippets
     snippets = []
-    extraction_dir = project_dir / "extraction"
-    if extraction_dir.exists():
-        for f in extraction_dir.glob("*_extraction.json"):
-            with open(f, 'r', encoding='utf-8') as fp:
-                data = json.load(fp)
-                snippets.extend(data.get("snippets", []))
+    enriched_used = False
+
+    # 优先使用 enriched snippets (Context Enrichment)
+    if use_context_enrichment:
+        enriched_file = project_dir / "enriched" / "enriched_snippets.json"
+        if enriched_file.exists():
+            with open(enriched_file, 'r', encoding='utf-8') as f:
+                enriched_data = json.load(f)
+                snippets = enriched_data.get("snippets", [])
+                enriched_used = True
+                print(f"[ArgumentComposer] Using enriched snippets ({len(snippets)} total)")
+
+    # Fallback: 从 extraction 目录加载
+    if not snippets:
+        extraction_dir = project_dir / "extraction"
+        if extraction_dir.exists():
+            for f in extraction_dir.glob("*_extraction.json"):
+                with open(f, 'r', encoding='utf-8') as fp:
+                    data = json.load(fp)
+                    snippets.extend(data.get("snippets", []))
 
     # 如果没有提供 metadata，尝试从文件加载
     if metadata is None:
@@ -689,7 +712,12 @@ def compose_project_arguments(
     return {
         "composed": {k: [asdict(a) for a in v] for k, v in composer.compose_all().items()},
         "lawyer_output": composer.generate_lawyer_output(),
-        "statistics": composer.get_statistics()
+        "statistics": composer.get_statistics(),
+        "enrichment_info": {
+            "enriched_used": enriched_used,
+            "snippet_count": len(snippets),
+            "snippets_with_context": sum(1 for s in snippets if s.get("context"))
+        }
     }
 
 
