@@ -155,7 +155,7 @@ function ArgumentNodeComponent({
     >
       <div
         className={`
-          w-[280px] p-4 rounded-xl border-2 border-purple-400 bg-purple-50 shadow-md transition-all
+          w-[320px] p-4 rounded-xl border-2 border-purple-400 bg-purple-50 shadow-md transition-all
           ${isSelected ? 'ring-2 ring-offset-2 ring-purple-500 shadow-lg border-purple-500' : 'hover:shadow-lg hover:border-purple-500'}
         `}
       >
@@ -305,7 +305,7 @@ function InternalConnectionLines({ argumentNodes, standardNodes }: InternalConne
         const standardPos = standardPositions.get(standardId);
         if (!standardPos) return null;
 
-        const x1 = argNode.position.x + 140; // Right edge of argument node (280px / 2)
+        const x1 = argNode.position.x + 160; // Right edge of argument node (320px / 2)
         const y1 = argNode.position.y;
         const x2 = standardPos.x - 90; // Left edge of standard node (180px / 2)
         const y2 = standardPos.y;
@@ -337,8 +337,8 @@ function calculateTreeLayout(
   arguments_: Argument[],
   savedPositions: Map<string, Position>
 ): { argumentNodes: ArgumentNode[]; standardNodes: StandardNode[] } {
-  const ARGUMENT_X = 180;
-  const STANDARD_X = 550;
+  const ARGUMENT_X = 200;
+  const STANDARD_X = 600;
   const START_Y = 100;
   const ARGUMENT_SPACING = 160;
   const STANDARD_SPACING = 140;
@@ -641,8 +641,8 @@ export function ArgumentGraph() {
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
               transformOrigin: '0 0',
               position: 'absolute',
-              width: '1500px',
-              height: '1200px',
+              width: '4000px',
+              height: '3000px',
               pointerEvents: 'none',
             }}
           >
