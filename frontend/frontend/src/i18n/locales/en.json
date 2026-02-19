@@ -32,7 +32,8 @@
     "focusModeActive": "Focus Mode Active",
     "generateDraft": "Generate Draft",
     "listView": "List View",
-    "graphView": "Graph View"
+    "graphView": "Graph View",
+    "writingTree": "Writing Tree"
   },
   "viewMode": {
     "line": "Line View",

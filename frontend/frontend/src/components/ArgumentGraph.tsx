@@ -568,7 +568,7 @@ export function ArgumentGraph() {
       <div className="flex-shrink-0 px-4 py-2 bg-white border-b border-slate-200">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-slate-800">{t('evidence.title')}</h2>
+            <h2 className="text-sm font-semibold text-slate-800">{t('header.writingTree')}</h2>
             <p className="text-xs text-slate-500">{contextArguments.length} arguments</p>
           </div>
         </div>

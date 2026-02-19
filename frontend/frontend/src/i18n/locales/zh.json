@@ -32,7 +32,8 @@
     "focusModeActive": "聚焦模式",
     "generateDraft": "生成草稿",
     "listView": "列表视图",
-    "graphView": "图形视图"
+    "graphView": "图形视图",
+    "writingTree": "写作树"
   },
   "viewMode": {
     "line": "连线视图",

@@ -569,7 +569,7 @@ export function ArgumentAssembly() {
       <div className="flex-shrink-0 px-4 py-3 bg-white border-b border-slate-200">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-slate-800">Argument Assembly</h2>
+            <h2 className="text-sm font-semibold text-slate-800">{t('header.writingTree')}</h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {arguments_.length} argument(s)
               {generatedMainSubject && (

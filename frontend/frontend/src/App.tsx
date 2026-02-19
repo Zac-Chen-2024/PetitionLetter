@@ -68,13 +68,13 @@ function AppContent() {
       default:
         return (
           <>
-            {/* Panel 2: Evidence Cards (40%) */}
-            <div className="w-[40%] flex-shrink-0 border-r border-slate-200 overflow-hidden">
+            {/* Panel 2: Evidence Cards (30%) */}
+            <div className="w-[30%] flex-shrink-0 border-r border-slate-200 overflow-hidden">
               <EvidenceCardPool />
             </div>
 
-            {/* Panel 3: Argument Assembly (35%) - list or graph view */}
-            <div className="w-[35%] flex-shrink-0 bg-white overflow-hidden">
+            {/* Panel 3: Writing Tree (40%) - list or graph view */}
+            <div className="w-[40%] flex-shrink-0 bg-white overflow-hidden">
               {argumentViewMode === 'list' ? (
                 <ArgumentAssembly />
               ) : (
@@ -157,8 +157,8 @@ function AppContent() {
 
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Panel 1: Document Viewer (25%) - z-0 to stay below connection lines */}
-        <div className="w-[25%] flex-shrink-0 border-r border-slate-200 bg-white overflow-hidden relative z-0">
+        {/* Panel 1: Document Viewer (30%) - z-0 to stay below connection lines */}
+        <div className="w-[30%] flex-shrink-0 border-r border-slate-200 bg-white overflow-hidden relative z-0">
           <DocumentViewer />
         </div>
 
