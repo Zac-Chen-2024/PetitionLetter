@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import type { FocusState, Connection, ElementPosition, Snippet, ViewMode, SelectionState, BoundingBox, Argument, WritingEdge, LetterSection, Position, ArgumentClaimType, ArgumentStatus, LLMProvider } from '../types';
+import type { FocusState, Connection, ElementPosition, Snippet, ViewMode, ArgumentViewMode, SelectionState, BoundingBox, Argument, WritingEdge, LetterSection, Position, ArgumentClaimType, ArgumentStatus, LLMProvider } from '../types';
 import { legalStandards } from '../data/legalStandards';
 import { getMaterialTypeColor, STANDARD_KEY_TO_ID } from '../constants/colors';
 import { apiClient } from '../services/api';
@@ -170,6 +170,14 @@ interface AppContextType {
   // View mode
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+
+  // Argument view mode (list vs graph)
+  argumentViewMode: ArgumentViewMode;
+  setArgumentViewMode: (mode: ArgumentViewMode) => void;
+
+  // Argument graph node positions (for graph view)
+  argumentGraphPositions: Map<string, Position>;
+  updateArgumentGraphPosition: (id: string, position: Position) => void;
 
   // Snippet management
   addSnippet: (snippet: Omit<Snippet, 'id'>) => void;

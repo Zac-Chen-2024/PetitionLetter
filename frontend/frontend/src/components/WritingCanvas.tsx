@@ -730,10 +730,10 @@ export function WritingCanvas() {
     }));
 
   // Build argument nodes from context
-  const argumentNodes: ArgumentNode[] = contextArguments.map(arg => ({
+  const argumentNodes: ArgumentNode[] = contextArguments.map((arg, index) => ({
     id: arg.id,
     type: 'argument' as const,
-    position: arg.position,
+    position: arg.position || { x: 400, y: 150 + index * 100 }, // Default position if undefined
     data: {
       title: arg.title,
       description: arg.description,

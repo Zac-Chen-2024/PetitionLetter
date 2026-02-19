@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Component, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppProvider, useApp } from './context/AppContext';
 import {
@@ -13,6 +13,39 @@ import {
   LanguageSwitcher,
   ArgumentAssembly,
 } from './components';
+
+// Error Boundary for debugging
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 bg-red-50 text-red-800">
+          <h2 className="text-lg font-bold mb-2">Component Error</h2>
+          <pre className="text-sm bg-red-100 p-4 rounded overflow-auto">
+            {this.state.error?.message}
+            {'\n\n'}
+            {this.state.error?.stack}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 type PageType = 'mapping' | 'materials' | 'writing';
 
@@ -93,7 +126,9 @@ function AppContent() {
           <LanguageSwitcher />
         </div>
         <div className="flex-1 overflow-hidden">
-          <WritingCanvas />
+          <ErrorBoundary>
+            <WritingCanvas />
+          </ErrorBoundary>
         </div>
       </div>
     );

@@ -83,6 +83,9 @@ export interface ElementPosition {
 // View mode types
 export type ViewMode = 'line' | 'sankey';
 
+// Argument view mode (list vs graph)
+export type ArgumentViewMode = 'list' | 'graph';
+
 // Selection state for creating snippets
 export interface SelectionState {
   isSelecting: boolean;

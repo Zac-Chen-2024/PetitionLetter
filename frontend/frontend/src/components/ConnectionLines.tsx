@@ -298,9 +298,21 @@ export function ConnectionLines() {
       {/* Apply clip path to all connection lines */}
       <g clipPath="url(#panels-clip)">
         {focusState.type === 'argument' && focusState.id ? (
-          <ArgumentConnectionLines key={focusState.id} argumentId={focusState.id} />
+          <>
+            <ArgumentConnectionLines key={focusState.id} argumentId={focusState.id} />
+            {/* Overlay selected snippet's PDF connection line */}
+            {selectedSnippetId && (
+              <SnippetConnectionLines key={`selected-${selectedSnippetId}`} snippetId={selectedSnippetId} />
+            )}
+          </>
         ) : focusState.type === 'standard' && focusState.id ? (
-          <StandardConnectionLines key={focusState.id} standardId={focusState.id} />
+          <>
+            <StandardConnectionLines key={focusState.id} standardId={focusState.id} />
+            {/* Overlay selected snippet's PDF connection line */}
+            {selectedSnippetId && (
+              <SnippetConnectionLines key={`selected-${selectedSnippetId}`} snippetId={selectedSnippetId} />
+            )}
+          </>
         ) : selectedSnippetId ? (
           <SnippetConnectionLines key={selectedSnippetId} snippetId={selectedSnippetId} />
         ) : null}
