@@ -71,11 +71,11 @@ function CurvedLine({
   );
 }
 
-// Connection lines for a focused snippet (PDF → Card → Argument)
+// Connection lines for a focused snippet (PDF → Card → SubArgument)
 function SnippetConnectionLines({ snippetId }: { snippetId: string }) {
   const {
     snippetPositions, pdfBboxPositions, allSnippets,
-    arguments: arguments_, argumentPositions
+    subArguments, subArgumentPositions
   } = useApp();
 
   const snippet = allSnippets.find(s => s.id === snippetId);
@@ -91,8 +91,8 @@ function SnippetConnectionLines({ snippetId }: { snippetId: string }) {
   const cardRightX = cardPos?.x || 0;
   const cardY = cardPos?.y || 0;
 
-  // Find arguments that contain this snippet
-  const relatedArguments = arguments_.filter(arg => arg.snippetIds?.includes(snippetId));
+  // Find sub-arguments that contain this snippet
+  const relatedSubArguments = subArguments.filter(sa => sa.snippetIds?.includes(snippetId));
 
   return (
     <g>
@@ -108,17 +108,17 @@ function SnippetConnectionLines({ snippetId }: { snippetId: string }) {
         />
       )}
 
-      {/* 2. Evidence Card RIGHT side → Argument(s) LEFT side */}
-      {cardPos && relatedArguments.map(arg => {
-        const argPos = argumentPositions.get(arg.id);
-        if (!argPos) return null;
+      {/* 2. Evidence Card RIGHT side → SubArgument(s) LEFT side */}
+      {cardPos && relatedSubArguments.map(subArg => {
+        const subArgPos = subArgumentPositions.get(subArg.id);
+        if (!subArgPos) return null;
         return (
           <CurvedLine
-            key={`snippet-arg-${arg.id}`}
+            key={`snippet-subarg-${subArg.id}`}
             startX={cardRightX}
             startY={cardY}
-            endX={argPos.x - (argPos.width || 0)} // Connect to LEFT side of argument
-            endY={argPos.y}
+            endX={subArgPos.x - (subArgPos.width || 0)} // Connect to LEFT side of sub-argument
+            endY={subArgPos.y}
             color={color}
             strokeWidth={2}
           />
@@ -128,42 +128,42 @@ function SnippetConnectionLines({ snippetId }: { snippetId: string }) {
   );
 }
 
-// Connection lines for a focused Argument (show Snippet → Argument connections)
-function ArgumentConnectionLines({ argumentId }: { argumentId: string }) {
+// Connection lines for a focused SubArgument (show Snippet → SubArgument connections)
+function SubArgumentConnectionLines({ subArgumentId }: { subArgumentId: string }) {
   const {
     allSnippets, snippetPositions,
-    arguments: arguments_, argumentPositions
+    arguments: arguments_, subArguments, subArgumentPositions
   } = useApp();
 
-  const argument = arguments_.find(a => a.id === argumentId);
-  const argPos = argumentPositions.get(argumentId);
+  const subArgument = subArguments.find(sa => sa.id === subArgumentId);
+  if (!subArgument) return null;
 
-  if (!argument || !argPos) return null;
+  const subArgPos = subArgumentPositions.get(subArgumentId);
+  if (!subArgPos) return null;
 
-  // Get all snippets in this argument
-  const snippetIds = argument.snippetIds || [];
+  // Find parent argument to get the color
+  const parentArgument = arguments_.find(a => a.id === subArgument.argumentId);
+  const standardColor = parentArgument?.standardKey
+    ? getStandardKeyColor(parentArgument.standardKey)
+    : '#10b981'; // emerald color for sub-arguments
 
-  // Calculate argument LEFT edge (argPos.x is right edge)
-  const argLeftX = argPos.x - (argPos.width || 0);
-
-  // Get the standard color from argument's standardKey
-  const standardColor = argument.standardKey ? getStandardKeyColor(argument.standardKey) : '#3b82f6';
+  const subArgLeftX = subArgPos.x - (subArgPos.width || 0);
 
   return (
     <g>
-      {/* Snippet → Argument connections */}
-      {snippetIds.map(snippetId => {
+      {/* Draw connections from snippets to this sub-argument */}
+      {(subArgument.snippetIds || []).map(snippetId => {
         const snippet = allSnippets.find(s => s.id === snippetId);
         const cardPos = snippetPositions.get(snippetId);
         if (!snippet || !cardPos) return null;
 
         return (
           <CurvedLine
-            key={`arg-snip-${snippetId}`}
+            key={`subarg-snip-${snippetId}`}
             startX={cardPos.x} // Right side of snippet card
             startY={cardPos.y}
-            endX={argLeftX} // Left side of argument
-            endY={argPos.y}
+            endX={subArgLeftX} // Left side of sub-argument
+            endY={subArgPos.y}
             color={standardColor}
             strokeWidth={2.5}
             glow={true}
@@ -174,11 +174,11 @@ function ArgumentConnectionLines({ argumentId }: { argumentId: string }) {
   );
 }
 
-// Connection lines for a focused Standard (show Snippet → Argument connections for that standard)
+// Connection lines for a focused Standard (show Snippet → SubArgument connections for that standard)
 function StandardConnectionLines({ standardId }: { standardId: string }) {
   const {
     allSnippets, snippetPositions,
-    arguments: arguments_, argumentPositions, argumentMappings
+    arguments: arguments_, subArguments, subArgumentPositions, argumentMappings
   } = useApp();
 
   // Find the standardKey that maps to this standardId (reverse lookup)
@@ -213,35 +213,35 @@ function StandardConnectionLines({ standardId }: { standardId: string }) {
     mappedArgumentIds.add(m.source);
   });
 
-  const mappedArguments = arguments_.filter(arg => mappedArgumentIds.has(arg.id));
-
   // Get the standard color
   const standardColor = standardKey ? getStandardKeyColor(standardKey) : '#3b82f6';
 
+  // Find all sub-arguments that belong to arguments mapped to this standard
+  const relevantSubArguments = subArguments.filter(sa => mappedArgumentIds.has(sa.argumentId));
+
   return (
     <g>
-      {mappedArguments.map(arg => {
-        const argPos = argumentPositions.get(arg.id);
-        if (!argPos) return null;
+      {relevantSubArguments.map(subArg => {
+        const subArgPos = subArgumentPositions.get(subArg.id);
+        if (!subArgPos) return null;
 
-        const argLeftX = argPos.x - (argPos.width || 0);
-        const snippetIds = arg.snippetIds || [];
+        const subArgLeftX = subArgPos.x - (subArgPos.width || 0);
 
         return (
-          <g key={`std-arg-group-${arg.id}`}>
-            {/* Snippet → Argument connections */}
-            {snippetIds.map(snippetId => {
+          <g key={`std-subarg-group-${subArg.id}`}>
+            {/* Snippet → SubArgument connections */}
+            {(subArg.snippetIds || []).map(snippetId => {
               const snippet = allSnippets.find(s => s.id === snippetId);
               const cardPos = snippetPositions.get(snippetId);
               if (!snippet || !cardPos) return null;
 
               return (
                 <CurvedLine
-                  key={`std-snip-arg-${snippetId}`}
+                  key={`std-snip-subarg-${snippetId}-${subArg.id}`}
                   startX={cardPos.x} // Right side of snippet card
                   startY={cardPos.y}
-                  endX={argLeftX} // Left side of argument
-                  endY={argPos.y}
+                  endX={subArgLeftX} // Left side of sub-argument
+                  endY={subArgPos.y}
                   color={standardColor}
                   strokeWidth={2}
                   glow={false}
@@ -297,9 +297,19 @@ export function ConnectionLines() {
 
       {/* Apply clip path to all connection lines */}
       <g clipPath="url(#panels-clip)">
+        {/* 聚焦子论点时：只高亮，不显示连线 */}
         {focusState.type === 'argument' && focusState.id ? (
           <>
-            <ArgumentConnectionLines key={focusState.id} argumentId={focusState.id} />
+            {/* No connection lines when argument is focused - only highlight */}
+            {/* Overlay selected snippet's PDF connection line if any */}
+            {selectedSnippetId && (
+              <SnippetConnectionLines key={`selected-${selectedSnippetId}`} snippetId={selectedSnippetId} />
+            )}
+          </>
+        ) : focusState.type === 'subargument' && focusState.id ? (
+          <>
+            {/* 聚焦次级子论点时：显示 snippet → 次级子论点 连线 */}
+            <SubArgumentConnectionLines key={focusState.id} subArgumentId={focusState.id} />
             {/* Overlay selected snippet's PDF connection line */}
             {selectedSnippetId && (
               <SnippetConnectionLines key={`selected-${selectedSnippetId}`} snippetId={selectedSnippetId} />

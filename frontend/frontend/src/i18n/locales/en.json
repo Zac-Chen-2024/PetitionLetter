@@ -176,5 +176,17 @@
     "eb1a": "EB-1A Template",
     "eb1b": "EB-1B Template",
     "niw": "NIW Template"
+  },
+  "graph": {
+    "argumentCount": "{{arguments}} arguments · {{subArguments}} sub-arguments",
+    "legend": {
+      "subArgument": "Sub-argument",
+      "argument": "Argument",
+      "standard": "Standard"
+    },
+    "node": {
+      "snippets": "{{count}} snippets",
+      "args": "{{count}} args"
+    }
   }
 }

@@ -30,9 +30,13 @@ from ..services.entity_analyzer import (
     analyze_project_entities,
     load_project_metadata
 )
+from ..services.legal_argument_organizer import (
+    full_legal_pipeline
+)
 from dataclasses import asdict
 import json
 from datetime import datetime
+from pathlib import Path
 
 router = APIRouter(prefix="/api/arguments", tags=["arguments"])
 
@@ -91,38 +95,31 @@ async def generate_arguments(
     request: GenerateRequest = GenerateRequest()
 ):
     """
-    一键生成论据
+    一键生成论据 (LLM + 法律条例驱动)
 
     Pipeline:
-    1. 加载 L1 Snippets (extracted_snippets.json)
-    2. 运行关系分析（按 exhibit 分批）
-    3. 识别主体（申请人）
-    4. 按 standard_key 分组生成 Arguments
-    5. 自动映射到 EB-1A Standards
+    1. LLM + 法律条例 → 组织子论点 (~7-8个，符合律师论证风格)
+    2. LLM → 划分次级子论点 (每个2-4个 SubArguments)
+    3. 智能过滤弱证据（如普通认证）
 
     Args:
         project_id: 项目 ID
-        force_reanalyze: 是否强制重新运行关系分析
-        applicant_name: 申请人姓名（可选，用于精确识别主体）
+        force_reanalyze: 是否强制重新生成
+        applicant_name: 申请人姓名
+        provider: LLM provider (deepseek/openai)
     """
     try:
-        result = await generate_arguments_for_project(
+        # 使用新的 LLM + 法律条例驱动流程
+        result = await full_legal_pipeline(
             project_id=project_id,
-            force_reanalyze=request.force_reanalyze,
-            applicant_name=request.applicant_name,
+            applicant_name=request.applicant_name or "the applicant",
             provider=request.provider
         )
 
-        if not result.get("success"):
-            raise HTTPException(
-                status_code=500,
-                detail=result.get("error", "Generation failed")
-            )
-
         return GenerateResponse(
             success=True,
-            main_subject=result.get("main_subject"),
-            argument_count=len(result.get("arguments", [])),
+            main_subject=request.applicant_name,
+            argument_count=result.get("stats", {}).get("argument_count", 0),
             arguments=result.get("arguments", []),
             stats=result.get("stats", {})
         )
@@ -163,23 +160,45 @@ async def get_arguments(project_id: str, include_qualification: bool = False):
     Args:
         project_id: 项目 ID
         include_qualification: 是否包含资格检查结果
+
+    Returns:
+        - arguments: 论据列表 (LLM + 法律条例生成的精华子论点)
+        - sub_arguments: 次级子论点列表
+        - main_subject: 识别的主体（申请人）
+        - generated_at: 生成时间
+        - stats: 统计信息
+        - filtered: 过滤掉的弱证据
     """
-    generator = ArgumentGenerator(project_id)
-    result = generator.load_generated_arguments()
+    # 优先读取新的 legal_arguments.json
+    projects_dir = Path(__file__).parent.parent.parent / "data" / "projects"
+    legal_file = projects_dir / project_id / "arguments" / "legal_arguments.json"
+
+    result = None
+    if legal_file.exists():
+        with open(legal_file, 'r', encoding='utf-8') as f:
+            result = json.load(f)
+
+    # Fallback: 读取旧格式
+    if not result:
+        generator = ArgumentGenerator(project_id)
+        result = generator.load_generated_arguments()
 
     if not result:
         return {
             "project_id": project_id,
             "arguments": [],
+            "sub_arguments": [],
             "main_subject": None,
             "generated_at": None
         }
 
     arguments = result.get("arguments", [])
+    sub_arguments = result.get("sub_arguments", [])
+    filtered = result.get("filtered", [])
 
     # 如果需要包含资格检查
     if include_qualification:
-        # 加载 snippets
+        generator = ArgumentGenerator(project_id)
         snippets = generator.load_snippets()
         arguments = qualify_all_arguments(arguments, snippets)
         qual_summary = get_qualification_summary(arguments)
@@ -189,9 +208,11 @@ async def get_arguments(project_id: str, include_qualification: bool = False):
     return {
         "project_id": project_id,
         "arguments": arguments,
+        "sub_arguments": sub_arguments,
         "main_subject": result.get("main_subject"),
         "generated_at": result.get("generated_at"),
         "stats": result.get("stats", {}),
+        "filtered": filtered,
         "qualification_summary": qual_summary
     }
 

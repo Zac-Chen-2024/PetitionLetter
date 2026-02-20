@@ -176,5 +176,17 @@
     "eb1a": "EB-1A 模板",
     "eb1b": "EB-1B 模板",
     "niw": "NIW 模板"
+  },
+  "graph": {
+    "argumentCount": "{{arguments}} 子论点 · {{subArguments}} 次级子论点",
+    "legend": {
+      "subArgument": "次级子论点",
+      "argument": "子论点",
+      "standard": "审批标准"
+    },
+    "node": {
+      "snippets": "{{count}} 证据",
+      "args": "{{count}} 个论点"
+    }
   }
 }

@@ -1,0 +1,184 @@
+======================================================================
+SubArgument 新方案测试报告 - 供专家评测
+======================================================================
+
+精华子论点: 14 个 (保持原有策略)
+次级子论点: 31 个 (新生成)
+平均每个子论点: 2.2 个 SubArguments
+
+======================================================================
+【MEMBERSHIP】- 2 个子论点
+======================================================================
+
+▶ Ms. Qu's Membership in Shanghai Fitness Bodybuilding Association
+  证据数量: 7 snippets
+  次级子论点 (4个):
+  ├─ 会员资格与申请过程
+  │  关系: 确立资格
+  │  证据: 2 snippets
+  ├─ 会员资格标准与要求
+  │  关系: 体现专业水平
+  │  证据: 2 snippets
+  ├─ 协会职能与会员义务
+  │  关系: 证明行业地位
+  │  证据: 2 snippets
+  ├─ 协会治理结构参与
+  │  关系: 体现参与深度
+  │  证据: 1 snippets
+
+▶ Ms. Qu's Membership in China Bodybuilding Association
+  证据数量: 3 snippets
+  次级子论点 (3个):
+  ├─ 行业地位与影响力
+  │  关系: 证明杰出地位
+  │  证据: 1 snippets
+  ├─ 专业成就与荣誉
+  │  关系: 佐证专业水平
+  │  证据: 1 snippets
+  ├─ 专业贡献与领导力
+  │  关系: 体现专业价值
+  │  证据: 1 snippets
+
+======================================================================
+【PUBLISHED_MATERIAL】- 5 个子论点
+======================================================================
+
+▶ Sixth Tone Coverage of Ms. Qu
+  证据数量: 5 snippets
+  次级子论点 (3个):
+  ├─ 申请人身份与背景
+  │  关系: 确立专业地位
+  │  证据: 2 snippets
+  ├─ 媒体报道机构权威性
+  │  关系: 增强可信度
+  │  证据: 2 snippets
+  ├─ 行业影响与愿景
+  │  关系: 证明影响力
+  │  证据: 1 snippets
+
+▶ The Paper Coverage of Ms. Qu
+  证据数量: 6 snippets
+  次级子论点 (2个):
+  ├─ 媒体平台地位与资质
+  │  关系: 证明平台权威性
+  │  证据: 3 snippets
+  ├─ 个人专业背景与行业洞察
+  │  关系: 证明专业深度
+  │  证据: 3 snippets
+
+▶ The Jakarta Post Coverage of Ms. Qu
+  证据数量: 6 snippets
+  次级子论点 (2个):
+  ├─ 媒体地位与历史意义
+  │  关系: 奠定权威性
+  │  证据: 3 snippets
+  ├─ 行业奖项与专业认可
+  │  关系: 佐证影响力
+  │  证据: 3 snippets
+
+▶ China Sports Daily Coverage of Ms. Qu
+  证据数量: 7 snippets
+  次级子论点 (2个):
+  ├─ 媒体权威性与影响力
+  │  关系: 增强报道可信度
+  │  证据: 5 snippets
+  ├─ 媒体报道内容与背景
+  │  关系: 提供报道证据
+  │  证据: 2 snippets
+
+▶ People's Daily Coverage of Ms. Qu
+  证据数量: 3 snippets
+  次级子论点 (2个):
+  ├─ 媒体权威性
+  │  关系: 增强可信度
+  │  证据: 2 snippets
+  ├─ 学术影响力
+  │  关系: 佐证重要性
+  │  证据: 1 snippets
+
+======================================================================
+【ORIGINAL_CONTRIBUTION】- 1 个子论点
+======================================================================
+
+▶ Ms. Qu's Original Founder of Venus Weightlifting Club, the first independent Olympic weightlifting club in China, and creator of the Body Alignment Training (BAT) system, a training method based on biomechanics, traditional Chinese bone setting, and modern sports science. and Its Major Significance
+  证据数量: 77 snippets
+  次级子论点 (4个):
+  ├─ 创新贡献与体系创立
+  │  关系: 证明原创性
+  │  证据: 12 snippets
+  ├─ 行业影响与专业认可
+  │  关系: 证明影响力
+  │  证据: 23 snippets
+  ├─ 具体成就与量化成果
+  │  关系: 证明成就
+  │  证据: 41 snippets
+  ├─ 其他证据
+  │  关系: 补充证明
+  │  证据: 1 snippets
+
+======================================================================
+【LEADING_ROLE】- 5 个子论点
+======================================================================
+
+▶ Ms. Qu's Leadership at Venus Weightlifting Club
+  证据数量: 2 snippets
+  次级子论点 (1个):
+  ├─ 主要证据
+  │  关系: 证明领导角色
+  │  证据: 2 snippets
+
+▶ Ms. Qu's Leadership at Shanghai Ying Fitness Management Co., Ltd.
+  证据数量: 2 snippets
+  次级子论点 (1个):
+  ├─ 主要证据
+  │  关系: 证明领导角色
+  │  证据: 2 snippets
+
+▶ Ms. Qu's Leadership at Shanghai Yiqing Fitness Management Co., Ltd.
+  证据数量: 3 snippets
+  次级子论点 (2个):
+  ├─ 法定代表身份
+  │  关系: 确立领导地位
+  │  证据: 1 snippets
+  ├─ 重大合作成就
+  │  关系: 证明影响力
+  │  证据: 2 snippets
+
+▶ Ms. Qu's Leadership at ISHTAR HEALTH PTE. LTD.
+  证据数量: 3 snippets
+  次级子论点 (2个):
+  ├─ 正式职位与授权
+  │  关系: 确立领导地位
+  │  证据: 2 snippets
+  ├─ 战略贡献与成就
+  │  关系: 证明领导成果
+  │  证据: 1 snippets
+
+▶ Ms. Qu's Leadership at Singapore Weightlifting Federation
+  证据数量: 1 snippets
+  次级子论点 (1个):
+  ├─ 主要证据
+  │  关系: 证明领导角色
+  │  证据: 1 snippets
+
+======================================================================
+【AWARDS】- 1 个子论点
+======================================================================
+
+▶ Ms. Qu's Achievement Award in the Fitness Industry in China at the National Fitness and Sports Exchange and Exhibition Conference in 2023
+  证据数量: 3 snippets
+  次级子论点 (2个):
+  ├─ 奖项性质与级别
+  │  关系: 证明权威性
+  │  证据: 2 snippets
+  ├─ 获奖者身份确认
+  │  关系: 证明主体性
+  │  证据: 1 snippets
+
+======================================================================
+评测要点:
+1. 精华子论点是否保持不变（约14个）？
+2. SubArgument 的 title 是否清晰描述证据组主题？
+3. relationship 字段是否准确描述与主论点的关系？
+4. 分组是否合理（每个子论点 2-4 个 SubArguments）？
+======================================================================

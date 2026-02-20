@@ -86,6 +86,7 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
     setSelectedDocumentId,
     arguments: arguments_,
     argumentMappings,
+    subArguments,
   } = useApp();
 
   // Check if this snippet is already assembled into an argument
@@ -170,7 +171,12 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
     ? !arguments_.some(arg => arg.id === focusState.id && arg.snippetIds?.includes(snippet.id))
     : false;
 
-  const isFilteredOut = isFilteredOutByStandard || isFilteredOutByArgument;
+  // Check if a sub-argument is focused and this snippet is NOT part of that sub-argument
+  const isFilteredOutBySubArgument = focusState.type === 'subargument' && focusState.id
+    ? !subArguments.some(sa => sa.id === focusState.id && sa.snippetIds?.includes(snippet.id))
+    : false;
+
+  const isFilteredOut = isFilteredOutByStandard || isFilteredOutByArgument || isFilteredOutBySubArgument;
 
   // Update position for SVG lines
   useEffect(() => {
@@ -459,7 +465,7 @@ const GraphIcon = () => (
 
 export function EvidenceCardPool() {
   const { t } = useTranslation();
-  const { focusState, snippetPositions, connections, viewMode, setSnippetPanelBounds, allSnippets, arguments: arguments_, argumentMappings } = useApp();
+  const { focusState, snippetPositions, connections, viewMode, setSnippetPanelBounds, allSnippets, arguments: arguments_, argumentMappings, subArguments } = useApp();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
   const [showGraphModal, setShowGraphModal] = useState(false);
@@ -477,6 +483,12 @@ export function EvidenceCardPool() {
       return focusedArg?.snippetIds?.includes(snippetId) || false;
     }
 
+    if (focusState.type === 'subargument') {
+      // Check if snippet belongs to the focused sub-argument
+      const focusedSubArg = subArguments.find(sa => sa.id === focusState.id);
+      return focusedSubArg?.snippetIds?.includes(snippetId) || false;
+    }
+
     if (focusState.type === 'standard') {
       // Check if snippet belongs to any argument that maps to the focused standard
       const focusedStandardId = focusState.id;
@@ -491,7 +503,7 @@ export function EvidenceCardPool() {
     }
 
     return true;
-  }, [focusState, arguments_, argumentMappings]);
+  }, [focusState, arguments_, argumentMappings, subArguments]);
 
   // Update container rect on scroll, resize, and focusState change
   useEffect(() => {

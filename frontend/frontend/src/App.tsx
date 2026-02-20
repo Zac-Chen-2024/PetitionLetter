@@ -1,4 +1,4 @@
-import { useState, Component, ReactNode } from 'react';
+import { Component, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppProvider, useApp } from './context/AppContext';
 import {
@@ -6,7 +6,6 @@ import {
   DocumentViewer,
   EvidenceCardPool,
   ConnectionLines,
-  ViewModeSwitcher,
   SankeyView,
   MaterialOrganization,
   WritingCanvas,
@@ -48,11 +47,8 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
-type PageType = 'mapping' | 'materials' | 'writing';
-
 function AppContent() {
-  const { viewMode, argumentViewMode } = useApp();
-  const [currentPage, setCurrentPage] = useState<PageType>('mapping');
+  const { viewMode, argumentViewMode, currentPage, setCurrentPage } = useApp();
   const { t } = useTranslation();
 
   // Render the appropriate view based on viewMode
@@ -68,13 +64,13 @@ function AppContent() {
       default:
         return (
           <>
-            {/* Panel 2: Evidence Cards (25%) */}
-            <div className="w-[25%] flex-shrink-0 border-r border-slate-200 overflow-hidden">
+            {/* Panel 2: Evidence Cards (20%) */}
+            <div className="w-[20%] flex-shrink-0 border-r border-slate-200 overflow-hidden">
               <EvidenceCardPool />
             </div>
 
-            {/* Panel 3: Writing Tree (50%) - list or graph view */}
-            <div className="w-[50%] flex-shrink-0 bg-white overflow-hidden">
+            {/* Panel 3: Writing Tree (60%) - list or graph view */}
+            <div className="w-[60%] flex-shrink-0 bg-white overflow-hidden">
               {argumentViewMode === 'list' ? (
                 <ArgumentAssembly />
               ) : (
@@ -144,21 +140,10 @@ function AppContent() {
       {/* Header */}
       <Header />
 
-      {/* View Mode Switcher + Writing Canvas */}
-      <div className="px-4 py-2 bg-white border-b border-slate-200 flex items-center justify-between">
-        <ViewModeSwitcher />
-        <button
-          onClick={() => setCurrentPage('writing')}
-          className="text-sm text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          {t('nav.writingCanvas')}
-        </button>
-      </div>
-
       {/* Main content area */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Panel 1: Document Viewer (25%) - z-0 to stay below connection lines */}
-        <div className="w-[25%] flex-shrink-0 border-r border-slate-200 bg-white overflow-hidden relative z-0">
+        {/* Panel 1: Document Viewer (20%) - z-0 to stay below connection lines */}
+        <div className="w-[20%] flex-shrink-0 border-r border-slate-200 bg-white overflow-hidden relative z-0">
           <DocumentViewer />
         </div>
 

@@ -85,13 +85,15 @@ Applicant: {applicant_name}
 ## Relationships
 {relations_summary}
 
-Organize these snippets into logical argument groups.
+Organize these snippets into logical argument groups. For each argument, also create sub-arguments (次级子论点) that group 1-5 related snippets together with a clear relationship description.
 
 KEY PRINCIPLES:
 1. Group by person/organization/media outlet - don't split the same entity across arguments
 2. For recommendations: combine all snippets from the same recommender into ONE argument
 3. For media coverage: combine article content + media credentials for each outlet
 4. Aim for 3-7 arguments total (not 10+ fragmented ones)
+5. Each argument should have 1-4 sub_arguments that break down the evidence logically
+6. Each sub_argument should explain HOW those snippets support the main argument
 
 IMPORTANT: Use the simplified IDs (S1, S2, etc.). Assign ALL snippets.
 
@@ -104,7 +106,21 @@ Return JSON:
       "purpose": "What legal point this proves",
       "snippet_ids": ["S1", "S3", "S5"],
       "key_entity": "Main entity name",
-      "confidence": 0.9
+      "confidence": 0.9,
+      "sub_arguments": [
+        {{
+          "title": "职责范围",
+          "purpose": "说明申请人在该组织的核心管理职责",
+          "relationship": "证明管理能力",
+          "snippet_ids": ["S1", "S3"]
+        }},
+        {{
+          "title": "业绩成就",
+          "purpose": "展示在任期内取得的具体成就",
+          "relationship": "证明卓越贡献",
+          "snippet_ids": ["S5"]
+        }}
+      ]
     }}
   ]
 }}"""
@@ -112,6 +128,20 @@ Return JSON:
 # Data storage root directory
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 PROJECTS_DIR = DATA_DIR / "projects"
+
+
+@dataclass
+class GeneratedSubArgument:
+    """Generated sub-argument data structure (次级子论点)"""
+    id: str
+    argument_id: str               # 所属主论点
+    title: str                     # 如 "职责范围"、"业绩成就"
+    purpose: str                   # 这组证据的作用说明
+    relationship: str              # LLM 生成的关系描述，如 "证明管理能力"
+    snippet_ids: List[str]         # 1-5 个 snippets
+    is_ai_generated: bool = True
+    status: str = "draft"
+    created_at: str = ""
 
 
 @dataclass
@@ -125,6 +155,11 @@ class GeneratedArgument:
     confidence: float
     created_at: str
     is_ai_generated: bool = True
+    sub_argument_ids: List[str] = None  # 次级子论点 IDs
+
+    def __post_init__(self):
+        if self.sub_argument_ids is None:
+            self.sub_argument_ids = []
 
 
 class ArgumentGenerator:
@@ -179,7 +214,7 @@ class ArgumentGenerator:
         relations: List[Dict],
         applicant_name: str,
         provider: str = "deepseek"
-    ) -> List[GeneratedArgument]:
+    ) -> Tuple[List[GeneratedArgument], List[GeneratedSubArgument]]:
         """
         Use LLM to intelligently group snippets into fine-grained arguments
 
@@ -262,10 +297,12 @@ class ArgumentGenerator:
             raw_arguments = result.get('arguments', [])
             if not raw_arguments:
                 print(f"[ArgumentGenerator] LLM returned no arguments for {evidence_type}, falling back")
-                return self._create_simple_arguments(snippets, evidence_type, applicant_name)
+                args, sub_args = self._create_simple_arguments(snippets, evidence_type, applicant_name)
+                return args, sub_args
 
-            # Convert to GeneratedArgument, mapping simple IDs back to real IDs
+            # Convert to GeneratedArgument and GeneratedSubArgument, mapping simple IDs back to real IDs
             arguments = []
+            sub_arguments = []
             all_simple_ids = set(id_mapping.keys())
 
             for arg in raw_arguments:
@@ -290,15 +327,49 @@ class ArgumentGenerator:
                 # Map evidence_type to standard_key
                 standard_key = self._evidence_to_standard(evidence_type)
 
+                # Generate argument ID first
+                arg_id = f"arg-{uuid.uuid4().hex[:8]}"
+
+                # Process sub_arguments if present
+                sub_arg_ids = []
+                raw_sub_args = arg.get('sub_arguments', [])
+                for raw_sub in raw_sub_args:
+                    sub_snippet_ids = raw_sub.get('snippet_ids', [])
+                    real_sub_snippet_ids = []
+
+                    for sid in sub_snippet_ids:
+                        normalized_sid = sid.upper() if isinstance(sid, str) else str(sid)
+                        if not normalized_sid.startswith('S'):
+                            normalized_sid = f"S{normalized_sid}"
+                        if normalized_sid in id_mapping:
+                            real_sub_snippet_ids.append(id_mapping[normalized_sid])
+
+                    if real_sub_snippet_ids:
+                        sub_arg_id = f"subarg-{uuid.uuid4().hex[:8]}"
+                        sub_arg = GeneratedSubArgument(
+                            id=sub_arg_id,
+                            argument_id=arg_id,
+                            title=raw_sub.get('title', '证据组'),
+                            purpose=raw_sub.get('purpose', ''),
+                            relationship=raw_sub.get('relationship', '支持论点'),
+                            snippet_ids=real_sub_snippet_ids,
+                            is_ai_generated=True,
+                            status="draft",
+                            created_at=datetime.now().isoformat()
+                        )
+                        sub_arguments.append(sub_arg)
+                        sub_arg_ids.append(sub_arg_id)
+
                 argument = GeneratedArgument(
-                    id=f"arg-{uuid.uuid4().hex[:8]}",
+                    id=arg_id,
                     title=arg.get('title', f"{applicant_name} - {evidence_type}"),
                     subject=applicant_name,
                     snippet_ids=real_snippet_ids,
                     standard_key=standard_key,
                     confidence=arg.get('confidence', 0.8),
                     created_at=datetime.now().isoformat(),
-                    is_ai_generated=True
+                    is_ai_generated=True,
+                    sub_argument_ids=sub_arg_ids
                 )
                 arguments.append(argument)
 
@@ -313,11 +384,12 @@ class ArgumentGenerator:
             if missed_snippets:
                 missed_pct = len(missed_snippets) / len(snippets) * 100
                 print(f"[ArgumentGenerator] {len(missed_snippets)} snippets ({missed_pct:.0f}%) not assigned, creating catch-all")
-                catch_all = self._create_simple_arguments(missed_snippets, evidence_type, applicant_name)
-                arguments.extend(catch_all)
+                catch_all_args, catch_all_sub_args = self._create_simple_arguments(missed_snippets, evidence_type, applicant_name)
+                arguments.extend(catch_all_args)
+                sub_arguments.extend(catch_all_sub_args)
 
-            print(f"[ArgumentGenerator] Smart grouped {evidence_type}: {len(arguments)} arguments from {len(snippets)} snippets")
-            return arguments
+            print(f"[ArgumentGenerator] Smart grouped {evidence_type}: {len(arguments)} arguments, {len(sub_arguments)} sub-arguments from {len(snippets)} snippets")
+            return arguments, sub_arguments
 
         except Exception as e:
             print(f"[ArgumentGenerator] Smart grouping failed for {evidence_type}: {e}")
@@ -328,7 +400,7 @@ class ArgumentGenerator:
         snippets: List[Dict],
         evidence_type: str,
         applicant_name: str
-    ) -> List[GeneratedArgument]:
+    ) -> Tuple[List[GeneratedArgument], List[GeneratedSubArgument]]:
         """
         Create a simple argument with all snippets (fallback)
 
@@ -337,7 +409,7 @@ class ArgumentGenerator:
         - Only a few snippets (<=3)
         """
         if not snippets:
-            return []
+            return [], []
 
         snippet_ids = [s.get('snippet_id', s.get('block_id', '')) for s in snippets]
         standard_key = self._evidence_to_standard(evidence_type)
@@ -348,18 +420,35 @@ class ArgumentGenerator:
         confidences = [s.get('confidence', 0.5) for s in snippets]
         avg_confidence = sum(confidences) / len(confidences) if confidences else 0.5
 
+        arg_id = f"arg-{uuid.uuid4().hex[:8]}"
+
+        # Create a single sub-argument containing all snippets
+        sub_arg_id = f"subarg-{uuid.uuid4().hex[:8]}"
+        sub_argument = GeneratedSubArgument(
+            id=sub_arg_id,
+            argument_id=arg_id,
+            title=type_display,
+            purpose=f"证明{type_display}相关资质",
+            relationship=f"支持{type_display}论证",
+            snippet_ids=snippet_ids,
+            is_ai_generated=True,
+            status="draft",
+            created_at=datetime.now().isoformat()
+        )
+
         argument = GeneratedArgument(
-            id=f"arg-{uuid.uuid4().hex[:8]}",
+            id=arg_id,
             title=title,
             subject=applicant_name,
             snippet_ids=snippet_ids,
             standard_key=standard_key,
             confidence=round(avg_confidence, 2),
             created_at=datetime.now().isoformat(),
-            is_ai_generated=True
+            is_ai_generated=True,
+            sub_argument_ids=[sub_arg_id]
         )
 
-        return [argument]
+        return [argument], [sub_argument]
 
     def _evidence_to_standard(self, evidence_type: str) -> str:
         """Map evidence_type to standard_key"""
@@ -434,21 +523,24 @@ class ArgumentGenerator:
             return await self._generate_from_unified(
                 unified_data,
                 applicant_name,
-                progress_callback
+                progress_callback,
+                provider
             )
 
         # Fall back to legacy pipeline
         return await self._generate_from_legacy(
             force_reanalyze,
             applicant_name,
-            progress_callback
+            progress_callback,
+            provider
         )
 
     async def _generate_from_unified(
         self,
         unified_data: Dict,
         applicant_name: Optional[str],
-        progress_callback
+        progress_callback,
+        provider: str = "deepseek"
     ) -> Dict:
         """Generate arguments from unified extraction data (with subject attribution)
 
@@ -507,6 +599,7 @@ class ArgumentGenerator:
         SMART_GROUPING_THRESHOLD = 2
 
         arguments = []
+        all_sub_arguments = []
         total_types = len(by_evidence_type)
         processed_types = 0
 
@@ -521,9 +614,9 @@ class ArgumentGenerator:
 
             # Use smart grouping for larger groups, simple for small ones
             if len(type_snippets) < SMART_GROUPING_THRESHOLD:
-                type_arguments = self._create_simple_arguments(type_snippets, evidence_type, main_subject)
+                type_arguments, type_sub_arguments = self._create_simple_arguments(type_snippets, evidence_type, main_subject)
             else:
-                type_arguments = await self._smart_group_snippets(
+                type_arguments, type_sub_arguments = await self._smart_group_snippets(
                     type_snippets,
                     evidence_type,
                     entities,
@@ -533,6 +626,7 @@ class ArgumentGenerator:
                 )
 
             arguments.extend(type_arguments)
+            all_sub_arguments.extend(type_sub_arguments)
 
             # Small delay to avoid rate limiting
             await asyncio.sleep(0.3)
@@ -549,6 +643,7 @@ class ArgumentGenerator:
             "generated_at": datetime.now().isoformat(),
             "main_subject": main_subject,
             "arguments": [asdict(a) for a in arguments],
+            "sub_arguments": [asdict(sa) for sa in all_sub_arguments],
             "stats": {
                 "total_snippets": len(snippets),
                 "applicant_snippets": len(applicant_snippets),
@@ -556,6 +651,7 @@ class ArgumentGenerator:
                 "entity_count": len(entities),
                 "relation_count": len(relations),
                 "argument_count": len(arguments),
+                "sub_argument_count": len(all_sub_arguments),
                 "evidence_types": list(by_evidence_type.keys()),
             }
         }
@@ -567,7 +663,7 @@ class ArgumentGenerator:
         if progress_callback:
             progress_callback(100, 100, "Done!")
 
-        print(f"[ArgumentGenerator] Generated {len(arguments)} arguments for {main_subject}")
+        print(f"[ArgumentGenerator] Generated {len(arguments)} arguments, {len(all_sub_arguments)} sub-arguments for {main_subject}")
         print(f"[ArgumentGenerator] Evidence types: {list(by_evidence_type.keys())}")
         return result
 
@@ -575,7 +671,8 @@ class ArgumentGenerator:
         self,
         force_reanalyze: bool,
         applicant_name: Optional[str],
-        progress_callback
+        progress_callback,
+        provider: str = "deepseek"
     ) -> Dict:
         """Legacy pipeline using relationship_analyzer (fallback)"""
         # Step 1: Load L1 Snippets

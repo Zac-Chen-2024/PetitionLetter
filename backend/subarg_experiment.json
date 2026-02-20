@@ -1,0 +1,1952 @@
+{
+  "arguments": [
+    {
+      "title": "Ms. Qu's Membership in Shanghai Fitness Bodybuilding Association",
+      "standard": "membership",
+      "group_key": "Shanghai Fitness Bodybuilding Association",
+      "claim": [
+        {
+          "text": "Ms. Yaruo Qu applied to join the Association as an individual member in 2022.",
+          "exhibit_id": "C2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_C2_p2_p2_b5_eadb0715",
+          "context_before": "...ely promote the gymnasium star level evaluation system to improve the overall level and set the benchmark for the industry by strengthening service standardization based on the authoritative standa",
+          "context_after": "been serving as senior management of a famous enterprise or institution in the industry, and the membership is especially reserved for those who have devoted into his or her specialty for many years a"
+        },
+        {
+          "text": "It is hereby certified that Ms. Yaruo Qu has been awarded individual membership upon the review of the Association.",
+          "exhibit_id": "C2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_C2_p3_p3_b2_4c9d79a1",
+          "context_before": "...ous enterprise or institution in the industry, and the membership is especially reserved for those who have devoted into his or her specialty for many years and have acquired outstanding achievemen",
+          "context_after": "Reference: Hao Wang Vice President Signature: Hao Wang (Signature)"
+        }
+      ],
+      "proof": [],
+      "significance": [
+        {
+          "text": "an individual member should have been engaged in the fitness and bodybuilding or relevant industries for more than 10 years or be a senior practitioner who has been serving as senior management of a famous enterprise or institution in the industry, and the membership is especially reserved for those who have devoted into his or her specialty for many years and have acquired outstanding achievements.",
+          "exhibit_id": "C2",
+          "purpose": "selectivity_proof",
+          "snippet_id": "snp_C2_p3_p3_b0_8cd887e6",
+          "context_before": "...application sheet, submit it to the Association for review, and acquire individual membership after passing the special review completed by the review group formed by the Directors of the Associati",
+          "context_after": "Upon the review conducted by Chong Peng, Vice President of the Association and top fitness and bodybuilding expert in China, and me, the Undersigned, on Ms. Yaruo Qu after receiving her membership app"
+        },
+        {
+          "text": "Upon the expiration of the term of office of the 4th Council of Shanghai Fitness Bodybuilding Association, the list of candidates for the 5th Council was put forward in the meeting of the Re- election Committee of Shanghai Fitness Bodybuilding Association upon deliberation based on the democratic recommendation and wide solicitation in accordance with applicable regulations of the Regulations for Registration and Management of Social Associations and the Articles of Association of the Shanghai F",
+          "exhibit_id": "C5",
+          "purpose": "selectivity_proof",
+          "snippet_id": "snp_C5_p2_p2_b2_cf38c413",
+          "context_before": "# Announcement of Candidates for the 5th Council of Shanghai Fitness Bodybuilding Association From: Shanghai Fitness Bodybuilding Association Published on: December 22, 2021 Hits: 2.658",
+          "context_after": "## Candidates for the 5th Council: ## Candidate for President:"
+        },
+        {
+          "text": "Members, affiliated institutions, and staff of CWA, as well as clubs, sports teams, athletes, coaches, referees, and staff registered with CWA and group members of CWA shall follow the Articles of Association as well as the regulations, standards, and decisions of the Association.",
+          "exhibit_id": "F5",
+          "purpose": "selectivity_proof",
+          "snippet_id": "snp_F5_p2_p2_b7_67ac0ac0",
+          "context_before": "...ifting associations and athletes from different countries, and strengthen connection and cooperation with the International Weightlifting Federation (IWF) and the Asian Weightlifting Federation (AW",
+          "context_after": "Official website of the China Weightlifting Association: www.cwa.org.cn/guanyuxiehui/ # Related news"
+        }
+      ],
+      "context": [
+        {
+          "text": "Help members solve problems in the production and operation, and provide such services as the market information, technology consultation, employee training and legal aid for members; offer members or publish industrial information on aspects including development researches, statistical analyses, policies and standards, and organize or hold activities such as the investment attraction in exhibitions, business inspection and product promotion and introduction; conduct domestic and overseas econo",
+          "exhibit_id": "C4",
+          "purpose": "selectivity_proof",
+          "snippet_id": "snp_C4_p2_p2_b6_10cdc4b5",
+          "context_before": "Functions of the association: ## 1. Industrial services",
+          "context_after": "## 2. Industrial self-discipline 2. Industrial self-disciplineFormulate quality specifications and service standards of the industry and participate in the formulation of product standards according t"
+        },
+        {
+          "text": "Formulate quality specifications and service standards of the industry and participate in the formulation of product standards according to the Articles of Association or industrial regulations and conventions; supervise the legal operation of member entities, take such measures as warning, industrial criticizing, announcement or membership cancellation to punish members that violate the Articles of Association and industrial laws and regulations, fail to meet industrial quality specifications a",
+          "exhibit_id": "C4",
+          "purpose": "selectivity_proof",
+          "snippet_id": "snp_C4_p3_p3_b1_97884309",
+          "context_before": "...and introduction; conduct domestic and overseas economic and technological exchange and cooperation, and expand market services for the industry from all processes of the production, supply and sal",
+          "context_after": "## 3. Right and interest protection 3. Right and interest protectionProtect legitimate rights and interests of members, and report requirements of enterprises and the industry to the government, espec"
+        }
+      ],
+      "exhibits": [
+        "C2",
+        "C4",
+        "C5",
+        "F5"
+      ],
+      "conclusion": "Ms. Qu's membership in Shanghai Fitness Bodybuilding Association clearly meets the requirements of 8 C.F.R. §204.5(h)(3)(ii).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": true,
+        "has_context": true,
+        "score": 80
+      },
+      "id": "arg-ede701e4",
+      "sub_argument_ids": [
+        "subarg-df8cadc0",
+        "subarg-a2cfc8f9",
+        "subarg-2f7aab6b",
+        "subarg-7f153ca9"
+      ]
+    },
+    {
+      "title": "Ms. Qu's Membership in China Bodybuilding Association",
+      "standard": "membership",
+      "group_key": "China Bodybuilding Association",
+      "claim": [],
+      "proof": [],
+      "significance": [
+        {
+          "text": "Ping Zhang is a Chinese bodybuilding athlete who won the first gold medal in the Asian Bodybuilding and Fitness Championships and has gained the most gold medals, making her widely recognized as the \"Asian Bodybuilding Queen\" by the bodybuilding industry and media.",
+          "exhibit_id": "C6",
+          "purpose": "selectivity_proof",
+          "snippet_id": "snp_C6_p2_p2_b2_00ad39f3",
+          "context_before": "# Ping Zhang From: Shanghai Fitness Bodybuilding Association Published on: November 6, 2019 Hits: 3,781",
+          "context_after": "Group photo of Ping Zhang and Schwarzenegger, international bodybuilding master, in 2008 Group photo of Ping Zhang and Ben Weider, Chairperson of the International Fitness and Bodybuilding Federation,"
+        },
+        {
+          "text": "Ping Zhang led the national team to participate in the Asian Bodybuilding and Fitness Championships in Sri Lanka in 2014 as the coach.",
+          "exhibit_id": "C6",
+          "purpose": "selectivity_proof",
+          "snippet_id": "snp_C6_p2_p2_b2_38d0209f",
+          "context_before": "# Ping Zhang From: Shanghai Fitness Bodybuilding Association Published on: November 6, 2019 Hits: 3,781",
+          "context_after": "Group photo of Ping Zhang and Schwarzenegger, international bodybuilding master, in 2008 Group photo of Ping Zhang and Ben Weider, Chairperson of the International Fitness and Bodybuilding Federation,"
+        },
+        {
+          "text": "Ping Zhang was honored with the Fitness China Awards \"Ten Figures\" in 2017; was awarded the \"Bodybuilding International Champion Award\" at the Centennial Celebration of China Bodybuilding in 2018; acquired the \"Most Charming Goddess\" at the Global Goddess in 2018.",
+          "exhibit_id": "C6",
+          "purpose": "selectivity_proof",
+          "snippet_id": "snp_C6_p2_p2_b2_c6700411",
+          "context_before": "# Ping Zhang From: Shanghai Fitness Bodybuilding Association Published on: November 6, 2019 Hits: 3,781",
+          "context_after": "Group photo of Ping Zhang and Schwarzenegger, international bodybuilding master, in 2008 Group photo of Ping Zhang and Ben Weider, Chairperson of the International Fitness and Bodybuilding Federation,"
+        }
+      ],
+      "context": [],
+      "exhibits": [
+        "C6"
+      ],
+      "conclusion": "Ms. Qu's membership in China Bodybuilding Association clearly meets the requirements of 8 C.F.R. §204.5(h)(3)(ii).",
+      "completeness": {
+        "has_claim": false,
+        "has_proof": false,
+        "has_significance": true,
+        "has_context": false,
+        "score": 40
+      },
+      "id": "arg-418d1c33",
+      "sub_argument_ids": [
+        "subarg-72f14454",
+        "subarg-b1d75994",
+        "subarg-935b3807"
+      ]
+    },
+    {
+      "title": "Sixth Tone Coverage of Ms. Qu",
+      "standard": "published_material",
+      "group_key": "Sixth Tone",
+      "claim": [
+        {
+          "text": "Gabriella Qu, founder of Venus Weightlifting in Shanghai.",
+          "exhibit_id": "D1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_D1_p2_p2_b4_4adc201e",
+          "context_before": "...basement gym, amateur weightlifters strain under two loads: the steel bars and plates that they lift, and a stigma rooted in the Chinese belief that the sport leaves its practitioners stunted and f",
+          "context_after": "\"That's the moment people say, \"That's not very nice. That's not the image I want to put on myself.\" Especially for women practitioners in China - - where physical beauty is typically equated with sle"
+        },
+        {
+          "text": "Qu, 32, a weightlifter and coach herself, says she opened Venus Weightlifting in 2015 partly to help address such misconceptions by increasing awareness of the sport as a form of healthy exercise.",
+          "exhibit_id": "D1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_D1_p2_p2_b10_f5138544",
+          "context_before": "## 'Not for you' \"My mother said to me, weightlifting athletes are all short and buff, so this sport is not for you,\" Xu said, citing a commonly held belief that \"girls shouldn't do this type of exerc",
+          "context_after": "China - - currently racking up its usual pile of weightlifting gold medals in Tokyo - - is a superpower in the sport, its athletes often selected for body type and groomed from a young age by a rigoro"
+        }
+      ],
+      "proof": [],
+      "significance": [
+        {
+          "text": "We belong to Shanghai United Media Group.",
+          "exhibit_id": "D10",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D10_p2_p2_b2_fa4cec1d",
+          "context_before": "## ABOUT US ...topics, in- depth features, and illuminating contributions, Sixth Tone covers issues from the perspectives of those most intimately involved to highlight the nuances and complexities of",
+          "context_after": "Daily Tones are daily news and highlights from across China. News are timely reports on issues and events from across China. Drawing from a vast range of sources, these articles provide insights into "
+        },
+        {
+          "text": "The Sixth Tone Fellowship is a field research program on contemporary China initiated and sponsored by Sixth Tone, an English-language news website based in Shanghai, China.",
+          "exhibit_id": "D10",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D10_p6_p6_b3_9b550bb8",
+          "context_before": "# ON THE FIELD: POVERTY ALLI # ON THE FIELD: RURAL E-COMMERCE",
+          "context_after": "We encourage research into and understanding of China by young scholars and visual artists from around the world, and we welcome inventive solutions to the challenges China is facing. The Sixth Tone F"
+        }
+      ],
+      "context": [
+        {
+          "text": "Still, many at Venus Weightlifting hope China's Olympic glory will eventually foster a sense of pride and make people more open to the sport.",
+          "exhibit_id": "D1",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_D1_p3_p3_b7_46d14a9e",
+          "context_before": "\"But for us amateurs, our bodies are already set in this way,\" he adds. \"No matter how much we train, we cannot shrink ourselves or make our legs shorter.\"",
+          "context_after": "Asked if she worries about the negative stereotypes, Xu, one of many female weightlifters at Venus, says she prefers to ignore traditional social expectations. \"Weightlifting does not make us short an"
+        }
+      ],
+      "exhibits": [
+        "D1",
+        "D10"
+      ],
+      "conclusion": "The coverage by Sixth Tone, a major publication, meets the requirements of 8 C.F.R. §204.5(h)(3)(iii).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": true,
+        "has_context": true,
+        "score": 80
+      },
+      "id": "arg-4d201582",
+      "sub_argument_ids": [
+        "subarg-fe18d749",
+        "subarg-bbae3d1b",
+        "subarg-ad1754b6"
+      ]
+    },
+    {
+      "title": "The Paper Coverage of Ms. Qu",
+      "standard": "published_material",
+      "group_key": "The Paper",
+      "claim": [
+        {
+          "text": "\"Weightlifting is strong in China, but not big,\" said Qu Yaruo, founder of Venus Weightlifting Club in Shanghai.",
+          "exhibit_id": "D9",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_D9_p3_p3_b1_d7c6b969",
+          "context_before": "ne entire Russian team ...y expected to win at least four gold medals, and seven medals overall. Yet despite China's consistent success on the international stage, weightlifting has never quite captur",
+          "context_after": "A man lifts weights at Venus Weightlifting Club in Shanghai, Aug. 4, 2016. Zhou Yinan/Sixth Tone Qu - - known as \"Gaby Q\" within the weightlifting community - - first came to the sport when she was wo"
+        },
+        {
+          "text": "Qu has partnered with the Shanghai Weightlifting Association for official support but believes that her savvy marketing skills can bring a new audience to the sport.",
+          "exhibit_id": "D9",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_D9_p6_p6_b3_6cb774a9",
+          "context_before": "<center>A man uses a jump rope for stamina training at Venus Weightlifting Club in Shanghai, Aug. 4, 2016. Zhou Yinan/Sixth Tone </center> ...oll on competitors' health and relationships. \"The cost to",
+          "context_after": "developing in new directions. He hopes weightlifting can become as popular as football and basketball, with white- collar gym- goers changing the sport's image and reputation. \"Weightlifters aren't me"
+        }
+      ],
+      "proof": [],
+      "significance": [
+        {
+          "text": "The Paper is the first product in China to undergo the overall transformation from traditional media to new media, possessing Class I Qualification for Internet News Information Service and Audio Video Service Permission.",
+          "exhibit_id": "D13",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D13_p2_p2_b2_82d0c268",
+          "context_before": "## About The Paper ...f Internet technologies and the inheritance of news collecting and editing genes, The Paper generates news 24 hours a day on high- quality current politics, ideology, finance & e",
+          "context_after": "The Paper has four terminals: APP, IPAD, PC, and WAP, and has opened accounts on such platforms as WeChat, Weibo, Douyin, Kuaishou, and Toutiao, with its product matrix covering all channels. By Mar. "
+        },
+        {
+          "text": "During the period from 2018 to 2023, The Paper was awarded over 400 domestic and international awards and honors, such as the China Journalism Award and SND Best of Digital Design.",
+          "exhibit_id": "D13",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D13_p2_p2_b4_90992266",
+          "context_before": "...for media convergence and transformation across the country, a leading brand in Internet original new media, and one of the most important omni- media content providers of the global Chinese Intern",
+          "context_after": "## One of the most important omni-media content providers of the global Chinese Internet. - News & Information: The Paper focuses on covering Chinese current politics, finance & economics, culture, an"
+        }
+      ],
+      "context": [
+        {
+          "text": "The Paper is different from BuzzFeed, Vice and other digital voices that have risen up to challenge traditional media: It is overseen by the Chinese Communist Party, prospering at a time when China's leaders are increasingly restricting what their people read and watch.",
+          "exhibit_id": "D12",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D12_p2_p2_b4_b76374a8",
+          "context_before": "April 5, 2016 ...as official corruption and a recent scandal involving improperly stored vaccines — with a clutch of digital bells and whistles. Its smartphone app, it says, has been downloaded about ",
+          "context_after": "Now The Paper's owner has set its sights elsewhere. On Wednesday it is set to publicly kick off an English- language version called Sixth Tone in hopes of making its recipe for success in China work a"
+        },
+        {
+          "text": "Qu - - known as \"Gaby Q\" within the weightlifting community - - first came to the sport when she was working in London in 2014.",
+          "exhibit_id": "D9",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_D9_p3_p3_b4_fa3d3fd0",
+          "context_before": "...s built on a state sport system that draws young recruits and pushes talent up through the ranks. But for adults who want to pursue Olympic weightlifting as a hobby, the system is entirely closed o",
+          "context_after": "d. \"I wanted to learn something I could show off,\" she told Sixth Tone."
+        }
+      ],
+      "exhibits": [
+        "D12",
+        "D13",
+        "D9"
+      ],
+      "conclusion": "The coverage by The Paper, a major publication, meets the requirements of 8 C.F.R. §204.5(h)(3)(iii).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": true,
+        "has_context": true,
+        "score": 80
+      },
+      "id": "arg-4590c433",
+      "sub_argument_ids": [
+        "subarg-3c835f29",
+        "subarg-786b88eb"
+      ]
+    },
+    {
+      "title": "The Jakarta Post Coverage of Ms. Qu",
+      "standard": "published_material",
+      "group_key": "The Jakarta Post",
+      "claim": [],
+      "proof": [],
+      "significance": [
+        {
+          "text": "The year 1983 marked an important milestone in the history of media publishing in Indonesia when the first issue of The Jakarta Post appeared on April 25.",
+          "exhibit_id": "D2",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D2_p2_p2_b7_0cbd6a56",
+          "context_before": "Progress & Development Promoting Art & Culture ## The Jakarta Post History",
+          "context_after": "The new English daily is unique, not only in its goal, which is to improve the standard of English language media in Indonesia, but also in bringing together four competing media publishers into produ"
+        },
+        {
+          "text": "The new English daily is unique, not only in its goal, which is to improve the standard of English language media in Indonesia, but also in bringing together four competing media publishers into producing a quality newspaper with an Indonesian perspective.",
+          "exhibit_id": "D2",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D2_p2_p2_b8_4d608df9",
+          "context_before": "## The Jakarta Post History The year 1983 marked an important milestone in the history of media publishing in Indonesia when the first issue of The Jakarta Post appeared on April 25.",
+          "context_after": "The objective of the new publication was to present to the public a newspaper of the highest quality that would provide its readers with all the news that was not only fit to print, but that would dee"
+        },
+        {
+          "text": "The Jakarta Post is a daily English language newspaper in Indonesia. The paper is owned by PT Bina Media Tenggara, and the head office is in the nation's capital, Jakarta. The Jakarta Post was started as a collaboration between four Indonesian media under the urging of Information Minister Ali Murtopo and politician Jusuf Wanandi. After the first issue was printed on 25 April 1983, it spent several years with minimal advertisements and increasing circulation. After a change in chief editors in 1",
+          "exhibit_id": "D3",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D3_p4_p4_b4_ec9ae98b",
+          "context_before": "Jakarta Post ## Summary",
+          "context_after": "## Created / Published Indonesia."
+        },
+        {
+          "text": "'The Jakarta Post' journalist wins Adam Malik award",
+          "exhibit_id": "D4",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D4_p2_p2_b0_c76b26c8",
+          "context_before": "D-4",
+          "context_after": "The Jakarta Post, Jakarta | World | Fri, January 09 2015, 11:47 AM Congratulations: Foreign Minister Retno LP Marsudi (third left) poses with Adam Malik award recipients Bagus BT Saragih of The Jakart"
+        },
+        {
+          "text": "The Adam Malik award, which takes its name from a former journalist- turned- foreign minister, was won by the Post's journalists for several times.",
+          "exhibit_id": "D4",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D4_p3_p3_b2_05540182",
+          "context_before": "## Jakarta Post WHEW I V IUI NEWS REVISION.",
+          "context_after": "The ministry first presented its awards to the national media in 2002. The Post allocates almost four pages to international news, views and analysis every day."
+        },
+        {
+          "text": "The Post was awarded top honors for its investigative report on the unrest in Wamena, Jayawijaya regency, Papua, in September 2019, and a bronze award for its print edition on the 2019 presidential election.",
+          "exhibit_id": "D4",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D4_p5_p5_b1_0edcb8c5",
+          "context_before": "Catch Asia! Media Network # 'The Jakarta Post' wins twice at Indonesia Print Media Awards",
+          "context_after": "Gemma Holliani Cahya (The Jakarta Post) Jakarta \\(\\cdot\\) Sat, February 8, 2020 T he Jakarta Post received two awards at the 2020 Indonesia Print Media Awards (IPMA) from the Union of Print Media Comp"
+        }
+      ],
+      "context": [],
+      "exhibits": [
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "conclusion": "The coverage by The Jakarta Post, a major publication, meets the requirements of 8 C.F.R. §204.5(h)(3)(iii).",
+      "completeness": {
+        "has_claim": false,
+        "has_proof": false,
+        "has_significance": true,
+        "has_context": false,
+        "score": 40
+      },
+      "id": "arg-705d9d10",
+      "sub_argument_ids": [
+        "subarg-47027ba3",
+        "subarg-ea8ebaa7"
+      ]
+    },
+    {
+      "title": "China Sports Daily Coverage of Ms. Qu",
+      "standard": "published_material",
+      "group_key": "China Sports Daily",
+      "claim": [
+        {
+          "text": "Yaruo Qu, founder of Shanghai Venus Weightlifting Club, made a speech at the Seminar. Her club was officially established in October 2015 at the Weightlifting Training Center of the Shanghai Jing'an District Administration of Sports and has become the exclusive partner of the Shanghai Weightlifting Association.",
+          "exhibit_id": "D5",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_D5_p5_p5_b0_35a57a46",
+          "context_before": "...roject, providing important references and lessons for weightlifting, which has already led the trends and gained immense popularity in public fitness abroad, on how to fulfill its potential in Chi",
+          "context_after": "\"People who are passionate about weightlifting are different from before, with an increasing educational background, including the backbone or elites of society, such as lawyers and financial workers,"
+        }
+      ],
+      "proof": [],
+      "significance": [
+        {
+          "text": "China Sports Daily has been recognized multiple times as \"Top Ten Most Beloved Newspapers\", \"Top Ten Influential Media Brands in China\", etc. in various national selection activities of the most popular newspapers among readers.",
+          "exhibit_id": "D6",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D6_p3_p3_b5_85051b17",
+          "context_before": "Established in 1958 (originally as Sports News), China Sports Daily published in folio with 8 pages. ...ehensiveness, readability, and professionalism. It is one of the primary newspapers displayed in",
+          "context_after": "personnel to guarantee their living conditions and political rights. ## People's Sports Publishing House"
+        },
+        {
+          "text": "China Sports Daily, supported by the General Administration of Sport of China, was once the mainstream journal of sports journals in China, with a weekly circulation of 1,000,000 copies.",
+          "exhibit_id": "D7",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D7_p2_p2_b6_1d950900",
+          "context_before": "...urther deepening of reform and opening up, various industries in China have made great progress, and the sports journal industry has also developed rapidly during this period, showing a booming tre",
+          "context_after": "Titan Sports and Soccer News are the most important journals in China's sports journal market. Titan Sports is the newspaper with the largest circulation in China's comprehensive sports journal market"
+        },
+        {
+          "text": "Titan Sports is the newspaper with the largest circulation in China's comprehensive sports journal market and has a broad market prospect.",
+          "exhibit_id": "D7",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D7_p2_p2_b7_ccc56db9",
+          "context_before": "## Current Situation ...cause professional sports journals such as Soccer News, Slam, and Soccer World quickly gained a place in the market, and the weekly circulation of China Sports Daily decreased ",
+          "context_after": "cooperation with other media at home and abroad, ensuring the timeless and high quality of reports. At present, Soccer News has established publication centers in foreign countries with remarkable cir"
+        },
+        {
+          "text": "At present, the weekly circulation of Titan Sports is about 4,000,000 copies.",
+          "exhibit_id": "D7",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D7_p2_p2_b7_dbc54b14",
+          "context_before": "## Current Situation ...cause professional sports journals such as Soccer News, Slam, and Soccer World quickly gained a place in the market, and the weekly circulation of China Sports Daily decreased ",
+          "context_after": "cooperation with other media at home and abroad, ensuring the timeless and high quality of reports. At present, Soccer News has established publication centers in foreign countries with remarkable cir"
+        },
+        {
+          "text": "Soccer News, with a weekly circulation of 1,000,000 copies, has 6 issues a week and is the most influential football newspaper in China.",
+          "exhibit_id": "D7",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D7_p2_p2_b7_2cbc9611",
+          "context_before": "## Current Situation ...cause professional sports journals such as Soccer News, Slam, and Soccer World quickly gained a place in the market, and the weekly circulation of China Sports Daily decreased ",
+          "context_after": "cooperation with other media at home and abroad, ensuring the timeless and high quality of reports. At present, Soccer News has established publication centers in foreign countries with remarkable cir"
+        }
+      ],
+      "context": [
+        {
+          "text": "China Sports Daily aims to provide comprehensive and multidimensional coverage of developments in Chinese and global sports, delivering timely, authoritative, vivid, and rich news reports to cater to the diverse reading needs of its readers.",
+          "exhibit_id": "D6",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D6_p3_p3_b4_0d890e41",
+          "context_before": "Supervised by the General Administration of Sport of China and hosted by the China Sports Daily General Office, China Sports Daily is the only central- level sports daily in China. Established in 1958",
+          "context_after": "China Sports Daily has been recognized multiple times as \"Top Ten Most Beloved Newspapers\", \"Top Ten Influential Media Brands in China\", etc. in various national selection activities of the most popul"
+        }
+      ],
+      "exhibits": [
+        "D5",
+        "D6",
+        "D7"
+      ],
+      "conclusion": "The coverage by China Sports Daily, a major publication, meets the requirements of 8 C.F.R. §204.5(h)(3)(iii).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": true,
+        "has_context": true,
+        "score": 80
+      },
+      "id": "arg-5859ba56",
+      "sub_argument_ids": [
+        "subarg-0f104fc4",
+        "subarg-d8765c9d"
+      ]
+    },
+    {
+      "title": "People's Daily Coverage of Ms. Qu",
+      "standard": "published_material",
+      "group_key": "People's Daily",
+      "claim": [],
+      "proof": [],
+      "significance": [
+        {
+          "text": "Sponsors: People's Daily",
+          "exhibit_id": "D8",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D8_p2_p2_b9_217fd781",
+          "context_before": "Basic Information Former Title: The Press Series Operations",
+          "context_after": "Pub. Periodicity: Semimonthly ISSN: 0257- 5930"
+        },
+        {
+          "text": "Combined IF: 0.139",
+          "exhibit_id": "D8",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D8_p2_p2_b21_54b87384",
+          "context_before": "AMI Extension Evaluation Information",
+          "context_after": "(2020) Comprehensive IF: 0.062 This journal is included in the following"
+        },
+        {
+          "text": "Journal Honors: 100 Key Journals",
+          "exhibit_id": "D8",
+          "purpose": "credibility_proof",
+          "snippet_id": "snp_D8_p2_p2_b31_0a3ff767",
+          "context_before": "2011 edition, 2014 edition Journal Honors:",
+          "context_after": "Article Issue Browse"
+        }
+      ],
+      "context": [],
+      "exhibits": [
+        "D8"
+      ],
+      "conclusion": "The coverage by People's Daily, a major publication, meets the requirements of 8 C.F.R. §204.5(h)(3)(iii).",
+      "completeness": {
+        "has_claim": false,
+        "has_proof": false,
+        "has_significance": true,
+        "has_context": false,
+        "score": 40
+      },
+      "id": "arg-944d76b0",
+      "sub_argument_ids": [
+        "subarg-a4544e14",
+        "subarg-0c91dad7"
+      ]
+    },
+    {
+      "title": "Ms. Qu's Original Founder of Venus Weightlifting Club, the first independent Olympic weightlifting club in China, and creator of the Body Alignment Training (BAT) system, a training method based on biomechanics, traditional Chinese bone setting, and modern sports science. and Its Major Significance",
+      "standard": "original_contribution",
+      "group_key": "Founder of Venus Weightlifting Club, the first independent Olympic weightlifting club in China, and creator of the Body Alignment Training (BAT) system, a training method based on biomechanics, traditional Chinese bone setting, and modern sports science.",
+      "claim": [
+        {
+          "text": "Internationally renowned Olympic weightlifting coach; founder of Venus Weightlifting and Body Alignment Training (BAT). Specializes in posture correction, sports rehabilitation, and strength training by integrating traditional Chinese bone-setting theories with modern sports science.",
+          "exhibit_id": "A1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_A1_p2_p2_b3_ec2557cf",
+          "context_before": "+86 18770203829 | gabya@venusweightlifting.com Building 1, B1, No. 751 Lingling Road, Xuhui District, Shanghai, 200030, China ## Profile",
+          "context_after": "## Work Experience ## Venus Weightlifting, China"
+        },
+        {
+          "text": "I chose to bring my athletes to train at Venus Weightlifting in Shanghai because Coach Yaruo (Gaby) Qu is highly competent in enhancing their performance.",
+          "exhibit_id": "B1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B1_p2_p2_b3_0e21ac4b",
+          "context_before": "To whom it may concern My name is Siem Hauw Kiauw Jeffry, and I am the President of Indonesian Weightlifting Federation East Java Province (PABSI).",
+          "context_after": "I had the pleasure of working with Coach Gaby and Venus Weightlifting over the past year, organizing a successful training camp in Shanghai for our athletes. Athletes from various provinces, including"
+        },
+        {
+          "text": "Coach Gaby's Body Alignment Training methods creatively emphasize the importance of proper alignment and functionality in athletic training to prevent overuse injuries.",
+          "exhibit_id": "B1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B1_p2_p2_b6_8d86d203",
+          "context_before": "...ver the past year, organizing a successful training camp in Shanghai for our athletes. Athletes from various provinces, including those preparing for national competitions, attended the training ca",
+          "context_after": "Coach Gaby's technical expertise in Olympic weightlifting coaching is second to none, and she has made a remarkable impact on the progress of numerous athletes under her tutelage. The training methodo"
+        },
+        {
+          "text": "Coach Gaby's technical expertise in Olympic weightlifting coaching is second to none, and she has made a remarkable impact on the progress of numerous athletes under her tutelage.",
+          "exhibit_id": "B1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B1_p3_p3_b0_7fc381c5",
+          "context_before": "...a, who won gold medals in the following national competitions (XXI National Sports Week (PON) in 2024, which is routinely held every 4 (four) years), after participating in Coach Gaby's training ca",
+          "context_after": "As a result of the success we've seen so far, we are excited to continue our collaboration in 2025. We plan to send more athletes for training under Coach Gaby's expert guidance and explore deeper par"
+        },
+        {
+          "text": "Her groundbreaking training approach has been widely implemented in coaching new weightlifters and rehabilitating injured athletes, earning widespread acclaim.",
+          "exhibit_id": "B1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B1_p3_p3_b0_5eb1711a",
+          "context_before": "...a, who won gold medals in the following national competitions (XXI National Sports Week (PON) in 2024, which is routinely held every 4 (four) years), after participating in Coach Gaby's training ca",
+          "context_after": "As a result of the success we've seen so far, we are excited to continue our collaboration in 2025. We plan to send more athletes for training under Coach Gaby's expert guidance and explore deeper par"
+        },
+        {
+          "text": "As an Executive Board Member of the International Weightlifting Federation, Vice President of the Commonwealth Weightlifting Federation and President of the Singapore Weightlifting Federation, I have had the privilege of working closely with Ms. Qu on several initiatives. I have witnessed firsthand her exceptional contributions to the sport of weightlifting and her profound impact on athletes worldwide.",
+          "exhibit_id": "B2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B2_p2_p2_b5_b527db42",
+          "context_before": "Dear Sir/Madam, I am honored to write this letter of recommendation for Ms. Qu Yaruo.",
+          "context_after": "My collaboration with Ms. Qu has focused primarily on the development of the Singapore Weightlifting Federation, where her support has been invaluable. Specifically, she has contributed in the followi"
+        },
+        {
+          "text": "Through Venus Weightlifting and her extensive social media following, Ms. Qu has supported multiple international and local weightlifting events organized by the Singapore Weightlifting Federation, thereby bolstering the visibility and success of these competitions.",
+          "exhibit_id": "B2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B2_p2_p2_b8_5ea64b86",
+          "context_before": "...boration with Ms. Qu has focused primarily on the development of the Singapore Weightlifting Federation, where her support has been invaluable. Specifically, she has contributed in the following wa",
+          "context_after": "## 2. Sponsorship Acquisition Ms. Qu has facilitated connections with international brands and helped secure sponsorships for weightlifting equipment and apparel from companies such as Cluster, Anta, "
+        },
+        {
+          "text": "Ms. Qu has facilitated connections with international brands and helped secure sponsorships for weightlifting equipment and apparel from companies such as Cluster, Anta, and Luxiaojun. This has significantly enhanced our athletes' training facilities, improving both their performance and the overall quality of their preparation.",
+          "exhibit_id": "B2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B2_p2_p2_b10_b4451dc2",
+          "context_before": "...ng, Ms. Qu has supported multiple international and local weightlifting events organized by the Singapore Weightlifting Federation, thereby bolstering the visibility and success of these competitio",
+          "context_after": "## 3. Discovery and Development of Young Athletes Ms. Qu's influence extends beyond elite athletes. She has played a critical role in identifying and nurturing promising young weightlifters. By levera"
+        },
+        {
+          "text": "Ms. Qu has played a critical role in identifying and nurturing promising young weightlifters. By leveraging her network and resources, Ms. Qu has helped us recruit and provide opportunities for these athletes to hone their skills and realize their potential.",
+          "exhibit_id": "B2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B2_p2_p2_b12_80a21939",
+          "context_before": "...l from companies such as Cluster, Anta, and Luxiaojun. This has significantly enhanced our athletes' training facilities, improving both their performance and the overall quality of their preparati",
+          "context_after": "Ms. Qu's contributions are not limited to the Singapore Weightlifting Federation. Through her work with Venus Weightlifting and Body Alignment Training (BAT), she has had a profound impact on athletes"
+        },
+        {
+          "text": "Through her work with Venus Weightlifting and Body Alignment Training (BAT), she has had a profound impact on athletes and coaches worldwide. Guided by her philosophy, \"Human before athlete,\" her holistic approach to training and recovery has led to remarkable achievements for her athletes in international competitions.",
+          "exhibit_id": "B2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B2_p3_p3_b0_19012190",
+          "context_before": "...ring promising young weightlifters. By leveraging her network and resources, Ms. Qu has helped us recruit and provide opportunities for these athletes to hone their skills and realize their potenti",
+          "context_after": "I am confident that Ms. Qu possesses not only the talent and expertise as an athlete and coach but also the drive to continue making significant contributions to the global weightlifting community. He"
+        },
+        {
+          "text": "I, the undersigned, Xiaojun Lyu, three-time Olympic Gold Medalist (Olympic Games London 2012, Olympic Games Rio 2016, and Olympic Games Tokyo 2020 (actually held in 2021) and four-time IWF World Championships Gold Medalist, have witnessed that Gaby has made tremendous contributions to the development of the worldwide weightlifting course and the improvement of athletes' performance and health.",
+          "exhibit_id": "B3",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B3_p2_p2_b2_7b20340b",
+          "context_before": "## Recommendation Esteemed Officer,",
+          "context_after": "Fortunately, I participated in the ALL Stars Weightlifting held by Venus Weightlifting. This event is remarkable in the amateur weightlifting industry in China, aiming to provide a high- level competi"
+        },
+        {
+          "text": "The Body Alignment Training (BAT) program founded by Gaby reflects her deep concern for the overall health of athletes, especially regarding innovative methods of body alignment and injury and disease prevention.",
+          "exhibit_id": "B3",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B3_p2_p2_b5_b2654490",
+          "context_before": "...s since its establishment, attracting contestants from 32 provinces and cities throughout China, and has become one of the most influential events in the development of amateur weightlifting in Chi",
+          "context_after": "physical health management are also necessary. Gaby has helped countless athletes address their issues with body alignment and injuries through her innovative training methods, so that they are able t"
+        },
+        {
+          "text": "I feel greatly honored to write this recommendation to recommend Ms. Yaruo Qu and the Venus Weightlifting Club (VWC) founded by her to you.",
+          "exhibit_id": "B4",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B4_p2_p2_b4_dadc987c",
+          "context_before": "## Recommendation Esteemed Sir/ Madam,",
+          "context_after": "Shanghai Donnor Exhibition Service Co. Ltd. is a professional exhibition company promoting domestic and foreign trade and technological exchange in the sports industry. We have successfully organized "
+        },
+        {
+          "text": "Venus Weightlifting Club participated in the Expo several times, showing its extraordinary contributions to the amateur weightlifting industry and its leading position in driving forward the development of amateur weightlifting in China and even globally.",
+          "exhibit_id": "B4",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B4_p2_p2_b5_b50ec1c3",
+          "context_before": "Esteemed Sir/ Madam, ... to the development of China's weightlifting industry. With years of experience in the fitness industry, I deeply understand VWC's unique value in driving forward weightlifting",
+          "context_after": "As the first amateur weightlifting club in China, the Venus Weightlifting Club successfully fills the gaps in amateur weightlifting in China. In the past, weightlifting in China was dominated by the n"
+        },
+        {
+          "text": "As the first amateur weightlifting club in China, the Venus Weightlifting Club successfully fills the gaps in amateur weightlifting in China.",
+          "exhibit_id": "B4",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B4_p2_p2_b6_4caf5d2b",
+          "context_before": "... to the development of China's weightlifting industry. With years of experience in the fitness industry, I deeply understand VWC's unique value in driving forward weightlifting in China and the wor",
+          "context_after": "Each year, Venus Weightlifting Club organizes or participates in multiple events, training, and public welfare activities, attracting the participation of numerous weightlifting enthusiasts and improv"
+        },
+        {
+          "text": "Ms. Qu has helped more than 20 students win medals in competitions around the world with her training system; therein, 12 athletes have made their step in the professional arena, become a vital new force in the global weightlifting industry, and won multiple championships.",
+          "exhibit_id": "B4",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B4_p3_p3_b1_89b09420",
+          "context_before": "...ticular, the \"Venus Weightlifting Challenge & Amateur Weightlifting Championships\" hosted by the Club has become a significant event for weightlifting enthusiasts nationwide, with the participation",
+          "context_after": "Under the leadership of Ms. Qu, Venue Weightlifting Club has developed a set of systematic and scientific weightlifting training systems and advanced the popularization of amateur weightlifting by org"
+        },
+        {
+          "text": "As the Founder of OneFit and a leader in fitness training, I'm pleased to recommend Yaru Qu (Gaby) to you. During our several times of cooperation (such as weightlifting coach training and athlete injury prevention), I was deeply impressed by Yaru Qu's excellence in weightlifting training for the Olympic Games in particular.",
+          "exhibit_id": "B5",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B5_p2_p2_b2_6b9f0780",
+          "context_before": "## Recommendation Your Excellency,",
+          "context_after": "About OneFit and me: I founded OneFit in 2011 with the purpose of introducing world- class fitness techniques into China, pioneering the coach training system in China. With 13- year efforts, OneFit h"
+        },
+        {
+          "text": "Yaru Qu, Founder of Venus Weightlifting Club (VWC), the first Olympic weightlifting club in China, has made significant contributions to the popularization and development of Olympic weightlifting.",
+          "exhibit_id": "B5",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B5_p2_p2_b6_5dab473b",
+          "context_before": "...s at the forefront of China's fitness education and training system revolution, leads industry standards, and constantly promotes the fitness industry towards professionalism and internationalizati",
+          "context_after": "Industry influence and leadership of Yaru Qu: Yaru Qu's influence in the fitness industry is obvious. She, as an internal weightlifting trainer of OneFit, trains coaches of OneFit, ensuring they maste"
+        },
+        {
+          "text": "Yaruo Qu's BAT has not only produced notable results in OneFit but has also been adopted by many international fitness institutions, including but not limited to the Singapore Weightlifting Federation, the Brunei national team weightlifters, and the Indonesian national team athletes.",
+          "exhibit_id": "B5",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B5_p3_p3_b2_f2b3823e",
+          "context_before": "Translation ONEFIT EVERYONE FIT athletes achieve optimal performance during training. Specific case:",
+          "context_after": "Cooperation with OneFit: As an internal weightlifting trainer of OneFit, Yaruo Qu has played a vital role in improving the professional competence of our coaches. Under her guidance, our coaches have "
+        },
+        {
+          "text": "Upon the review conducted by Chong Peng, Vice President of the Association and top fitness and bodybuilding expert in China, and me, the Undersigned, on Ms. Yaruo Qu after receiving her membership application, it was certified that Ms. Yaruo Qu had been devoting herself to teaching promotion in the aspect of fitness and had been serving the industry for 10 years since establishing Shanghai Yiqing Fitness Management Co. Ltd. in 2015.",
+          "exhibit_id": "C2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_C2_p3_p3_b1_b7d99017",
+          "context_before": "...p application review of the Association, an individual member should have been engaged in the fitness and bodybuilding or relevant industries for more than 10 years or be a senior practitioner who ",
+          "context_after": "It is hereby certified that Ms. Yaruo Qu has been awarded individual membership upon the review of the Association. Reference: Hao Wang Vice President"
+        },
+        {
+          "text": "During her tenure as Senior Management and Technical Instructor in the company, Ms. Yaruo Qu successfully organized multiple large weightlifting competitions and activities in the industry, and her significant promotional effect on fitness and bodybuilding activities was widely recognized in the industry, contributing to the key position of the company's brand in the industry and advancing the enthusiasm and participation of Shanghai citizens in fitness and bodybuilding activities.",
+          "exhibit_id": "C2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_C2_p3_p3_b1_4dc2be37",
+          "context_before": "...p application review of the Association, an individual member should have been engaged in the fitness and bodybuilding or relevant industries for more than 10 years or be a senior practitioner who ",
+          "context_after": "It is hereby certified that Ms. Yaruo Qu has been awarded individual membership upon the review of the Association. Reference: Hao Wang Vice President"
+        },
+        {
+          "text": "The Star Level Evaluation Standard Implementation Outline for Commercial Fitness Service Gymnasiums in Shanghai and the Professional Skill Level Evaluation Standard Implementation Outline for Fitness Coaches in Shanghai were published at the conference at the same time to standardize and evaluate services as well as coaches' skills and qualifications of fitness clubs in Shanghai for the year.",
+          "exhibit_id": "C3",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_C3_p9_p9_b2_6b5f7776",
+          "context_before": "...aining, and exhibition services. That is to say, the brand- new association is showing new energy and stepping into a new era. We hope aspirants actively join us to jointly advance nationwide sport",
+          "context_after": "It was said that 2018 Shanghai Fitness and Bodybuilding Championships would be held in September 2018, covering nts and 34 categories in the Adult Group and College Student Group, making it the larges"
+        },
+        {
+          "text": "I approached the physician and asked to learn from him, and fortunately, he accepted me as an apprentice.",
+          "exhibit_id": "E1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E1_p10_p10_b10_0cc29469",
+          "context_before": "... very simple exercise that he asked me to do for just 8 reps a day, without any equipr confused wondering if this simple exercise would ever work, yet I still followed the instruction since I had n",
+          "context_after": "It was like magic. The physician... let's call him Master Shifu like in Kung Fu Panda. Shifu (师傅), in Chinese literally means teacher that's what he was to me. Master Shifu told me that pain is merely"
+        },
+        {
+          "text": "With Gaby's Body Alignment Training, athletes and fitness enthusiasts alike can train like a human before training like an athlete, achieving full-body functionality for sustained progress and pain-free training.",
+          "exhibit_id": "E1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E1_p12_p12_b2_2bd372b4",
+          "context_before": "...ers unique needs and ensures full- body alignment and functionality. By prioritizing proper alignment, athletes cc efficiently and effectively for sustained progress and minimize the risk of injuri",
+          "context_after": "I would love to help those of you who have experienced similar circumstances as me, to go and grow further of pain. Train like a human before you train like an athlete."
+        },
+        {
+          "text": "I Enjoyed Being Coached By Someone As Knowledgeable And Innovative As Gaby!",
+          "exhibit_id": "E2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E2_p8_p8_b7_1c472285",
+          "context_before": "## ★★★★★ ## ★★★★★",
+          "context_after": "I started with the Platinum Membership with Venus Weightlifting and was able to break a long plateau in my lifting! I love how Gabby gives very precise cues and guidance after observing my lifts, and "
+        },
+        {
+          "text": "I started with the Platinum Membership with Venus Weightlifting and was able to break a long plateau in my lifting! I love how Gabby gives very precise cues and guidance after observing my lifts, and was surprised by the amount of resources that they have.",
+          "exhibit_id": "E2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E2_p8_p8_b8_8af28862",
+          "context_before": "## ★★★★★ I Enjoyed Being Coached By Someone As Knowledgeable And Innovative As Gaby!",
+          "context_after": "MyKnees Are Most Of The Times Pain Free My right Ankle seems to getting better since I'm doing the BAT of last week, I combine that with the inner thighs work and the internal rotation one"
+        },
+        {
+          "text": "Developed from 10- years' coaching experience",
+          "exhibit_id": "E2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E2_p17_p17_b2_cd727829",
+          "context_before": "## Lift, like never before! This program is for everyone - beginners, competitive lifters, and coaches can all benefit. I hope you could enjoy learning and training with us on this journey!",
+          "context_after": "A holistic program - 3 training days/week Know what to do: step- by- step demos in detail"
+        },
+        {
+          "text": "Shanghai Yiqing Fitness Management Co., Ltd. indeed established and legally operates Venus Weightlifting Club, which is the first weightlifting club in China aiming to promote Chinese-style Olympic weightlifting technologies.",
+          "exhibit_id": "E4",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E4_p2_p2_b3_aaaa0f23",
+          "context_before": "Party A: Shanghai Jing'an No. 2 Youth Amateur Sports School Party B: Shanghai Yiqing Fitness Management Co., Ltd.",
+          "context_after": "## I. Cooperation Background Due to three major problems confronted in weightlifting events, i.e., shortage of talents, a lack of specialized youth training, and a contradiction between the increasing"
+        },
+        {
+          "text": "My name is Cassandra, and I am a national- level weightlifter from Singapore. I had the opportunity to attend Gaby's Body Alignment Training (BAT) and weightlifting seminar in July 2023 and subsequently began training under her guidance.",
+          "exhibit_id": "E5",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E5_p2_p2_b3_4b8a251b",
+          "context_before": "14 March 2025 To Whom It May Concern,",
+          "context_after": "Prior to working with Gaby, I experienced persistent discomfort during training, which affected my lifting efficiency and overall performance. Despite years of training, these challenges remained unre"
+        },
+        {
+          "text": "Gaby's approach was fundamentally different—her combination of weightlifting expertise and movement correction strategies provided a comprehensive system that significantly improved my performance.",
+          "exhibit_id": "E5",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E5_p2_p2_b4_412b8c9f",
+          "context_before": "To Whom It May Concern, ...onal- level weightlifter from Singapore. I had the opportunity to attend Gaby's Body Alignment Training (BAT) and weightlifting seminar in July 2023 and subsequently began t",
+          "context_after": "Through her coaching, I was able to lift pain- free for the first time, develop better mobility and stability, and refine my technique for more efficient and sustainable progress. Her methodology is s"
+        },
+        {
+          "text": "By the end of 2024, I was selected as a national weightlifting athlete after competing in my country's national competition. Gaby's guidance played a pivotal role in my ability to reach this level, and her training principles continue to shape my progress as an athlete.",
+          "exhibit_id": "E5",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E5_p2_p2_b6_4cea56a2",
+          "context_before": "...d. Gaby's approach was fundamentally different—her combination of weightlifting expertise and movement correction strategies provided a comprehensive system that significantly improved my performan",
+          "context_after": "Gaby's contributions to the field of weightlifting, movement optimization, and athlete performance are invaluable, and her ability to train and mentor athletes at a high level sets her apart. Please f"
+        },
+        {
+          "text": "Gaby's contributions to the field of weightlifting, movement optimization, and athlete performance are invaluable, and her ability to train and mentor athletes at a high level sets her apart.",
+          "exhibit_id": "E5",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E5_p2_p2_b7_e305100a",
+          "context_before": "...like conventional training approaches, her system integrates body alignment principles with weightlifting performance, providing a framework that not only enhances strength but also prevents injuri",
+          "context_after": "Please feel free to contact me for any further details. Sincerely,"
+        },
+        {
+          "text": "In December 2024 I began training under Gaby's Body Alignment Training (BAT) system, and within just four months, I started to see progress again and everything changed.",
+          "exhibit_id": "E6",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E6_p2_p2_b4_897430bc",
+          "context_before": "## To Whom It May Concern, ...trength and weightlifting mobility, which held me back from reaching my full potential. No matter how much I trained, I felt like I was plateauing and hitting a wall—unti",
+          "context_after": "I can lift heavier loads ( \\(90\\%\\) and above) more often and pain- free. I recover faster with her guidance with stretches, warmups, cool- downs and mobility work. I have a clearer long- term play/go"
+        },
+        {
+          "text": "I am now preparing for the 2025 lifting competition season, which involve several international and prestigious competitions, which will require me to perform at my peak. The progress I've made under Gaby's training has given me the confidence, technical refinement, and physical readiness to step onto the competition platform stronger than ever.",
+          "exhibit_id": "E6",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E6_p2_p2_b6_99d2c1ff",
+          "context_before": "...t me how to move efficiently and eliminate the root cause of my limitations. Gaby's coaching wasn't about temporary fixes—it was about building a foundation for long- term success. Under her guidan",
+          "context_after": "Although my time with Gaby has only just begun, her impact on my career has been profound, and I have no doubt that her expertise in weightlifting, movement correction, and injury prevention will cont"
+        },
+        {
+          "text": "Although my time with Gaby has only just begun, her impact on my career has been profound, and I have no doubt that her expertise in weightlifting, movement correction, and injury prevention will continue to benefit countless athletes.",
+          "exhibit_id": "E6",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E6_p2_p2_b7_78b2a881",
+          "context_before": "...and mobility work. I have a clearer long- term play/goal with weightlifting. I have learnt more about how the human anatomy affects weightlifting and how to refine my lifts based on my body mechani",
+          "context_after": "Please feel free to contact me if you need any further information. Sincerely,"
+        },
+        {
+          "text": "Ms. Qu's deep understanding of body alignment training and weightlifting techniques significantly contributed to the development of ISHTAR's training programs. She was responsible for curating high-level educational workshops, coaching mentorship programs, and hands-on training experiences that catered to a diverse range of athletes and coaches.",
+          "exhibit_id": "F6",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F6_p2_p2_b3_288bf319",
+          "context_before": ".... As the Singaporean branch of Venus Weightlifting, the company has developed cutting- edge training programs, seminars, and coaching methodologies that have significantly contributed to the indust",
+          "context_after": "Through these initiatives, she helped ISHTAR bridge the gap between traditional weightlifting methodologies and modern scientific approaches, ensuring that the company remained at the forefront of spo"
+        },
+        {
+          "text": "It is my honor to recommend Ms. Yaruq Qu Gaby, an internationally influential expert in Olympic weightlifting, posture training, and sports rehabilitation.",
+          "exhibit_id": "F7",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F7_p2_p2_b4_992d1e62",
+          "context_before": "## Recommendation Letter Dear Officer,",
+          "context_after": "## Background of Collaboration & Gaby's Role We began working with Ms. Gaby in September 2023 on a project aimed at promoting professional weightlifting coaching in Singapore. Ms. Gaby has been the dr"
+        },
+        {
+          "text": "She is the founder of Body Alignment Training (BAT), a system based on biomechanics, traditional Chinese bone setting, and modern sports science, offering a scientific approach to optimizing posture for athletes.",
+          "exhibit_id": "F7",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F7_p2_p2_b6_e90c9d3b",
+          "context_before": "...ntial expert in Olympic weightlifting, posture training, and sports rehabilitation. She has demonstrated exceptional leadership and professional expertise in multiple projects we have collaborated ",
+          "context_after": "## Gaby's Contributions & Impact During our collaboration, Ms. Gaby has demonstrated outstanding professional expertise, management skills, and international influence, with contributions reflected in"
+        },
+        {
+          "text": "Your expertise in leveraging social media, conducting live workshops worldwide, and fostering a community-centered approach has been transformative, inspiring both aspiring athletes and the broader fitness community.",
+          "exhibit_id": "G2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_G2_p2_p2_b6_6934939a",
+          "context_before": "...dly request your support in hosting a session for 40 Higher Nitec in Sport Management students, accompanied by 4 staff members, during their visit to Shanghai under the Asia- Ready Exposure Program",
+          "context_after": "Proposed Session Details: Date: January 14, 2025 (Tuesday) Time: 2:00 PM to 5:00 PM"
+        },
+        {
+          "text": "The Venus Weightlifting and Body Alignment Training (BAT) established by you, an outstanding entrepreneur and educator, has embraced prominent international influence and performance growth within a short period.",
+          "exhibit_id": "G3",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_G3_p2_p2_b3_b484ed40",
+          "context_before": "Dear Ms. Yaruo Qu, ...ociation holds an aim to provide alumni with a platform to share intelligence and exchange experiences, in order to enlighten and inspire more alumni with ambitions of entreprene",
+          "context_after": "I hereby represent KEDGE Business School Chinese Alumni Association to sincerely invite you to attend the Entrepreneurship Sharing Salon to be held on February 28, as an industry sharing guest, and I "
+        },
+        {
+          "text": "As a successful entrepreneur and professional coach, you founded Venus Weightlifting Club (VWC) and Body Alignment Training (BAT), achieving brilliant accomplishments.",
+          "exhibit_id": "G4",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_G4_p2_p2_b3_4e89b2ba",
+          "context_before": "Esteemed Alumna Yaruou Qu, I hope this letter finds you well!",
+          "context_after": "We look forward to your presence to share your entrepreneurial experience with entrepreneurs in Shandong. ## Attachment: Brief Introduction to Shandong Taishan Management Training School"
+        },
+        {
+          "text": "We are convinced that your experiences and insights from your entrepreneurship will enlighten and inspire other alumni engaged in various industries.",
+          "exhibit_id": "G4",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_G4_p2_p2_b3_9d08f8a7",
+          "context_before": "Esteemed Alumna Yaruou Qu, I hope this letter finds you well!",
+          "context_after": "We look forward to your presence to share your entrepreneurial experience with entrepreneurs in Shandong. ## Attachment: Brief Introduction to Shandong Taishan Management Training School"
+        },
+        {
+          "text": "Delegating Person: Yaru0 Qu",
+          "exhibit_id": "G5",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_G5_p5_p5_b1_6ebe860e",
+          "context_before": "Contact Tel.: 63611155 ## Delegation",
+          "context_after": "Delegated Person: I. Delegated Content:"
+        },
+        {
+          "text": "Founder of @venus_weightlifting & @bat_bodyalignmenttraining",
+          "exhibit_id": "G7",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_G7_p2_p2_b6_95256e4f",
+          "context_before": "Gabby Q venus_gabby",
+          "context_after": "# Instagram # Instagram"
+        },
+        {
+          "text": "Since founding Venus Weightlifting—China's first independently- run Olympic weightlifting club—in 2015, I have been fully dedicated to promoting, educating, and developing the sport of weightlifting.",
+          "exhibit_id": "H1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_H1_p2_p2_b2_e1cc29fd",
+          "context_before": "## U.S. Development Plan By Gaby Qu",
+          "context_after": "In 2022, I launched Body Alignment Training (BAT), a training system built on the philosophy of \"Human Before Athlete.\" It integrates traditional Eastern practices (such as Tai Chi and Kung Fu) with m"
+        },
+        {
+          "text": "In 2022, I launched Body Alignment Training (BAT), a training system built on the philosophy of 'Human Before Athlete.'",
+          "exhibit_id": "H1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_H1_p2_p2_b3_dfef1720",
+          "context_before": "By Gaby Qu ... national and international competitions. I've also worked closely with Olympic champions such as Deng Wei and Lu Xiaojun to advance the public understanding and appreciation of weightli",
+          "context_after": "I currently have a social media following of over 500,000 (450K on Instagram and 70K on YouTube) and have already built significant brand influence and recognition in the United States. With a proven "
+        }
+      ],
+      "proof": [],
+      "significance": [
+        {
+          "text": "Delivered online and offline training in over 50 countries, serving Olympic athletes and national team members.",
+          "exhibit_id": "A1",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_A1_p2_p2_b10_6b203373",
+          "context_before": "## Body Alignment Training (BAT), International Founder & Instructor | 2022 - Present",
+          "context_after": "## OneFit Fitness Academy, China Guest Lecturer | 2019 - Present"
+        },
+        {
+          "text": "The camp was highly successful, with several athletes, including Eko Yuli Irawan, a frequent Summer Olympics medal recipient, and Luluk Diana Tri Wijayana, who won gold medals in the following national competitions (XXI National Sports Week (PON) in 2024, which is routinely held every 4 (four) years), after participating in Coach Gaby's training camp.",
+          "exhibit_id": "B1",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_B1_p2_p2_b5_e377d78b",
+          "context_before": "...tes, especially in the province of East Java. I chose to bring my athletes to train at Venus Weightlifting in Shanghai because Coach Yaruo (Gaby) Qu is highly competent in enhancing their performan",
+          "context_after": "These accomplishments would not have been possible without the outstanding guidance and expertise provided by Coach Gaby and the Venus Weightlifting team. Coach Gaby's Body Alignment Training methods "
+        },
+        {
+          "text": "ALL Stars Weightlifting held by Venus Weightlifting... has become one of the most influential events in the development of amateur weightlifting in China.",
+          "exhibit_id": "B3",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_B3_p2_p2_b3_504e61d1",
+          "context_before": "Esteemed Officer, ...hampionships Gold Medalist, have witnessed that Gaby has made tremendous contributions to the development of the worldwide weightlifting course and the improvement of athletes' pe",
+          "context_after": "ALL Stars Weightlifting has reached international standards in aspects such as scale, competition level, and professionalism of organization. In 2019, the event set multiple competition levels, coveri"
+        },
+        {
+          "text": "In 2019, the event set multiple competition levels, covering different weight groups from 55kg to 105kg, ensuring that athletes at different levels have fair competition opportunities. In that year, 185 contestants registered for competition, including 10 national or international athletes, as well as amateur weightlifting enthusiasts nationwide.",
+          "exhibit_id": "B3",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_B3_p2_p2_b4_b9bbefd0",
+          "context_before": "...hampionships Gold Medalist, have witnessed that Gaby has made tremendous contributions to the development of the worldwide weightlifting course and the improvement of athletes' performance and heal",
+          "context_after": "The Body Alignment Training (BAT) program founded by Gaby reflects her deep concern for the overall health of athletes, especially regarding innovative methods of body alignment and injury and disease"
+        },
+        {
+          "text": "The \"Venus Weightlifting Challenge & Amateur Weightlifting Championships\" hosted by the Club has become a significant event for weightlifting enthusiasts nationwide, with the participation of more than 200 contestants each year.",
+          "exhibit_id": "B4",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_B4_p3_p3_b0_4a589c2d",
+          "context_before": "...ina's fitness industry since its founding in 2015. With several training venues and a powerful coaching team, the Club strives to provide scientific and systematic weightlifting training for traine",
+          "context_after": "In terms of athlete cultivation, Ms. Qu has helped more than 20 students win medals in competitions around the world with her training system; therein, 12 athletes have made their step in the professi"
+        },
+        {
+          "text": "OneFit has developed into a leading fitness brand in China. It has 14 branch stores, has cumulatively trained over 200,000 coaches, and has its training courses adopted by many international fitness institutions.",
+          "exhibit_id": "B5",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_B5_p2_p2_b4_a7506b32",
+          "context_before": "...times of cooperation (such as weightlifting coach training and athlete injury prevention), I was deeply impressed by Yaru Qu's excellence in weightlifting training for the Olympic Games in particul",
+          "context_after": "Contributions made by Yaru Qu to the fitness industry: Yaru Qu, Founder of Venus Weightlifting Club (VWC), the first Olympic weightlifting club in China, has made significant contributions to the popu"
+        },
+        {
+          "text": "With the application of BAT, athletes' knee injury rate significantly decreased by 32%.",
+          "exhibit_id": "B5",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_B5_p3_p3_b2_57374fcd",
+          "context_before": "Translation ONEFIT EVERYONE FIT athletes achieve optimal performance during training. Specific case:",
+          "context_after": "Cooperation with OneFit: As an internal weightlifting trainer of OneFit, Yaruo Qu has played a vital role in improving the professional competence of our coaches. Under her guidance, our coaches have "
+        },
+        {
+          "text": "The Paper is a new media success story in a fast-changing marketplace for news. It covers contentious issues — such as official corruption and a recent scandal involving improperly stored vaccines — with a clutch of digital bells and whistles. Its smartphone app, it says, has been downloaded about 10 million times.",
+          "exhibit_id": "D12",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_D12_p2_p2_b3_1bc948dd",
+          "context_before": "By Didi Kirsten Tatlow April 5, 2016",
+          "context_after": "But The Paper is different from BuzzFeed, Vice and other digital voices that have risen up to challenge traditional media: It is overseen by the Chinese Communist Party, prospering at a time when Chin"
+        },
+        {
+          "text": "In addition to 22 Chinese and eight non-Chinese staff, Sixth Tone will use the resources of The Paper, which include a network of about 400 text and multimedia journalists — and a drone.",
+          "exhibit_id": "D12",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_D12_p6_p6_b6_98c3c1a9",
+          "context_before": "...ries, with interactive graphics, about Ling Jihua, a former top aide to former President Hu Jintao who was arrested and accused of corruption, adultery and improperly hoarding party and state secre",
+          "context_after": "Shanghai United Media Group is overseen by the city's Communist Party Committee, and it owns a clutch of other Chinese media outlets. The group is initially investing 30 million renminbi in Sixth Tone"
+        },
+        {
+          "text": "By Mar. 2024, The Paper APP has been downloaded over 250 million times; the followers of The Paper have exceeded 32.42 million on Weibo, exceeded 3.96 million on the WeChat official account, and exceeded 41.77 million on Douyin, and The Paper reaches 450 million users across all online platforms every day.",
+          "exhibit_id": "D13",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_D13_p2_p2_b3_871bfe03",
+          "context_before": "...f Internet technologies and the inheritance of news collecting and editing genes, The Paper generates news 24 hours a day on high- quality current politics, ideology, finance & economics, and cultu",
+          "context_after": "During the period from 2018 to 2023, The Paper was awarded over 400 domestic and international awards and honors, such as the China Journalism Award and SND Best of Digital Design. ## One of the most "
+        },
+        {
+          "text": "On the first day of publication, not more than 5,474 copies of the newspaper reached readers.",
+          "exhibit_id": "D2",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_D2_p2_p2_b15_3dee1448",
+          "context_before": "...hing some of the leading national publications: Suara Karya, Kompas, Sinar Harapan and Tempo. Ten percent of equity (later increased to 20 percent) was provided as a collective share of all employe",
+          "context_after": "Looking back, it was not a very impressive newspaper. However, a fresh and different outlook was created in the Indonesian press. <table><tr><td>Life</td><td>Sci-Tech</td><td>Environment</td><td>Body "
+        },
+        {
+          "text": "The union said it received 679 entries for the IPMA award during the nomination process between Nov. 4, 2019 and Jan. 8.",
+          "exhibit_id": "D4",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_D4_p7_p7_b1_ad50acf2",
+          "context_before": "...r time to monitoring the presidential election even before the campaign season began. They are Karina Tehusijarana, Marguerite Afra Sapie, Nurul Fitri Ramadhani, Made Anthony Iswara and Ghina Ghali",
+          "context_after": "This is the second time the Post has won a gold IPMA award. The newspaper received the gold award in the category of Best National Newspaper in 2015 for its July 23, 2014 edition."
+        },
+        {
+          "text": "In August of this year, the Venus Weightlifting Club co-hosted the 2nd Shanghai Citizen's Games with the Shanghai Weightlifting Association, with the competitions divided into professional and amateur categories, attracting participants from over 30 provinces and cities, as well as international competitors, and generating a highly enthusiastic response.",
+          "exhibit_id": "D5",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_D5_p5_p5_b0_b6e5ce31",
+          "context_before": "...roject, providing important references and lessons for weightlifting, which has already led the trends and gained immense popularity in public fitness abroad, on how to fulfill its potential in Chi",
+          "context_after": "\"People who are passionate about weightlifting are different from before, with an increasing educational background, including the backbone or elites of society, such as lawyers and financial workers,"
+        },
+        {
+          "text": "Currently, there are approximately 200 members, of whom 75% to 85% are men.",
+          "exhibit_id": "D5",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_D5_p5_p5_b1_7c00357c",
+          "context_before": "...officially established in October 2015 at the Weightlifting Training Center of the Shanghai Jing'an District Administration of Sports and has become the exclusive partner of the Shanghai Weightlift",
+          "context_after": "\"The commercialization of weightlifting has been relatively slow, with limited opportunities for social participation. The initial impression of weightlifting is often one of national pride, gaining g"
+        },
+        {
+          "text": "My clean went from 155 to 205, C&J from 135 to 187, Snatch went from 95 to 137. Trust the program",
+          "exhibit_id": "E2",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_E2_p10_p10_b3_3a4d67f7",
+          "context_before": "# ★★★★★ # What An Amazing Program!",
+          "context_after": "# ★★★★★ ## I Finally Understand How To Perform A Snatch!"
+        },
+        {
+          "text": "Total Opt- ins ① 10,765",
+          "exhibit_id": "E3",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_E3_p2_p2_b4_19b2aa7d",
+          "context_before": "OVERVIEW Help",
+          "context_after": "Total Pageviews Conversion Rate"
+        },
+        {
+          "text": "185,288 Pageviews",
+          "exhibit_id": "E3",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_E3_p2_p2_b7_ff8958a7",
+          "context_before": "Total Pageviews Conversion Rate",
+          "context_after": "0.7% Orders Mar 05 2022 - Mar 11 2025"
+        },
+        {
+          "text": "Revenue (52,829.51)",
+          "exhibit_id": "E3",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_E3_p3_p3_b2_030507ed",
+          "context_before": "# Home # Welcome, Gaby",
+          "context_after": "0 Leads 1210 New Accounts"
+        },
+        {
+          "text": "1210 New Accounts",
+          "exhibit_id": "E3",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_E3_p3_p3_b4_4f90c9da",
+          "context_before": "\\(52,829.51\\) Revenue 0 Leads",
+          "context_after": "Jan 19, 2022 - Mar 11, 2025 10 out of 680"
+        },
+        {
+          "text": "Venus Weightlifting Club has more than 200 members around the country.",
+          "exhibit_id": "E4",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_E4_p2_p2_b3_563b7b72",
+          "context_before": "Party A: Shanghai Jing'an No. 2 Youth Amateur Sports School Party B: Shanghai Yiqing Fitness Management Co., Ltd.",
+          "context_after": "## I. Cooperation Background Due to three major problems confronted in weightlifting events, i.e., shortage of talents, a lack of specialized youth training, and a contradiction between the increasing"
+        },
+        {
+          "text": "Yaruou Qu owns 95.9% shareholding",
+          "exhibit_id": "F1",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_F1_p10_p10_b3_2dc2a9e0",
+          "context_before": "# Risk perception Enterprise risk Risk of its own Co- related risk Warning of change",
+          "context_after": "# Shareholding chart Shanghai Yiqing Fitness Management Co., Ltd."
+        },
+        {
+          "text": "More Than 5,000,000 People Participate in the 2nd Shanghai Citizen's Games",
+          "exhibit_id": "F3",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_F3_p2_p2_b0_ef02e90b",
+          "context_before": "F-3",
+          "context_after": "Accessible browsing Website navigation General Administration of Sport of China"
+        },
+        {
+          "text": "This competition has attracted nearly 300 athletes from ten countries and various provinces in China with a high level, high quality, high education level, and high income.",
+          "exhibit_id": "F3",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_F3_p5_p5_b0_e1fb9df0",
+          "context_before": "Using a knife or a fork while eating is weightlifting; Lowering your head and playing with the phone is also weightlifting...",
+          "context_after": "This competition, in combination with the 1st Jing'an District Games & 2017 Student Sunshine Sports League \"Venus Weightlifting Cup\" Fun Weightlifting Competition, together with Venus Weightlifting Da"
+        },
+        {
+          "text": "Her leadership helped establish ISHTAR as a reputable provider of advanced weightlifting education, with events held in North America, Asia, and Europe.",
+          "exhibit_id": "F6",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_F6_p4_p4_b0_8b1e4dfb",
+          "context_before": "... participate in key weightlifting industry events, attract athletes, coaches, and fitness professionals from around the world, and contribute to the development of Singapore's weightlifting communi",
+          "context_after": "In conclusion, Ms. Qu Ya Ruo's strategic vision, technical expertise, and commitment to industry collaboration have been invaluable to ISHTAR HEALTH PTE. LTD. Her contributions have not only shaped th"
+        },
+        {
+          "text": "Ms. Gaby's training system has reached over 40 countries, earning recognition from professional athletes, Olympic-level coaches, and rehabilitation specialists worldwide.",
+          "exhibit_id": "F7",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_F7_p2_p2_b12_844a4d8e",
+          "context_before": "...ificant improvements in training outcomes.- Her research has enabled athletes to fine-tune their posture with greater precision, reducing injuries while enhancing strength, flexibility, and stabili",
+          "context_after": "- She has been a keynote speaker at international fitness summits, professional sports forums, and top athletic institutions, actively advancing the understanding and application of posture optimizati"
+        },
+        {
+          "text": "She has a strong presence in the global fitness and sports community, with hundreds of thousands of followers and subscribers.",
+          "exhibit_id": "F7",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_F7_p3_p3_b4_254af417",
+          "context_before": "...stry Recognition & Authority- Ms. Gaby's expertise and leadership have been acknowledged by multiple national organizations, and she has established long-term partnerships with companies such as ou",
+          "context_after": "## Conclusion Ms. Gaby Qu is not only an outstanding sports training expert but also a pioneer in the industry. Her innovative training methods, global influence, and exceptional leadership make her a"
+        },
+        {
+          "text": "Gabriella Qu: Single session S$270nett 8 sessions: S$2,080nett 12 sessions: S$3,000nett",
+          "exhibit_id": "F8",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_F8_p13_p13_b2_6efa6604",
+          "context_before": "## Schedule 1 # Core Services Fees",
+          "context_after": "\\*Each session will have a 60 min duration # Schedule 2"
+        },
+        {
+          "text": "The School has a total of over 20 million followers on social media throughout the entire network, with nearly 200,000 people studying online courses, and has provided tens of thousands of managers with opportunities to receive business administration education, management training, as well as equity management theory and practice training.",
+          "exhibit_id": "G4",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_G4_p5_p5_b1_a709489a",
+          "context_before": "Shandong Taishan Management Training School enables students to ...s, case discussions, scenario simulations, action learning, special salons, enterprise visits, and overseas study, in order to meet t",
+          "context_after": "Welcome to Shandong Taishan Management Training School! ## Home > Teaching/ Research > Teachers"
+        },
+        {
+          "text": "443K followers",
+          "exhibit_id": "G7",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_G7_p2_p2_b3_a2e1ccb5",
+          "context_before": "# Instagram venus_gabby Follow Message",
+          "context_after": "Gabby Q venus_gabby"
+        },
+        {
+          "text": "I currently have a social media following of over 500,000 (450K on Instagram and 70K on YouTube) and have already built significant brand influence and recognition in the United States.",
+          "exhibit_id": "H1",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_H1_p2_p2_b4_9ad6182d",
+          "context_before": "... national and international competitions. I've also worked closely with Olympic champions such as Deng Wei and Lu Xiaojun to advance the public understanding and appreciation of weightlifting cultu",
+          "context_after": "## 1. Weightlifting Academy Project ## Vision & Goals:"
+        },
+        {
+          "text": "Generate over $1 million USD in annual revenue through academy operations and affiliated programs, while boosting local employment and related industries.",
+          "exhibit_id": "H1",
+          "purpose": "impact_proof",
+          "snippet_id": "snp_H1_p4_p4_b0_36a2154c",
+          "context_before": "Introduce leading- edge Chinese Olympic weightlifting systems and innovative BAT methodology to enhance the capabilities of U.S. coaches and athletes and reduce injury incidence. Economic Impact",
+          "context_after": "## Social Value Improve health awareness and movement literacy among local residents, addressing a growing demand for high- level training and rehabilitation services in the U.S."
+        }
+      ],
+      "context": [],
+      "exhibits": [
+        "A1",
+        "B1",
+        "B2",
+        "B3",
+        "B4",
+        "B5",
+        "C2",
+        "C3",
+        "D12",
+        "D13",
+        "D2",
+        "D4",
+        "D5",
+        "E1",
+        "E2",
+        "E3",
+        "E4",
+        "E5",
+        "E6",
+        "F1",
+        "F3",
+        "F6",
+        "F7",
+        "F8",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G7",
+        "H1"
+      ],
+      "conclusion": "Ms. Qu has made original contributions of major significance to the field, as required under 8 C.F.R. §204.5(h)(3)(v).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": true,
+        "has_context": false,
+        "score": 70
+      },
+      "id": "arg-88811744",
+      "sub_argument_ids": [
+        "subarg-097d3018",
+        "subarg-28b0b7f7",
+        "subarg-02eff598",
+        "subarg-f5fc6c62"
+      ]
+    },
+    {
+      "title": "Ms. Qu's Leadership at Venus Weightlifting Club",
+      "standard": "leading_role",
+      "group_key": "Venus Weightlifting Club",
+      "claim": [
+        {
+          "text": "I had the pleasure of working with Coach Gaby and Venus Weightlifting over the past year, organizing a successful training camp in Shanghai for our athletes.",
+          "exhibit_id": "B1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_B1_p2_p2_b4_f842db56",
+          "context_before": "My name is Siem Hauw Kiauw Jeffry, and I am the President of Indonesian Weightlifting Federation East Java Province (PABSI). ...tes, especially in the province of East Java. I chose to bring my athlet",
+          "context_after": "The camp was highly successful, with several athletes, including Eko Yuli Irawan, a frequent Summer Olympics medal recipient, and Luluk Diana Tri Wijayana, who won gold medals in the following nationa"
+        },
+        {
+          "text": "Gaby Qu is the founder of Venus Weightlifting Club and Body Align Training, harboring a passion for Olympic weightlifting and a dedication to aiding others excel in the sport.",
+          "exhibit_id": "E2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_E2_p10_p10_b18_0168da07",
+          "context_before": "# YES, I WANT TO ENROLL NOW # MEET YOUR HOST AND TRAINER",
+          "context_after": "Gaby Qu is the founder of Venus Weightlifting Club and Body Align Training, harboring a passion for Olympic weightlifting and a dedication to aiding others excel in the sport. In her club, she focuses"
+        }
+      ],
+      "proof": [],
+      "significance": [],
+      "context": [],
+      "exhibits": [
+        "B1",
+        "E2"
+      ],
+      "conclusion": "Ms. Qu has performed a leading and critical role for Venus Weightlifting Club, an organization of distinguished reputation, as required under 8 C.F.R. §204.5(h)(3)(viii).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": false,
+        "has_context": false,
+        "score": 30
+      },
+      "id": "arg-aedf8d39",
+      "sub_argument_ids": [
+        "subarg-1c40d8fc"
+      ]
+    },
+    {
+      "title": "Ms. Qu's Leadership at Shanghai Ying Fitness Management Co., Ltd.",
+      "standard": "leading_role",
+      "group_key": "Shanghai Ying Fitness Management Co., Ltd.",
+      "claim": [
+        {
+          "text": "Legal representative: Yaruou",
+          "exhibit_id": "F1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F1_p4_p4_b5_a6fed799",
+          "context_before": "Uniform credit code: 91310116MA1J846U44 Registration No.:",
+          "context_after": "Registration authority: Baoshan District Administration for Market Regulation Date of establishment: December 9, 2015"
+        },
+        {
+          "text": "Yaruou Qu as a natural person shareholder",
+          "exhibit_id": "F1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F1_p4_p4_b24_28bdfcd8",
+          "context_before": "Business term from: December 9, 2015 Information of Shareholder and Capital Contribution",
+          "context_after": "https://shiming.gsxt.gov.cn/%7B2BE2BF031A0A9975DD61C0D07800120BB728AE061689F19TCADAC37FE0A 012AE0F90E88ED3C345A9C5DC305CDA7BF Translation March 5, 2025, 11:51 AM National Enterprise Credit Information"
+        }
+      ],
+      "proof": [],
+      "significance": [],
+      "context": [],
+      "exhibits": [
+        "F1"
+      ],
+      "conclusion": "Ms. Qu has performed a leading and critical role for Shanghai Ying Fitness Management Co., Ltd., an organization of distinguished reputation, as required under 8 C.F.R. §204.5(h)(3)(viii).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": false,
+        "has_context": false,
+        "score": 30
+      },
+      "id": "arg-46a97c1c",
+      "sub_argument_ids": [
+        "subarg-2da18cdb"
+      ]
+    },
+    {
+      "title": "Ms. Qu's Leadership at Shanghai Yiqing Fitness Management Co., Ltd.",
+      "standard": "leading_role",
+      "group_key": "Shanghai Yiqing Fitness Management Co., Ltd.",
+      "claim": [
+        {
+          "text": "Grant Party B the title of \"Event Partner of the 2nd Shanghai Citizen's Games\" and present medals;",
+          "exhibit_id": "F2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F2_p2_p2_b9_56ed6dfa",
+          "context_before": "1. Serve as the guiding entity of the Municipal Events held by Party B; 2. Present all the Municipal Events on the official information platform of the 2nd Shanghai Citizen's Games;",
+          "context_after": "4. Provide coordinated guidance for the Municipal Events held by Party B; 5. Organize municipal mainstream media to promote and popularize outstanding municipal events;"
+        },
+        {
+          "text": "Signature of Legal Representative: Yaruo Qu (Signature and Seal)",
+          "exhibit_id": "F2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F2_p5_p5_b4_02c5b96b",
+          "context_before": "Name: Shanghai Yiqing Fitness Management Co., Ltd. Signature of Legal Representative: Guangsheng Zhao (Signature)",
+          "context_after": "Signed on: MM/DD/YY Signed on: April 28, 2016"
+        },
+        {
+          "text": "Party A will become the event sponsor of the \"Venus Weightlifting Cup\" Weightlifting and Physical Fitness Challenge 2017 and related series of events to be held by Party B on July 1, 2017 upon careful consultation.",
+          "exhibit_id": "F2",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F2_p6_p6_b3_1a419a3e",
+          "context_before": "Party A: TeNiu (Shanghai) Sports Culture Development Co., Ltd. Party B: Shanghai Yiqing Fitness Management Co., Ltd.",
+          "context_after": "## I. Rights of Party A 1. Party A is qualified as a title sponsor of the event held by Party B: \"Venus Weightlifting Cup\" Weightlifting and Physical Fitness Challenge 2017 (hereinafter referred to as"
+        }
+      ],
+      "proof": [],
+      "significance": [],
+      "context": [],
+      "exhibits": [
+        "F2"
+      ],
+      "conclusion": "Ms. Qu has performed a leading and critical role for Shanghai Yiqing Fitness Management Co., Ltd., an organization of distinguished reputation, as required under 8 C.F.R. §204.5(h)(3)(viii).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": false,
+        "has_context": false,
+        "score": 30
+      },
+      "id": "arg-4310f494",
+      "sub_argument_ids": [
+        "subarg-85ece1f3",
+        "subarg-52226af5"
+      ]
+    },
+    {
+      "title": "Ms. Qu's Leadership at ISHTAR HEALTH PTE. LTD.",
+      "standard": "leading_role",
+      "group_key": "ISHTAR HEALTH PTE. LTD.",
+      "claim": [
+        {
+          "text": "Ms. Qu Ya Ruo (Gaby) served as a Shareholder, Founder, Head Coach at ISHTAR HEALTH PTE. LTD. from April 2023 until now. During this period, she played a crucial role in the company's training programs development and innovation, professional network expansion and industry collaborations, development of global seminars, coach mentorship and management, and international collaboration.",
+          "exhibit_id": "F6",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F6_p2_p2_b2_9fe7bbcd",
+          "context_before": "## Certificate of Employment & Recommendation .... As the Singaporean branch of Venus Weightlifting, the company has developed cutting- edge training programs, seminars, and coaching methodologies tha",
+          "context_after": "Ms. Qu's deep understanding of body alignment training and weightlifting techniques significantly contributed to the development of ISHTAR's training programs. She was responsible for curating high- l"
+        },
+        {
+          "text": "One of her most notable contributions was facilitating ISHTAR's connection with the Singapore Weightlifting Federation. Through her efforts, ISHTAR built strong partnerships that enhanced its credibility and positioned it as a key player in the weightlifting education space.",
+          "exhibit_id": "F6",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F6_p3_p3_b3_898f3c5e",
+          "context_before": "...ing- The impact of body alignment training on lifting mechanics- Strength training methodologies tailored for elite athletes and beginners- Integrating biomechanics assessments into coaching practi",
+          "context_after": "Ms. Qu's contributions extended beyond Singapore, as she played a significant role in organizing and leading ISHTAR's international weightlifting seminars and coaching certifications. Beyond her role "
+        },
+        {
+          "text": "SIGNED BY GABRIELLA QU YA RUO for and on behalf of ISHTAR HEALTH PTE. LTD.",
+          "exhibit_id": "F8",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F8_p16_p16_b2_83b49b67",
+          "context_before": "This Agreement has been entered into on the date stated at the beginning. ## THE PROVIDER",
+          "context_after": "Director ## THE CUSTOMER"
+        }
+      ],
+      "proof": [],
+      "significance": [],
+      "context": [],
+      "exhibits": [
+        "F6",
+        "F8"
+      ],
+      "conclusion": "Ms. Qu has performed a leading and critical role for ISHTAR HEALTH PTE. LTD., an organization of distinguished reputation, as required under 8 C.F.R. §204.5(h)(3)(viii).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": false,
+        "has_context": false,
+        "score": 30
+      },
+      "id": "arg-efabe538",
+      "sub_argument_ids": [
+        "subarg-6f573a3d",
+        "subarg-e8bd9fa7"
+      ]
+    },
+    {
+      "title": "Ms. Qu's Leadership at Singapore Weightlifting Federation",
+      "standard": "leading_role",
+      "group_key": "Singapore Weightlifting Federation",
+      "claim": [
+        {
+          "text": "She has been a keynote speaker at international fitness summits, professional sports forums, and top athletic institutions, actively advancing the understanding and application of posture optimization among athletes and coaches globally.",
+          "exhibit_id": "F7",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_F7_p2_p2_b13_3999dc91",
+          "context_before": "2. Global Collaboration & Influence - Ms. Gaby's training system has reached over 40 countries, earning recognition from professional athletes, Olympic-level coaches, and rehabilitation specialists wo",
+          "context_after": "3. Unique Contributions Through Interdisciplinary Integration - By integrating principles of Chinese bone setting with Western sports science, she has pioneered a revolutionary training methodology th"
+        }
+      ],
+      "proof": [],
+      "significance": [],
+      "context": [],
+      "exhibits": [
+        "F7"
+      ],
+      "conclusion": "Ms. Qu has performed a leading and critical role for Singapore Weightlifting Federation, an organization of distinguished reputation, as required under 8 C.F.R. §204.5(h)(3)(viii).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": false,
+        "has_context": false,
+        "score": 30
+      },
+      "id": "arg-4d2ac1a4",
+      "sub_argument_ids": [
+        "subarg-018e385c"
+      ]
+    },
+    {
+      "title": "Ms. Qu's Achievement Award in the Fitness Industry in China at the National Fitness and Sports Exchange and Exhibition Conference in 2023",
+      "standard": "awards",
+      "group_key": "Achievement Award in the Fitness Industry in China at the National Fitness and Sports Exchange and Exhibition Conference in 2023",
+      "claim": [
+        {
+          "text": "Awarded 'Fitness Industry Achievement Award', China Bodybuilding Association (2023)",
+          "exhibit_id": "A1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_A1_p3_p3_b3_c29525e5",
+          "context_before": "...- Brand Ambassador for ON, China (2018)- VENUS LIFTOFF 2021, Kerry Parkside, Pudong, Shanghai (2022)- Olympic Champion Deng Wei attended as guest judge.- VENUS LIFTOFF 2024, iapm Mall, Shanghai (20",
+          "context_after": "Professional Affiliations Member, USA Weightlifting (USAW)"
+        },
+        {
+          "text": "Ms. Yarno Ou, In the National Fitness and Sports Exchange and Exhibition Conference in 2023, you are awarded the Achievement Award in the Fitness Industry in China.",
+          "exhibit_id": "G1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_G1_p2_p2_b0_222716d6",
+          "context_before": "G-1",
+          "context_after": "We hereby issue this Certificate as encouragement! Certificate No.: ZGC20231021086"
+        },
+        {
+          "text": "Awarded the Achievement Award in the Fitness Industry in China at the National Fitness and Sports Exchange and Exhibition Conference in 2023",
+          "exhibit_id": "G1",
+          "purpose": "direct_proof",
+          "snippet_id": "snp_G1_p3_p3_b5_562da51d",
+          "context_before": "Information Publicity Teaching and Scientific Research Certificate Inquiry Papers Educational News Yaruou Qu",
+          "context_after": "# First Page Previous Page"
+        }
+      ],
+      "proof": [],
+      "significance": [],
+      "context": [],
+      "exhibits": [
+        "A1",
+        "G1"
+      ],
+      "conclusion": "Ms. Qu's receipt of this award meets the requirements of 8 C.F.R. §204.5(h)(3)(i).",
+      "completeness": {
+        "has_claim": true,
+        "has_proof": false,
+        "has_significance": false,
+        "has_context": false,
+        "score": 30
+      },
+      "id": "arg-7f3ab0b1",
+      "sub_argument_ids": [
+        "subarg-a5ac35b6",
+        "subarg-247b9711"
+      ]
+    }
+  ],
+  "sub_arguments": [
+    {
+      "id": "subarg-df8cadc0",
+      "argument_id": "arg-ede701e4",
+      "title": "会员资格与申请过程",
+      "purpose": "证明申请人正式获得协会会员资格的具体事实",
+      "relationship": "确立资格",
+      "snippet_ids": [
+        "snp_C2_p3_p3_b2_4c9d79a1",
+        "snp_C2_p2_p2_b5_eadb0715"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:24.863019"
+    },
+    {
+      "id": "subarg-a2cfc8f9",
+      "argument_id": "arg-ede701e4",
+      "title": "会员资格标准与要求",
+      "purpose": "展示协会对个人会员的严格专业要求",
+      "relationship": "体现专业水平",
+      "snippet_ids": [
+        "snp_C2_p3_p3_b0_8cd887e6",
+        "snp_F5_p2_p2_b7_67ac0ac0"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:24.863019"
+    },
+    {
+      "id": "subarg-2f7aab6b",
+      "argument_id": "arg-ede701e4",
+      "title": "协会职能与会员义务",
+      "purpose": "说明协会的行业职能和会员需遵守的规范",
+      "relationship": "证明行业地位",
+      "snippet_ids": [
+        "snp_C4_p3_p3_b1_97884309",
+        "snp_C4_p2_p2_b6_10cdc4b5"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:24.863019"
+    },
+    {
+      "id": "subarg-7f153ca9",
+      "argument_id": "arg-ede701e4",
+      "title": "协会治理结构参与",
+      "purpose": "展示申请人与协会治理结构的关联",
+      "relationship": "体现参与深度",
+      "snippet_ids": [
+        "snp_C5_p2_p2_b2_cf38c413"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:24.863019"
+    },
+    {
+      "id": "subarg-72f14454",
+      "argument_id": "arg-418d1c33",
+      "title": "行业地位与影响力",
+      "purpose": "展示申请人在健美行业的权威地位和广泛认可",
+      "relationship": "证明杰出地位",
+      "snippet_ids": [
+        "snp_C6_p2_p2_b2_00ad39f3"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:29.645441"
+    },
+    {
+      "id": "subarg-b1d75994",
+      "argument_id": "arg-418d1c33",
+      "title": "专业成就与荣誉",
+      "purpose": "列举申请人在健美领域获得的重要奖项和荣誉",
+      "relationship": "佐证专业水平",
+      "snippet_ids": [
+        "snp_C6_p2_p2_b2_c6700411"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:29.645441"
+    },
+    {
+      "id": "subarg-935b3807",
+      "argument_id": "arg-418d1c33",
+      "title": "专业贡献与领导力",
+      "purpose": "展示申请人在专业领域的实际贡献和领导角色",
+      "relationship": "体现专业价值",
+      "snippet_ids": [
+        "snp_C6_p2_p2_b2_38d0209f"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:29.645441"
+    },
+    {
+      "id": "subarg-fe18d749",
+      "argument_id": "arg-4d201582",
+      "title": "申请人身份与背景",
+      "purpose": "介绍申请人的专业身份和创办机构的背景信息",
+      "relationship": "确立专业地位",
+      "snippet_ids": [
+        "snp_D1_p2_p2_b10_f5138544",
+        "snp_D1_p2_p2_b4_4adc201e"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:34.530319"
+    },
+    {
+      "id": "subarg-bbae3d1b",
+      "argument_id": "arg-4d201582",
+      "title": "媒体报道机构权威性",
+      "purpose": "说明报道媒体的背景、性质和权威性",
+      "relationship": "增强可信度",
+      "snippet_ids": [
+        "snp_D10_p6_p6_b3_9b550bb8",
+        "snp_D10_p2_p2_b2_fa4cec1d"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:34.530319"
+    },
+    {
+      "id": "subarg-ad1754b6",
+      "argument_id": "arg-4d201582",
+      "title": "行业影响与愿景",
+      "purpose": "展示申请人对行业的贡献和未来愿景",
+      "relationship": "证明影响力",
+      "snippet_ids": [
+        "snp_D1_p3_p3_b7_46d14a9e"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:34.530319"
+    },
+    {
+      "id": "subarg-3c835f29",
+      "argument_id": "arg-4590c433",
+      "title": "媒体平台地位与资质",
+      "purpose": "展示澎湃新闻作为权威媒体的行业地位和官方资质",
+      "relationship": "证明平台权威性",
+      "snippet_ids": [
+        "snp_D13_p2_p2_b4_90992266",
+        "snp_D12_p2_p2_b4_b76374a8",
+        "snp_D13_p2_p2_b2_82d0c268"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:38.726981"
+    },
+    {
+      "id": "subarg-786b88eb",
+      "argument_id": "arg-4590c433",
+      "title": "个人专业背景与行业洞察",
+      "purpose": "展示申请人个人在举重领域的专业背景和行业认知",
+      "relationship": "证明专业深度",
+      "snippet_ids": [
+        "snp_D9_p6_p6_b3_6cb774a9",
+        "snp_D9_p3_p3_b1_d7c6b969",
+        "snp_D9_p3_p3_b4_fa3d3fd0"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:38.726981"
+    },
+    {
+      "id": "subarg-47027ba3",
+      "argument_id": "arg-705d9d10",
+      "title": "媒体地位与历史意义",
+      "purpose": "展示《雅加达邮报》在印尼媒体界的重要地位和历史意义",
+      "relationship": "奠定权威性",
+      "snippet_ids": [
+        "snp_D2_p2_p2_b7_0cbd6a56",
+        "snp_D3_p4_p4_b4_ec9ae98b",
+        "snp_D2_p2_p2_b8_4d608df9"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:43.155140"
+    },
+    {
+      "id": "subarg-ea8ebaa7",
+      "argument_id": "arg-705d9d10",
+      "title": "行业奖项与专业认可",
+      "purpose": "证明《雅加达邮报》获得的重要行业奖项和专业认可",
+      "relationship": "佐证影响力",
+      "snippet_ids": [
+        "snp_D4_p3_p3_b2_05540182",
+        "snp_D4_p2_p2_b0_c76b26c8",
+        "snp_D4_p5_p5_b1_0edcb8c5"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:43.155140"
+    },
+    {
+      "id": "subarg-0f104fc4",
+      "argument_id": "arg-5859ba56",
+      "title": "媒体权威性与影响力",
+      "purpose": "证明报道媒体的行业地位和公信力",
+      "relationship": "增强报道可信度",
+      "snippet_ids": [
+        "snp_D6_p3_p3_b5_85051b17",
+        "snp_D7_p2_p2_b7_ccc56db9",
+        "snp_D7_p2_p2_b7_2cbc9611",
+        "snp_D7_p2_p2_b6_1d950900",
+        "snp_D7_p2_p2_b7_dbc54b14"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:47.458414"
+    },
+    {
+      "id": "subarg-d8765c9d",
+      "argument_id": "arg-5859ba56",
+      "title": "媒体报道内容与背景",
+      "purpose": "展示媒体报道的具体内容和背景信息",
+      "relationship": "提供报道证据",
+      "snippet_ids": [
+        "snp_D6_p3_p3_b4_0d890e41",
+        "snp_D5_p5_p5_b0_35a57a46"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:47.458414"
+    },
+    {
+      "id": "subarg-a4544e14",
+      "argument_id": "arg-944d76b0",
+      "title": "媒体权威性",
+      "purpose": "证明报道媒体的专业地位与影响力",
+      "relationship": "增强可信度",
+      "snippet_ids": [
+        "snp_D8_p2_p2_b31_0a3ff767",
+        "snp_D8_p2_p2_b9_217fd781"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:51.064726"
+    },
+    {
+      "id": "subarg-0c91dad7",
+      "argument_id": "arg-944d76b0",
+      "title": "学术影响力",
+      "purpose": "展示报道所涉期刊的学术水平",
+      "relationship": "佐证重要性",
+      "snippet_ids": [
+        "snp_D8_p2_p2_b21_54b87384"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:00:51.064726"
+    },
+    {
+      "id": "subarg-097d3018",
+      "argument_id": "arg-88811744",
+      "title": "创新贡献与体系创立",
+      "purpose": "展示申请人作为创始人的原创性贡献，包括创建首个独立举重俱乐部和独创训练体系",
+      "relationship": "证明原创性",
+      "snippet_ids": [
+        "snp_A1_p2_p2_b3_ec2557cf",
+        "snp_B4_p2_p2_b6_4caf5d2b",
+        "snp_H1_p2_p2_b3_dfef1720",
+        "snp_B5_p2_p2_b6_5dab473b",
+        "snp_B3_p2_p2_b5_b2654490",
+        "snp_F7_p2_p2_b4_992d1e62",
+        "snp_G7_p2_p2_b6_95256e4f",
+        "snp_H1_p2_p2_b2_e1cc29fd",
+        "snp_B4_p2_p2_b4_dadc987c",
+        "snp_G3_p2_p2_b3_b484ed40",
+        "snp_F7_p2_p2_b6_e90c9d3b",
+        "snp_G4_p2_p2_b3_4e89b2ba"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:01.453468"
+    },
+    {
+      "id": "subarg-28b0b7f7",
+      "argument_id": "arg-88811744",
+      "title": "行业影响与专业认可",
+      "purpose": "展示申请人在行业内的影响力、专业地位以及获得的权威认可",
+      "relationship": "证明影响力",
+      "snippet_ids": [
+        "snp_B5_p2_p2_b2_6b9f0780",
+        "snp_E6_p2_p2_b7_78b2a881",
+        "snp_B1_p2_p2_b3_0e21ac4b",
+        "snp_B3_p2_p2_b2_7b20340b",
+        "snp_B2_p2_p2_b12_80a21939",
+        "snp_G2_p2_p2_b6_6934939a",
+        "snp_C2_p3_p3_b1_4dc2be37",
+        "snp_B2_p2_p2_b10_b4451dc2",
+        "snp_C3_p9_p9_b2_6b5f7776",
+        "snp_B2_p2_p2_b8_5ea64b86",
+        "snp_B1_p3_p3_b0_7fc381c5",
+        "snp_E2_p8_p8_b7_1c472285",
+        "snp_E5_p2_p2_b4_412b8c9f",
+        "snp_C2_p3_p3_b1_b7d99017",
+        "snp_E5_p2_p2_b7_e305100a",
+        "snp_F6_p4_p4_b0_8b1e4dfb",
+        "snp_B1_p3_p3_b0_5eb1711a",
+        "snp_B2_p2_p2_b5_b527db42",
+        "snp_G4_p2_p2_b3_9d08f8a7",
+        "snp_A1_p2_p2_b10_6b203373",
+        "snp_B2_p3_p3_b0_19012190",
+        "snp_F7_p3_p3_b4_254af417",
+        "snp_F6_p2_p2_b3_288bf319"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:01.453468"
+    },
+    {
+      "id": "subarg-02eff598",
+      "argument_id": "arg-88811744",
+      "title": "具体成就与量化成果",
+      "purpose": "展示申请人及其俱乐部/体系在运动员培养、赛事举办、商业运营等方面的具体成就和量化数据",
+      "relationship": "证明成就",
+      "snippet_ids": [
+        "snp_D5_p5_p5_b1_7c00357c",
+        "snp_E6_p2_p2_b4_897430bc",
+        "snp_E3_p3_p3_b4_4f90c9da",
+        "snp_F1_p10_p10_b3_2dc2a9e0",
+        "snp_F3_p2_p2_b0_ef02e90b",
+        "snp_E1_p12_p12_b2_2bd372b4",
+        "snp_E3_p2_p2_b7_ff8958a7",
+        "snp_B1_p2_p2_b5_e377d78b",
+        "snp_B4_p3_p3_b1_89b09420",
+        "snp_D12_p2_p2_b3_1bc948dd",
+        "snp_B4_p3_p3_b0_4a589c2d",
+        "snp_B1_p2_p2_b6_8d86d203",
+        "snp_B4_p2_p2_b5_b50ec1c3",
+        "snp_E6_p2_p2_b6_99d2c1ff",
+        "snp_B5_p2_p2_b4_a7506b32",
+        "snp_E3_p2_p2_b4_19b2aa7d",
+        "snp_H1_p4_p4_b0_36a2154c",
+        "snp_E5_p2_p2_b6_4cea56a2",
+        "snp_E2_p8_p8_b8_8af28862",
+        "snp_E5_p2_p2_b3_4b8a251b",
+        "snp_H1_p2_p2_b4_9ad6182d",
+        "snp_D5_p5_p5_b0_b6e5ce31",
+        "snp_F8_p13_p13_b2_6efa6604",
+        "snp_E4_p2_p2_b3_aaaa0f23",
+        "snp_D13_p2_p2_b3_871bfe03",
+        "snp_B3_p2_p2_b4_b9bbefd0",
+        "snp_G7_p2_p2_b3_a2e1ccb5",
+        "snp_D12_p6_p6_b6_98c3c1a9",
+        "snp_F3_p5_p5_b0_e1fb9df0",
+        "snp_E2_p17_p17_b2_cd727829",
+        "snp_D2_p2_p2_b15_3dee1448",
+        "snp_E2_p10_p10_b3_3a4d67f7",
+        "snp_F7_p2_p2_b12_844a4d8e",
+        "snp_D4_p7_p7_b1_ad50acf2",
+        "snp_B3_p2_p2_b3_504e61d1",
+        "snp_G4_p5_p5_b1_a709489a",
+        "snp_E1_p10_p10_b10_0cc29469",
+        "snp_E3_p3_p3_b2_030507ed",
+        "snp_B5_p3_p3_b2_57374fcd",
+        "snp_E4_p2_p2_b3_563b7b72",
+        "snp_B5_p3_p3_b2_f2b3823e"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:01.453468"
+    },
+    {
+      "id": "subarg-f5fc6c62",
+      "argument_id": "arg-88811744",
+      "title": "其他证据",
+      "purpose": "补充支持材料",
+      "relationship": "补充证明",
+      "snippet_ids": [
+        "snp_G5_p5_p5_b1_6ebe860e"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:01.453468"
+    },
+    {
+      "id": "subarg-1c40d8fc",
+      "argument_id": "arg-aedf8d39",
+      "title": "主要证据",
+      "purpose": "支持主论点的核心证据",
+      "relationship": "证明领导角色",
+      "snippet_ids": [
+        "snp_B1_p2_p2_b4_f842db56",
+        "snp_E2_p10_p10_b18_0168da07"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:01.656304"
+    },
+    {
+      "id": "subarg-2da18cdb",
+      "argument_id": "arg-46a97c1c",
+      "title": "主要证据",
+      "purpose": "支持主论点的核心证据",
+      "relationship": "证明领导角色",
+      "snippet_ids": [
+        "snp_F1_p4_p4_b5_a6fed799",
+        "snp_F1_p4_p4_b24_28bdfcd8"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:01.870989"
+    },
+    {
+      "id": "subarg-85ece1f3",
+      "argument_id": "arg-4310f494",
+      "title": "法定代表身份",
+      "purpose": "证明申请人在公司的正式法律地位和决策权限",
+      "relationship": "确立领导地位",
+      "snippet_ids": [
+        "snp_F2_p5_p5_b4_02c5b96b"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:05.448593"
+    },
+    {
+      "id": "subarg-52226af5",
+      "argument_id": "arg-4310f494",
+      "title": "重大合作成就",
+      "purpose": "展示在申请人领导下公司获得的重要行业合作与认可",
+      "relationship": "证明影响力",
+      "snippet_ids": [
+        "snp_F2_p2_p2_b9_56ed6dfa",
+        "snp_F2_p6_p6_b3_1a419a3e"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:05.448593"
+    },
+    {
+      "id": "subarg-6f573a3d",
+      "argument_id": "arg-efabe538",
+      "title": "正式职位与授权",
+      "purpose": "证明申请人在组织中的法定领导身份和代表权限",
+      "relationship": "确立领导地位",
+      "snippet_ids": [
+        "snp_F8_p16_p16_b2_83b49b67",
+        "snp_F6_p2_p2_b2_9fe7bbcd"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:09.063374"
+    },
+    {
+      "id": "subarg-e8bd9fa7",
+      "argument_id": "arg-efabe538",
+      "title": "战略贡献与成就",
+      "purpose": "展示申请人在任期内推动的关键战略合作与业务发展",
+      "relationship": "证明领导成果",
+      "snippet_ids": [
+        "snp_F6_p3_p3_b3_898f3c5e"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:09.063374"
+    },
+    {
+      "id": "subarg-018e385c",
+      "argument_id": "arg-4d2ac1a4",
+      "title": "主要证据",
+      "purpose": "支持主论点的核心证据",
+      "relationship": "证明领导角色",
+      "snippet_ids": [
+        "snp_F7_p2_p2_b13_3999dc91"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:09.274000"
+    },
+    {
+      "id": "subarg-a5ac35b6",
+      "argument_id": "arg-7f3ab0b1",
+      "title": "奖项性质与级别",
+      "purpose": "明确奖项的官方属性和行业地位",
+      "relationship": "证明权威性",
+      "snippet_ids": [
+        "snp_A1_p3_p3_b3_c29525e5",
+        "snp_G1_p3_p3_b5_562da51d"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:13.133403"
+    },
+    {
+      "id": "subarg-247b9711",
+      "argument_id": "arg-7f3ab0b1",
+      "title": "获奖者身份确认",
+      "purpose": "确认获奖者为曲女士本人",
+      "relationship": "证明主体性",
+      "snippet_ids": [
+        "snp_G1_p2_p2_b0_222716d6"
+      ],
+      "is_ai_generated": true,
+      "status": "draft",
+      "created_at": "2026-02-19T21:01:13.133403"
+    }
+  ],
+  "stats": {
+    "argument_count": 14,
+    "sub_argument_count": 31
+  }
+}

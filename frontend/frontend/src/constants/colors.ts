@@ -7,16 +7,18 @@
 
 import type { MaterialType } from '../types';
 
-// EB-1A 8 Legal Standards - Official Colors
+// EB-1A 10 Legal Standards - Official Colors (8 C.F.R. §204.5(h)(3)(i)-(x))
 export const STANDARD_COLORS: Record<string, string> = {
-  'std-awards': '#3B82F6',      // blue - Awards
-  'std-membership': '#8B5CF6',  // purple - Membership
-  'std-published': '#EC4899',   // pink - Published Material
-  'std-judging': '#F59E0B',     // amber - Judging
-  'std-contribution': '#10B981', // emerald - Original Contribution
-  'std-scholarly': '#06B6D4',   // cyan - Scholarly Articles
-  'std-leading': '#EF4444',     // red - Leading/Critical Role
-  'std-salary': '#84CC16',      // lime - High Salary
+  'std-awards': '#3B82F6',      // blue - (i) Awards
+  'std-membership': '#8B5CF6',  // purple - (ii) Membership
+  'std-published': '#EC4899',   // pink - (iii) Published Material
+  'std-judging': '#F59E0B',     // amber - (iv) Judging
+  'std-contribution': '#10B981', // emerald - (v) Original Contribution
+  'std-scholarly': '#06B6D4',   // cyan - (vi) Scholarly Articles
+  'std-display': '#F472B6',     // pink-400 - (vii) Artistic Display
+  'std-leading': '#EF4444',     // red - (viii) Leading/Critical Role
+  'std-salary': '#84CC16',      // lime - (ix) High Salary
+  'std-commercial': '#A78BFA',  // violet-400 - (x) Commercial Success
 } as const;
 
 // MaterialType to Standard ID mapping
@@ -46,16 +48,22 @@ export function getStandardColor(standardId: string): string {
 }
 
 // standardKey (from backend) to standard_id mapping
-// Backend uses: awards, membership, scholarly_articles, judging, original_contribution, leading_role, high_salary, published_material
+// Backend uses: awards, membership, scholarly_articles, judging, original_contribution(s), leading_role, high_salary, published_material, display, commercial_success
 export const STANDARD_KEY_TO_ID: Record<string, string> = {
   'awards': 'std-awards',
   'membership': 'std-membership',
   'scholarly_articles': 'std-scholarly',
   'judging': 'std-judging',
   'original_contribution': 'std-contribution',
+  'original_contributions': 'std-contribution',  // 兼容复数形式
+  'display': 'std-display',
+  'artistic_display': 'std-display',
+  'exhibitions': 'std-display',
   'leading_role': 'std-leading',
   'high_salary': 'std-salary',
   'published_material': 'std-published',
+  'commercial_success': 'std-commercial',
+  'commercial': 'std-commercial',
 } as const;
 
 // Get color for a standardKey (from backend argument)

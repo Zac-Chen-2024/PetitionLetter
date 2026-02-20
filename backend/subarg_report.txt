@@ -1,0 +1,207 @@
+================================================================================
+SubArgument 功能测试报告 - 供专家评测
+================================================================================
+
+申请人: Ms. Qu
+总 Arguments: 37
+总 SubArguments: 80
+
+================================================================================
+【】- 1 个子论点
+================================================================================
+1. Ms. Qu - Other
+   证据数量: 1 snippets
+   次级子论点 (1个):
+   ├─ Other
+   │  关系: 支持Other论证
+   │  证据: 1 snippets
+
+
+================================================================================
+【AWARDS】- 1 个子论点
+================================================================================
+1. China Bodybuilding Association Achievement Award
+   证据数量: 3 snippets
+   次级子论点 (3个):
+   ├─ Award Description and Recipient
+   │  关系: Proves the applicant is the named recipient of a s...
+   │  证据: 3 snippets
+   ├─ Awarding Body and Prestige
+   │  关系: Proves the award is from a distinguished, national...
+   │  证据: 1 snippets
+   ├─ Award Context and Venue
+   │  关系: Proves the award was not a minor or local honor, b...
+   │  证据: 2 snippets
+
+
+================================================================================
+【LEADING_ROLE】- 5 个子论点
+================================================================================
+1. Founder and Leader of Venus Weightlifting Club
+   证据数量: 7 snippets
+   次级子论点 (3个):
+   ├─ 创始与核心职责
+   │  关系: 证明领导地位与决策权
+   │  证据: 4 snippets
+   ├─ 组织运营与活动成就
+   │  关系: 证明卓越的组织管理能力和行业影响力
+   │  证据: 3 snippets
+   ├─ 国际拓展与合作
+   │  关系: 证明其领导力具有国际影响力和战略眼光
+   │  证据: 1 snippets
+
+2. Industry Recognition as a Thought Leader and Partner
+   证据数量: 4 snippets
+   次级子论点 (3个):
+   ├─ 国际论坛主题演讲
+   │  关系: 证明其被公认为行业内的思想领袖和专家
+   │  证据: 1 snippets
+   ├─ 教育机构合作与邀请
+   │  关系: 证明其专业知识和领导模式受到国内外知名教育机构的认可与寻求
+   │  证据: 2 snippets
+   ├─ 知名品牌合作
+   │  关系: 证明其个人影响力和专业形象获得国际一线商业品牌的认可
+   │  证据: 1 snippets
+
+3. Leadership at ISHTAR HEALTH PTE. LTD.
+   证据数量: 3 snippets
+   次级子论点 (2个):
+   ├─ 高级管理职位
+   │  关系: 证明其在该组织中的决策与领导地位
+   │  证据: 2 snippets
+   ├─ 战略贡献与行业合作
+   │  关系: 证明其领导力直接带来了显著的商业成果和行业信誉
+   │  证据: 1 snippets
+
+   ... 还有 2 个子论点未显示
+
+================================================================================
+【MEMBERSHIP】- 8 个子论点
+================================================================================
+1. USA Weightlifting Coach Certification and Membership
+   证据数量: 4 snippets
+   次级子论点 (2个):
+   ├─ 一级教练认证成就
+   │  关系: 证明申请人达到了该组织设定的专业能力标准
+   │  证据: 2 snippets
+   ├─ 正式会员身份
+   │  关系: 证明申请人被接纳进入美国举重运动的核心专业社群
+   │  证据: 2 snippets
+
+2. Shanghai Fitness Bodybuilding Association Membership Criteria
+   证据数量: 4 snippets
+   次级子论点 (3个):
+   ├─ Eligibility Requirements for Outstanding Practitioners
+   │  关系: Establishes the selective and achievement-based na...
+   │  证据: 1 snippets
+   ├─ Association's Role in Setting Industry Standards
+   │  关系: Proves the organization is a distinguished, govern...
+   │  证据: 2 snippets
+   ├─ Democratic and Rigorous Governance Structure
+   │  关系: Supports the distinguished nature of the organizat...
+   │  证据: 1 snippets
+
+3. Ping Zhang's Distinguished Achievements as a Benchmark
+   证据数量: 3 snippets
+   次级子论点 (3个):
+   ├─ Elite Competitive Pedigree
+   │  关系: Establishes the high benchmark of achievement amon...
+   │  证据: 1 snippets
+   ├─ National-Level Leadership Role
+   │  关系: Indicates the applicant moves in circles with indi...
+   │  证据: 1 snippets
+   ├─ Sustained Industry Recognition
+   │  关系: Confirms that the applicant's professional network...
+   │  证据: 1 snippets
+
+   ... 还有 5 个子论点未显示
+
+================================================================================
+【ORIGINAL_CONTRIBUTION】- 13 个子论点
+================================================================================
+1. Ms. Qu - Contribution
+   证据数量: 34 snippets
+   次级子论点 (1个):
+   ├─ Contribution
+   │  关系: 支持Contribution论证
+   │  证据: 34 snippets
+
+2. Digital and Social Media Influence Metrics
+   证据数量: 8 snippets
+   次级子论点 (3个):
+   ├─ Substantial Social Media Following and Brand Influence
+   │  关系: Proves national and international recognition as a...
+   │  证据: 4 snippets
+   ├─ High-Engagement Campaign Performance
+   │  关系: Proves the applicant can effectively engage a larg...
+   │  证据: 3 snippets
+   ├─ Direct Revenue from Digital Operations
+   │  关系: Proves the commercial success and sustainability o...
+   │  证据: 1 snippets
+
+3. Venus Weightlifting Club's National and International Reach
+   证据数量: 7 snippets
+   次级子论点 (3个):
+   ├─ Major Event Scale and Participation
+   │  关系: Proves event significance and applicant's ability ...
+   │  证据: 4 snippets
+   ├─ Substantial and Growing Membership Base
+   │  关系: Proves the commercial viability and community impa...
+   │  证据: 2 snippets
+   ├─ Co-hosting a Mass-Participation Civic Event
+   │  关系: Proves the applicant's work has reached a massive ...
+   │  证据: 1 snippets
+
+   ... 还有 10 个子论点未显示
+
+================================================================================
+【PUBLISHED_MATERIAL】- 9 个子论点
+================================================================================
+1. Chinese Sports Media (The Paper, China Sports Daily, Titan Sports) Credentials
+   证据数量: 12 snippets
+   次级子论点 (4个):
+   ├─ The Paper: Premier Digital News Platform
+   │  关系: Proves the media outlet is a major and authoritati...
+   │  证据: 3 snippets
+   ├─ China Sports Daily: Official and Influential Sports Paper
+   │  关系: Proves the media outlet is a mainstream, authorita...
+   │  证据: 3 snippets
+   ├─ Titan Sports and Soccer News: Market Leaders
+   │  关系: Proves the applicant's coverage reached the larges...
+   │  证据: 3 snippets
+   ├─ People's Daily Sponsorship and Journal Honors
+   │  关系: Further establishes the distinguished nature of th...
+   │  证据: 3 snippets
+
+2. Credibility of Supporting Institutions and Businesses
+   证据数量: 7 snippets
+   次级子论点 (3个):
+   ├─ Sixth Tone and Shanghai United Media Group
+   │  关系: Proves the applicant was selected by a program bac...
+   │  证据: 2 snippets
+   ├─ High-Credit Business and Elite Educational Partners
+   │  关系: Proves the applicant associates with and is endors...
+   │  证据: 3 snippets
+   ├─ Ministry of Education Research Center
+   │  关系: Proves the applicant's contributions have been rec...
+   │  证据: 2 snippets
+
+3. The Jakarta Post Coverage and Credentials
+   证据数量: 6 snippets
+   次级子论点 (2个):
+   ├─ Historic and Unique Media Platform
+   │  关系: Proves the media outlet is a distinguished and inf...
+   │  证据: 3 snippets
+   ├─ Journalistic Excellence and Awards
+   │  关系: Proves the media outlet maintains high standards, ...
+   │  证据: 3 snippets
+
+   ... 还有 6 个子论点未显示
+
+================================================================================
+评测要点:
+1. SubArgument 的 title 是否清晰描述了证据组的主题?
+2. relationship 字段是否准确描述了与主论点的关系?
+3. 证据分组是否合理（1-5个snippets为宜）?
+4. 层级结构是否有助于理清文章脉络?
+================================================================================

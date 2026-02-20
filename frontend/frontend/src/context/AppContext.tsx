@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import type { FocusState, Connection, ElementPosition, Snippet, ViewMode, ArgumentViewMode, SelectionState, BoundingBox, Argument, WritingEdge, LetterSection, Position, ArgumentClaimType, ArgumentStatus, LLMProvider } from '../types';
+import type { FocusState, Connection, ElementPosition, Snippet, ViewMode, ArgumentViewMode, SelectionState, BoundingBox, Argument, SubArgument, WritingEdge, LetterSection, Position, ArgumentClaimType, ArgumentStatus, LLMProvider, PageType } from '../types';
 import { legalStandards } from '../data/legalStandards';
 import { getMaterialTypeColor, STANDARD_KEY_TO_ID } from '../constants/colors';
 import { apiClient } from '../services/api';
@@ -225,9 +225,21 @@ interface AppContextType {
   argumentPositions: Map<string, ElementPosition>;
   updateArgumentPosition2: (id: string, position: ElementPosition) => void;
 
+  // SubArgument positions for connection lines
+  subArgumentPositions: Map<string, ElementPosition>;
+  updateSubArgumentPosition: (id: string, position: ElementPosition) => void;
+
   // Hover state for snippet linking hints
   hoveredSnippetId: string | null;
   setHoveredSnippetId: (id: string | null) => void;
+
+  // ============================================
+  // SubArgument State (次级子论点)
+  // ============================================
+  subArguments: SubArgument[];
+  addSubArgument: (subArgument: Omit<SubArgument, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateSubArgument: (id: string, updates: Partial<Omit<SubArgument, 'id' | 'createdAt'>>) => void;
+  removeSubArgument: (id: string) => void;
 
   // ============================================
   // Writing Canvas State (kept for step 2)
@@ -277,6 +289,12 @@ interface AppContextType {
   // ============================================
   llmProvider: LLMProvider;
   setLlmProvider: (provider: LLMProvider) => void;
+
+  // ============================================
+  // Page Navigation
+  // ============================================
+  currentPage: PageType;
+  setCurrentPage: (page: PageType) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -291,6 +309,7 @@ const STORAGE_KEY_WRITING_NODE_POSITIONS = 'evidence-system-writing-node-positio
 const STORAGE_KEY_LLM_PROVIDER = 'evidence-system-llm-provider';
 const STORAGE_KEY_ARGUMENT_VIEW_MODE = 'evidence-system-argument-view-mode';
 const STORAGE_KEY_ARGUMENT_GRAPH_POSITIONS = 'evidence-system-argument-graph-positions';
+const STORAGE_KEY_SUB_ARGUMENTS = 'evidence-system-sub-arguments';
 
 // Initial arguments - empty, will be created via ArgumentAssembly panel
 const initialArguments: Argument[] = [];
@@ -425,7 +444,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             setPipelineState(prev => ({ ...prev, stage: 'snippets_ready', snippetCount: converted.length }));
             console.log(`Loaded ${converted.length} unified extraction snippets from project ${projectId}`);
 
-            // Also try to load generated arguments from backend
+            // Also try to load generated arguments and sub-arguments from backend
             try {
               const argsResponse = await apiClient.get<{
                 project_id: string;
@@ -438,6 +457,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   confidence: number;
                   created_at: string;
                   is_ai_generated: boolean;
+                  sub_argument_ids?: string[];
+                }>;
+                sub_arguments: Array<{
+                  id: string;
+                  argument_id: string;
+                  title: string;
+                  purpose: string;
+                  relationship: string;
+                  snippet_ids: string[];
+                  is_ai_generated: boolean;
+                  status: string;
+                  created_at: string;
                 }>;
                 main_subject: string | null;
                 generated_at: string | null;
@@ -453,11 +484,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   claimType: (arg.standard_key || 'other') as ArgumentClaimType,
                   status: 'draft' as ArgumentStatus,
                   isAIGenerated: arg.is_ai_generated,
+                  subArgumentIds: arg.sub_argument_ids || [],
                   createdAt: new Date(arg.created_at),
                   updatedAt: new Date(),
                 }));
                 setArguments(convertedArgs);
                 console.log(`Loaded ${convertedArgs.length} generated arguments from backend`);
+              }
+
+              // Load sub-arguments
+              if (argsResponse.sub_arguments && argsResponse.sub_arguments.length > 0) {
+                const convertedSubArgs: SubArgument[] = argsResponse.sub_arguments.map((sa) => ({
+                  id: sa.id,
+                  argumentId: sa.argument_id,
+                  title: sa.title,
+                  purpose: sa.purpose,
+                  relationship: sa.relationship,
+                  snippetIds: sa.snippet_ids,
+                  isAIGenerated: sa.is_ai_generated,
+                  status: sa.status as 'draft' | 'verified',
+                  createdAt: new Date(sa.created_at),
+                  updatedAt: new Date(),
+                }));
+                setSubArguments(convertedSubArgs);
+                console.log(`Loaded ${convertedSubArgs.length} sub-arguments from backend`);
               }
             } catch {
               // Arguments not available yet, that's fine
@@ -482,7 +532,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSnippets(converted);
           console.log(`Loaded ${converted.length} extracted snippets from project ${projectId}`);
           // NOTE: snippet→standard connections removed - classification at Argument level
-        } else {
+        }
+
+        // Also try to load generated arguments and sub-arguments (for legacy path)
+        try {
+          const argsResponse = await apiClient.get<{
+            project_id: string;
+            arguments: Array<{
+              id: string;
+              title: string;
+              subject: string;
+              snippet_ids: string[];
+              standard_key: string;
+              confidence: number;
+              created_at: string;
+              is_ai_generated: boolean;
+              sub_argument_ids?: string[];
+            }>;
+            sub_arguments: Array<{
+              id: string;
+              argument_id: string;
+              title: string;
+              purpose: string;
+              relationship: string;
+              snippet_ids: string[];
+              is_ai_generated: boolean;
+              status: string;
+              created_at: string;
+            }>;
+            main_subject: string | null;
+            generated_at: string | null;
+          }>(`/arguments/${projectId}`);
+
+          if (argsResponse.arguments && argsResponse.arguments.length > 0) {
+            const convertedArgs: Argument[] = argsResponse.arguments.map((arg) => ({
+              id: arg.id,
+              title: arg.title,
+              subject: arg.subject,
+              snippetIds: arg.snippet_ids,
+              standardKey: arg.standard_key,
+              claimType: (arg.standard_key || 'other') as ArgumentClaimType,
+              status: 'draft' as ArgumentStatus,
+              isAIGenerated: arg.is_ai_generated,
+              subArgumentIds: arg.sub_argument_ids || [],
+              createdAt: new Date(arg.created_at),
+              updatedAt: new Date(),
+            }));
+            setArguments(convertedArgs);
+            console.log(`Loaded ${convertedArgs.length} generated arguments from backend (legacy path)`);
+          }
+
+          // Load sub-arguments
+          if (argsResponse.sub_arguments && argsResponse.sub_arguments.length > 0) {
+            const convertedSubArgs: SubArgument[] = argsResponse.sub_arguments.map((sa) => ({
+              id: sa.id,
+              argumentId: sa.argument_id,
+              title: sa.title,
+              purpose: sa.purpose,
+              relationship: sa.relationship,
+              snippetIds: sa.snippet_ids,
+              isAIGenerated: sa.is_ai_generated,
+              status: sa.status as 'draft' | 'verified',
+              createdAt: new Date(sa.created_at),
+              updatedAt: new Date(),
+            }));
+            setSubArguments(convertedSubArgs);
+            console.log(`Loaded ${convertedSubArgs.length} sub-arguments from backend (legacy path)`);
+          }
+        } catch {
+          // Arguments not available yet, that's fine
+          console.log('No generated arguments found (legacy path)');
+        }
+
+        if (!(response.snippets && response.snippets.length > 0)) {
           // Fall back to raw OCR data if no extracted snippets
           const rawResponse = await apiClient.get<{
             project_id: string;
@@ -518,6 +640,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem(STORAGE_KEY_LLM_PROVIDER);
     return (saved as LLMProvider) || 'deepseek';
   });
+
+  // Page navigation state
+  const [currentPage, setCurrentPage] = useState<PageType>('mapping');
 
   const setLlmProvider = useCallback((provider: LLMProvider) => {
     setLlmProviderState(provider);
@@ -569,6 +694,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Argument Assembly state (NEW)
   const [draggedArgumentId, setDraggedArgumentId] = useState<string | null>(null);
   const [argumentPositions, setArgumentPositions] = useState<Map<string, ElementPosition>>(new Map());
+  const [subArgumentPositions, setSubArgumentPositions] = useState<Map<string, ElementPosition>>(new Map());
   const [hoveredSnippetId, setHoveredSnippetId] = useState<string | null>(null);
   const [argumentMappings, setArgumentMappings] = useState<WritingEdge[]>([]);
 
@@ -596,6 +722,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return new Map(Object.entries(parsed));
     }
     return new Map();
+  });
+
+  // SubArguments state (次级子论点)
+  const [subArguments, setSubArguments] = useState<SubArgument[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_SUB_ARGUMENTS);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return parsed.map((sa: SubArgument) => ({
+        ...sa,
+        createdAt: new Date(sa.createdAt),
+        updatedAt: new Date(sa.updatedAt),
+      }));
+    }
+    return [];
   });
 
   // Selection state for creating snippets
@@ -650,6 +790,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     argumentGraphPositions.forEach((v, k) => { obj[k] = v; });
     localStorage.setItem(STORAGE_KEY_ARGUMENT_GRAPH_POSITIONS, JSON.stringify(obj));
   }, [argumentGraphPositions]);
+
+  // Persist sub-arguments
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SUB_ARGUMENTS, JSON.stringify(subArguments));
+  }, [subArguments]);
 
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeState(mode);
@@ -872,6 +1017,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  // ============================================
+  // SubArgument Management (次级子论点)
+  // ============================================
+
+  const addSubArgument = useCallback((subArgumentData: Omit<SubArgument, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newSubArgument: SubArgument = {
+      ...subArgumentData,
+      id: `subarg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    setSubArguments(prev => [...prev, newSubArgument]);
+
+    // Also update the parent argument's subArgumentIds
+    setArguments(prev => prev.map(arg => {
+      if (arg.id === subArgumentData.argumentId) {
+        const existingSubArgIds = arg.subArgumentIds || [];
+        return {
+          ...arg,
+          subArgumentIds: [...existingSubArgIds, newSubArgument.id],
+          updatedAt: new Date(),
+        };
+      }
+      return arg;
+    }));
+  }, []);
+
+  const updateSubArgument = useCallback((id: string, updates: Partial<Omit<SubArgument, 'id' | 'createdAt'>>) => {
+    setSubArguments(prev => prev.map(sa =>
+      sa.id === id ? { ...sa, ...updates, updatedAt: new Date() } : sa
+    ));
+  }, []);
+
+  const removeSubArgument = useCallback((id: string) => {
+    const subArg = subArguments.find(sa => sa.id === id);
+    setSubArguments(prev => prev.filter(sa => sa.id !== id));
+
+    // Also update the parent argument's subArgumentIds
+    if (subArg) {
+      setArguments(prev => prev.map(arg => {
+        if (arg.id === subArg.argumentId) {
+          return {
+            ...arg,
+            subArgumentIds: (arg.subArgumentIds || []).filter(saId => saId !== id),
+            updatedAt: new Date(),
+          };
+        }
+        return arg;
+      }));
+    }
+  }, [subArguments]);
+
   // Argument → Standard mapping (NEW - replaces snippet → standard)
   const addArgumentMapping = useCallback((argumentId: string, standardKey: string) => {
     // Check if mapping already exists
@@ -911,6 +1108,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Argument position for connection lines (NEW)
   const updateArgumentPosition2 = useCallback((id: string, position: ElementPosition) => {
     setArgumentPositions(prev => {
+      const newMap = new Map(prev);
+      newMap.set(id, position);
+      return newMap;
+    });
+  }, []);
+
+  const updateSubArgumentPosition = useCallback((id: string, position: ElementPosition) => {
+    setSubArgumentPositions(prev => {
       const newMap = new Map(prev);
       newMap.set(id, position);
       return newMap;
@@ -1172,11 +1377,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const canConfirm = pipelineState.stage === 'snippets_ready';
   const canGenerate = pipelineState.stage === 'mapping_confirmed';
 
-  // AI Argument Generation - now uses composed endpoint for lawyer-style grouping
+  // AI Argument Generation - uses new legal pipeline with sub-arguments
   const generateArguments = useCallback(async (forceReanalyze: boolean = false, applicantName?: string) => {
     setIsGeneratingArguments(true);
     try {
-      // Step 1: Run the generation pipeline (creates underlying data)
+      // Step 1: Run the generation pipeline (creates legal_arguments.json with arguments + sub_arguments)
       await apiClient.post<{
         success: boolean;
       }>(`/arguments/${projectId}/generate`, {
@@ -1185,7 +1390,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         provider: llmProvider  // Pass LLM provider selection
       });
 
-      // Step 2: Fetch composed (lawyer-style) arguments
+      // Step 2: Fetch generated arguments and sub-arguments from main endpoint
       const response = await apiClient.get<{
         project_id: string;
         arguments: Array<{
@@ -1194,18 +1399,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           subject: string;
           snippet_ids: string[];
           standard_key: string;
-          exhibits: string[];
           confidence: number;
           created_at: string;
           is_ai_generated: boolean;
-          layers: {
+          sub_argument_ids?: string[];
+          // Extended lawyer-style fields
+          exhibits?: string[];
+          layers?: {
             claim: Array<{ text: string; exhibit_id: string; purpose: string; snippet_id: string }>;
             proof: Array<{ text: string; exhibit_id: string; purpose: string; snippet_id: string }>;
             significance: Array<{ text: string; exhibit_id: string; purpose: string; snippet_id: string }>;
             context: Array<{ text: string; exhibit_id: string; purpose: string; snippet_id: string }>;
           };
-          conclusion: string;
-          completeness: {
+          conclusion?: string;
+          completeness?: {
             has_claim: boolean;
             has_proof: boolean;
             has_significance: boolean;
@@ -1213,11 +1420,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
             score: number;
           };
         }>;
+        sub_arguments: Array<{
+          id: string;
+          argument_id: string;
+          title: string;
+          purpose: string;
+          relationship: string;
+          snippet_ids: string[];
+          is_ai_generated: boolean;
+          status: string;
+          created_at: string;
+        }>;
         main_subject: string | null;
         generated_at: string;
         stats: Record<string, unknown>;
-        lawyer_output: string;
-      }>(`/arguments/${projectId}/composed?applicant_name=${encodeURIComponent(applicantName || 'Ms. Qu')}`);
+      }>(`/arguments/${projectId}`);
 
       setGeneratedMainSubject(response.main_subject);
 
@@ -1228,9 +1445,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         subject: arg.subject,
         snippetIds: arg.snippet_ids,
         standardKey: arg.standard_key,
-        claimType: arg.standard_key as ArgumentClaimType,
+        claimType: (arg.standard_key || 'other') as ArgumentClaimType,
         status: 'draft' as ArgumentStatus,
         isAIGenerated: arg.is_ai_generated,
+        subArgumentIds: arg.sub_argument_ids || [],
         createdAt: new Date(arg.created_at),
         updatedAt: new Date(),
         // Extended fields for lawyer-style display
@@ -1241,7 +1459,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
 
       setArguments(convertedArguments);
-      console.log(`Generated ${convertedArguments.length} composed arguments for ${response.main_subject}`);
+      console.log(`Generated ${convertedArguments.length} arguments for ${response.main_subject}`);
+
+      // Convert and set sub-arguments
+      if (response.sub_arguments && response.sub_arguments.length > 0) {
+        const convertedSubArgs: SubArgument[] = response.sub_arguments.map((sa) => ({
+          id: sa.id,
+          argumentId: sa.argument_id,
+          title: sa.title,
+          purpose: sa.purpose,
+          relationship: sa.relationship,
+          snippetIds: sa.snippet_ids,
+          isAIGenerated: sa.is_ai_generated,
+          status: sa.status as 'draft' | 'verified',
+          createdAt: new Date(sa.created_at),
+          updatedAt: new Date(),
+        }));
+        setSubArguments(convertedSubArgs);
+        console.log(`Generated ${convertedSubArgs.length} sub-arguments`);
+      }
     } catch (err) {
       console.error('Failed to generate arguments:', err);
       throw err;
@@ -1492,8 +1728,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDraggedArgumentId,
     argumentPositions,
     updateArgumentPosition2,
+    subArgumentPositions,
+    updateSubArgumentPosition,
     hoveredSnippetId,
     setHoveredSnippetId,
+    // SubArgument state (次级子论点)
+    subArguments,
+    addSubArgument,
+    updateSubArgument,
+    removeSubArgument,
     // Writing canvas state (kept for step 2)
     writingEdges,
     addWritingEdge,
@@ -1525,6 +1768,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // LLM Provider
     llmProvider,
     setLlmProvider,
+    // Page Navigation
+    currentPage,
+    setCurrentPage,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

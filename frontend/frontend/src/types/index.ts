@@ -60,7 +60,7 @@ export interface Connection {
 }
 
 export interface FocusState {
-  type: 'none' | 'snippet' | 'standard' | 'document' | 'argument';
+  type: 'none' | 'snippet' | 'standard' | 'document' | 'argument' | 'subargument';
   id: string | null;
 }
 
@@ -85,6 +85,9 @@ export type ViewMode = 'line' | 'sankey';
 
 // Argument view mode (list vs graph)
 export type ArgumentViewMode = 'list' | 'graph';
+
+// Page navigation types
+export type PageType = 'mapping' | 'materials' | 'writing';
 
 // Selection state for creating snippets
 export interface SelectionState {
@@ -236,8 +239,9 @@ export interface Argument {
   subject: string;                  // 论据主体，防止主体错乱的关键字段
   claimType: ArgumentClaimType;     // 论据类型
 
-  // === 组成 snippets ===
-  snippetIds: string[];             // 组成这个论据的 snippet IDs
+  // === 组成 ===
+  snippetIds: string[];             // 组成这个论据的 snippet IDs (向后兼容)
+  subArgumentIds?: string[];        // 次级子论点 IDs (新增)
 
   // === 状态 ===
   status: ArgumentStatus;
@@ -268,6 +272,31 @@ export interface Argument {
   // === WritingCanvas 兼容 ===
   position?: Position;              // 画布上的位置（可选，仅 WritingCanvas 使用）
   description?: string;             // 描述（可选，向后兼容）
+}
+
+// SubArgument - 次级子论点，Snippet 和 Argument 之间的中间层级
+export interface SubArgument {
+  id: string;
+  argumentId: string;               // 所属主论点
+
+  // === 内容 ===
+  title: string;                    // 如 "职责范围"、"业绩成就"
+  purpose: string;                  // 这组证据的作用说明
+  relationship: string;             // LLM 生成的关系描述，如 "证明管理能力"
+
+  // === 关联 ===
+  snippetIds: string[];             // 1-5 个 snippets
+
+  // === 状态 ===
+  isAIGenerated: boolean;
+  status: 'draft' | 'verified';
+
+  // === 位置 (用于图形视图) ===
+  position?: Position;
+
+  // === 时间戳 ===
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Edge types for the writing canvas

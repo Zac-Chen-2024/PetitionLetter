@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { legalStandards } from '../data/legalStandards';
 import { STANDARD_KEY_TO_ID } from '../constants/colors';
-import type { Position, Argument } from '../types';
+import type { Position, Argument, SubArgument } from '../types';
 
 // ============================================
 // Types for internal use
@@ -35,7 +35,21 @@ interface StandardNode {
   };
 }
 
-type NodeType = ArgumentNode | StandardNode;
+interface SubArgumentNode {
+  id: string;
+  type: 'subargument';
+  position: Position;
+  data: {
+    title: string;
+    purpose: string;
+    relationship: string;  // LLM 生成的关系描述
+    argumentId: string;
+    snippetCount: number;
+    isAIGenerated: boolean;
+  };
+}
+
+type NodeType = ArgumentNode | StandardNode | SubArgumentNode;
 
 // ============================================
 // Icons
@@ -84,9 +98,13 @@ function ArgumentNodeComponent({
   onDrag,
   scale,
   onPositionReport,
+  t,
+  transformVersion,
 }: DraggableNodeProps & {
   node: ArgumentNode;
   onPositionReport?: (id: string, rect: DOMRect) => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
+  transformVersion?: number;  // Triggers position update when canvas transforms
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef<Position | null>(null);
@@ -102,12 +120,28 @@ function ArgumentNodeComponent({
   };
 
   // Report position to parent for connection lines
+  // Re-report when canvas transforms (scale/offset changes)
   useEffect(() => {
-    if (nodeRef.current && onPositionReport) {
+    if (!nodeRef.current || !onPositionReport) return;
+
+    const reportPosition = () => {
+      if (!nodeRef.current) return;
       const rect = nodeRef.current.getBoundingClientRect();
       onPositionReport(node.id, rect);
-    }
-  });
+    };
+
+    // Initial report with requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(reportPosition);
+
+    // Listen for scroll/resize events
+    window.addEventListener('resize', reportPosition);
+    window.addEventListener('scroll', reportPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', reportPosition);
+      window.removeEventListener('scroll', reportPosition, true);
+    };
+  }, [node.id, node.position.x, node.position.y, onPositionReport, transformVersion]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -178,7 +212,7 @@ function ArgumentNodeComponent({
 
         {/* Stats row */}
         <div className="flex items-center justify-between text-xs">
-          <span className="text-purple-500">{node.data.snippetCount} snippets</span>
+          <span className="text-purple-500">{t('graph.node.snippets', { count: node.data.snippetCount })}</span>
           {node.data.completenessScore !== undefined && (
             <div className="flex items-center gap-1">
               <div className={`w-2.5 h-2.5 rounded-full ${getCompletenessColor(node.data.completenessScore)}`} />
@@ -200,7 +234,7 @@ function ArgumentNodeComponent({
   );
 }
 
-function StandardNodeComponent({ node, isSelected, onSelect, onDrag, scale }: DraggableNodeProps & { node: StandardNode }) {
+function StandardNodeComponent({ node, isSelected, onSelect, onDrag, scale, t }: DraggableNodeProps & { node: StandardNode; t: (key: string, options?: Record<string, unknown>) => string }) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef<Position | null>(null);
   const nodeStartPos = useRef<Position | null>(null);
@@ -273,12 +307,132 @@ function StandardNodeComponent({ node, isSelected, onSelect, onDrag, scale }: Dr
           <span className="text-base font-bold text-slate-800">{node.data.shortName}</span>
         </div>
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-xs text-slate-400">Standard</span>
+          <span className="text-xs text-slate-400">{t('graph.legend.standard')}</span>
           {node.data.argumentCount > 0 && (
             <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
-              {node.data.argumentCount} args
+              {t('graph.node.args', { count: node.data.argumentCount })}
             </span>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubArgumentNodeComponent({
+  node,
+  isSelected,
+  onSelect,
+  onDrag,
+  scale,
+  t,
+  onPositionReport,
+  transformVersion,
+}: DraggableNodeProps & {
+  node: SubArgumentNode;
+  t: (key: string, options?: Record<string, unknown>) => string;
+  onPositionReport?: (id: string, rect: DOMRect) => void;
+  transformVersion?: number;  // Triggers position update when canvas transforms
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartPos = useRef<Position | null>(null);
+  const nodeStartPos = useRef<Position | null>(null);
+  const nodeRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    nodeStartPos.current = { ...node.position };
+    onSelect();
+  };
+
+  // Report position to parent for connection lines
+  // Re-report when canvas transforms (scale/offset changes)
+  useEffect(() => {
+    if (!nodeRef.current || !onPositionReport) return;
+
+    const reportPosition = () => {
+      if (!nodeRef.current) return;
+      const rect = nodeRef.current.getBoundingClientRect();
+      onPositionReport(node.id, rect);
+    };
+
+    requestAnimationFrame(reportPosition);
+    window.addEventListener('resize', reportPosition);
+    window.addEventListener('scroll', reportPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', reportPosition);
+      window.removeEventListener('scroll', reportPosition, true);
+    };
+  }, [node.id, node.position.x, node.position.y, onPositionReport, transformVersion]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragStartPos.current || !nodeStartPos.current) return;
+      const dx = (e.clientX - dragStartPos.current.x) / scale;
+      const dy = (e.clientY - dragStartPos.current.y) / scale;
+      onDrag(node.id, {
+        x: nodeStartPos.current.x + dx,
+        y: nodeStartPos.current.y + dy,
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      dragStartPos.current = null;
+      nodeStartPos.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, node.id, onDrag, scale]);
+
+  return (
+    <div
+      ref={nodeRef}
+      className={`
+        absolute cursor-grab active:cursor-grabbing select-none
+        ${isDragging ? 'z-50' : 'z-15'}
+      `}
+      style={{
+        left: node.position.x,
+        top: node.position.y,
+        transform: 'translate(-50%, -50%)',
+        pointerEvents: 'auto',
+      }}
+      onMouseDown={handleMouseDown}
+    >
+      <div
+        className={`
+          w-[240px] p-3 rounded-lg border-2 border-emerald-400 bg-emerald-50 shadow-sm transition-all
+          ${isSelected ? 'ring-2 ring-offset-2 ring-emerald-500 shadow-md border-emerald-500' : 'hover:shadow-md hover:border-emerald-500'}
+        `}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <span className="text-sm font-semibold text-emerald-800 line-clamp-1">{node.data.title}</span>
+          {node.data.isAIGenerated && (
+            <span className="text-[9px] px-1.5 py-0.5 bg-emerald-200 text-emerald-700 rounded flex-shrink-0">AI</span>
+          )}
+        </div>
+
+        {/* Purpose */}
+        <p className="text-xs text-emerald-600 mb-2 line-clamp-2">{node.data.purpose}</p>
+
+        {/* Relationship label */}
+        <div className="flex items-center justify-between text-xs">
+          <span className="px-2 py-0.5 bg-emerald-200 text-emerald-700 rounded-full text-[10px]">
+            {node.data.relationship}
+          </span>
+          <span className="text-emerald-500">{t('graph.node.snippets', { count: node.data.snippetCount })}</span>
         </div>
       </div>
     </div>
@@ -292,10 +446,12 @@ function StandardNodeComponent({ node, isSelected, onSelect, onDrag, scale }: Dr
 interface InternalConnectionLinesProps {
   argumentNodes: ArgumentNode[];
   standardNodes: StandardNode[];
+  subArgumentNodes: SubArgumentNode[];
 }
 
-function InternalConnectionLines({ argumentNodes, standardNodes }: InternalConnectionLinesProps) {
+function InternalConnectionLines({ argumentNodes, standardNodes, subArgumentNodes }: InternalConnectionLinesProps) {
   const standardPositions = new Map(standardNodes.map(n => [n.id, n.position]));
+  const argumentPositions = new Map(argumentNodes.map(n => [n.id, n.position]));
 
   return (
     <svg className="absolute" style={{ zIndex: 35, pointerEvents: 'none', left: 0, top: 0, width: '4000px', height: '3000px', overflow: 'visible' }}>
@@ -303,7 +459,65 @@ function InternalConnectionLines({ argumentNodes, standardNodes }: InternalConne
         <marker id="arg-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
           <polygon points="0 0, 10 3.5, 0 7" fill="#a855f7" />
         </marker>
+        <marker id="subarg-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#10b981" />
+        </marker>
       </defs>
+
+      {/* SubArgument → Argument connections (with relationship labels) */}
+      {subArgumentNodes.map(subArgNode => {
+        const argPos = argumentPositions.get(subArgNode.data.argumentId);
+        if (!argPos) return null;
+
+        const x1 = subArgNode.position.x + 120; // Right edge of subargument node (240px / 2)
+        const y1 = subArgNode.position.y;
+        const x2 = argPos.x - 160; // Left edge of argument node (320px / 2)
+        const y2 = argPos.y;
+
+        const midX = (x1 + x2) / 2;
+        const pathD = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+
+        // Label position (middle of the curve)
+        const labelX = midX;
+        const labelY = (y1 + y2) / 2 - 8;
+
+        return (
+          <g key={`${subArgNode.id}-${subArgNode.data.argumentId}`}>
+            <path
+              d={pathD}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth={2}
+              markerEnd="url(#subarg-arrowhead)"
+              opacity={0.6}
+            />
+            {/* Relationship label */}
+            <rect
+              x={labelX - 40}
+              y={labelY - 8}
+              width={80}
+              height={16}
+              rx={4}
+              fill="white"
+              stroke="#10b981"
+              strokeWidth={1}
+              opacity={0.9}
+            />
+            <text
+              x={labelX}
+              y={labelY + 3}
+              textAnchor="middle"
+              fontSize={9}
+              fill="#059669"
+              fontWeight={500}
+            >
+              {subArgNode.data.relationship.slice(0, 12)}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Argument → Standard connections */}
       {argumentNodes.map(argNode => {
         if (!argNode.data.standardKey) return null;
 
@@ -341,13 +555,33 @@ function InternalConnectionLines({ argumentNodes, standardNodes }: InternalConne
 
 function calculateTreeLayout(
   arguments_: Argument[],
+  subArguments: SubArgument[],
   savedPositions: Map<string, Position>
-): { argumentNodes: ArgumentNode[]; standardNodes: StandardNode[] } {
-  // Position layout towards the right side (leave room for sub-arguments in the middle)
-  const ARGUMENT_X = 1300;
-  const STANDARD_X = 1700;
+): { argumentNodes: ArgumentNode[]; standardNodes: StandardNode[]; subArgumentNodes: SubArgumentNode[] } {
+  // Position layout with sub-arguments on the left
+  const SUBARG_X = 200;          // Base X for sub-arguments (reduced from 500)
+  const SUBARG_X_OFFSET = 80;    // Horizontal offset for staggered layout
+  const ARGUMENT_X = 800;        // Reduced from 1100
+  const STANDARD_X = 1200;       // Reduced from 1500
   const START_Y = 100;
-  const ARGUMENT_SPACING = 160;  // Vertical spacing between arguments
+  const MIN_ARGUMENT_SPACING = 180;  // Minimum spacing between arguments
+  const SUBARG_SPACING = 140;    // Vertical spacing between sub-arguments
+  const SUBARG_CARD_HEIGHT = 100; // Approximate height of sub-argument card
+
+  // Pre-calculate sub-argument counts per argument
+  const subArgCountByArgument = new Map<string, number>();
+  subArguments.forEach(sa => {
+    const count = subArgCountByArgument.get(sa.argumentId) || 0;
+    subArgCountByArgument.set(sa.argumentId, count + 1);
+  });
+
+  // Helper: calculate vertical space needed for an argument based on its sub-arguments
+  const getArgumentHeight = (argId: string): number => {
+    const subArgCount = subArgCountByArgument.get(argId) || 0;
+    if (subArgCount <= 1) return MIN_ARGUMENT_SPACING;
+    // Height = (subArgCount - 1) * spacing + card height + buffer
+    return (subArgCount - 1) * SUBARG_SPACING + SUBARG_CARD_HEIGHT + 40;
+  };
 
   // Group arguments by standardKey
   const argumentsByStandard = new Map<string, Argument[]>();
@@ -401,10 +635,24 @@ function calculateTreeLayout(
 
     if (standardArgs.length === 0) return;
 
-    // Calculate Y positions for this group of arguments
+    // Calculate Y positions for this group of arguments with dynamic spacing
     const groupStartY = currentY;
-    const groupHeight = (standardArgs.length - 1) * ARGUMENT_SPACING;
-    const standardY = groupStartY + groupHeight / 2;  // Standard at center of its argument group
+    const argPositions: number[] = [];
+    let argY = groupStartY;
+
+    standardArgs.forEach((arg, idx) => {
+      argPositions.push(argY);
+      if (idx < standardArgs.length - 1) {
+        // Calculate spacing based on current and next argument's sub-argument count
+        const currentHeight = getArgumentHeight(arg.id);
+        const nextHeight = getArgumentHeight(standardArgs[idx + 1].id);
+        const spacing = Math.max(currentHeight / 2 + nextHeight / 2, MIN_ARGUMENT_SPACING);
+        argY += spacing;
+      }
+    });
+
+    const groupEndY = argPositions[argPositions.length - 1];
+    const standardY = (groupStartY + groupEndY) / 2;  // Standard at center of its argument group
 
     // Add argument nodes for this standard
     standardArgs.forEach((arg, idx) => {
@@ -412,7 +660,7 @@ function calculateTreeLayout(
       argumentNodes.push({
         id: arg.id,
         type: 'argument' as const,
-        position: savedPos || { x: ARGUMENT_X, y: groupStartY + idx * ARGUMENT_SPACING },
+        position: savedPos || { x: ARGUMENT_X, y: argPositions[idx] },
         data: {
           title: arg.title,
           subject: arg.subject,
@@ -439,12 +687,14 @@ function calculateTreeLayout(
     });
 
     // Move currentY to after this group (with extra spacing between groups)
-    currentY = groupStartY + groupHeight + ARGUMENT_SPACING * 1.5;
+    const lastArgHeight = getArgumentHeight(standardArgs[standardArgs.length - 1].id);
+    currentY = groupEndY + lastArgHeight / 2 + MIN_ARGUMENT_SPACING;
   });
 
   // Add unmapped arguments at the end
   unmappedArguments.forEach(arg => {
     const savedPos = savedPositions.get(arg.id);
+    const argHeight = getArgumentHeight(arg.id);
     argumentNodes.push({
       id: arg.id,
       type: 'argument' as const,
@@ -458,10 +708,52 @@ function calculateTreeLayout(
         completenessScore: arg.completeness?.score,
       },
     });
-    currentY += ARGUMENT_SPACING;
+    currentY += Math.max(argHeight, MIN_ARGUMENT_SPACING);
   });
 
-  return { argumentNodes, standardNodes };
+  // Build sub-argument nodes
+  // Group sub-arguments by their parent argument
+  const subArgsByArgument = new Map<string, SubArgument[]>();
+  subArguments.forEach(sa => {
+    const list = subArgsByArgument.get(sa.argumentId) || [];
+    list.push(sa);
+    subArgsByArgument.set(sa.argumentId, list);
+  });
+
+  const subArgumentNodes: SubArgumentNode[] = [];
+
+  // Position sub-arguments aligned with their parent argument
+  // Stagger groups horizontally based on argument index
+  argumentNodes.forEach((argNode, argIndex) => {
+    const argSubArgs = subArgsByArgument.get(argNode.id) || [];
+    if (argSubArgs.length === 0) return;
+
+    // Calculate vertical range for sub-arguments
+    const totalHeight = (argSubArgs.length - 1) * SUBARG_SPACING;
+    const startY = argNode.position.y - totalHeight / 2;
+
+    // Staggered X position for the entire group based on argument index
+    const groupStaggerX = SUBARG_X + (argIndex % 2) * SUBARG_X_OFFSET;
+
+    argSubArgs.forEach((sa, idx) => {
+      const savedPos = savedPositions.get(sa.id);
+      subArgumentNodes.push({
+        id: sa.id,
+        type: 'subargument' as const,
+        position: savedPos || { x: groupStaggerX, y: startY + idx * SUBARG_SPACING },
+        data: {
+          title: sa.title,
+          purpose: sa.purpose,
+          relationship: sa.relationship,
+          argumentId: sa.argumentId,
+          snippetCount: sa.snippetIds?.length || 0,
+          isAIGenerated: sa.isAIGenerated,
+        },
+      });
+    });
+  });
+
+  return { argumentNodes, standardNodes, subArgumentNodes };
 }
 
 // ============================================
@@ -472,24 +764,39 @@ export function ArgumentGraph() {
   const { t } = useTranslation();
   const {
     arguments: contextArguments,
+    subArguments: contextSubArguments,
     argumentGraphPositions,
     updateArgumentGraphPosition,
     clearArgumentGraphPositions,
     setFocusState,
     focusState,
     updateArgumentPosition2,
+    updateSubArgumentPosition,
+    setSelectedSnippetId,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.5);  // Start at 50% zoom for better overview
+  const [scale, setScale] = useState(0.8);  // Start at 80% zoom
   const [offset, setOffset] = useState<Position>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const panStartPos = useRef<Position | null>(null);
   const offsetStartPos = useRef<Position | null>(null);
 
+  // Transform version - increments on scale/offset changes to trigger position updates
+  const [transformVersion, setTransformVersion] = useState(0);
+
+  // Update transformVersion when scale or offset changes
+  useEffect(() => {
+    setTransformVersion(v => v + 1);
+  }, [scale, offset.x, offset.y]);
+
   // Calculate layout
-  const { argumentNodes, standardNodes } = calculateTreeLayout(contextArguments, argumentGraphPositions);
+  const { argumentNodes, standardNodes, subArgumentNodes } = calculateTreeLayout(
+    contextArguments,
+    contextSubArguments,
+    argumentGraphPositions
+  );
 
   // Handle node drag
   const handleNodeDrag = useCallback((id: string, position: Position) => {
@@ -508,17 +815,48 @@ export function ArgumentGraph() {
     });
   }, [updateArgumentPosition2]);
 
+  // Handle sub-argument position report for connection lines
+  // ConnectionLines connects snippets to sub-arguments (not arguments)
+  const handleSubArgumentPositionReport = useCallback((id: string, rect: DOMRect) => {
+    updateSubArgumentPosition(id, {
+      id,
+      x: rect.right,  // Right edge
+      y: rect.top + rect.height / 2,
+      width: rect.width,
+      height: rect.height,
+    });
+  }, [updateSubArgumentPosition]);
+
   // Handle argument selection - set focusState
   const handleArgumentSelect = useCallback((argumentId: string) => {
     setSelectedNodeId(argumentId);
     setFocusState({ type: 'argument', id: argumentId });
-  }, [setFocusState]);
+    setSelectedSnippetId(null);  // Clear snippet selection when focusing argument
+  }, [setFocusState, setSelectedSnippetId]);
+
+  // Handle sub-argument selection - set focusState and clear snippet selection
+  const handleSubArgumentSelect = useCallback((subArgumentId: string) => {
+    setSelectedNodeId(subArgumentId);
+    setFocusState({ type: 'subargument', id: subArgumentId });
+    setSelectedSnippetId(null);  // Clear snippet selection when focusing sub-argument
+  }, [setFocusState, setSelectedSnippetId]);
 
   // Handle standard selection
   const handleStandardSelect = useCallback((standardId: string) => {
     setSelectedNodeId(standardId);
     setFocusState({ type: 'standard', id: standardId });
   }, [setFocusState]);
+
+  // Check if a sub-argument should be highlighted (when its parent argument is focused)
+  const isSubArgumentHighlighted = useCallback((subArgNode: SubArgumentNode): boolean => {
+    // Highlighted if directly selected
+    if (selectedNodeId === subArgNode.id) return true;
+    // Highlighted if its parent argument is focused
+    if (focusState.type === 'argument' && focusState.id === subArgNode.data.argumentId) return true;
+    // Highlighted if this sub-argument is focused
+    if (focusState.type === 'subargument' && focusState.id === subArgNode.id) return true;
+    return false;
+  }, [selectedNodeId, focusState]);
 
   // Handle canvas mouse events
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
@@ -606,6 +944,9 @@ export function ArgumentGraph() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Get generateArguments from context
+  const { generateArguments, isGeneratingArguments } = useApp();
+
   return (
     <div className="flex flex-col h-full bg-slate-50">
       {/* Header */}
@@ -613,8 +954,32 @@ export function ArgumentGraph() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold text-slate-800">{t('header.writingTree')}</h2>
-            <p className="text-xs text-slate-500">{contextArguments.length} arguments</p>
+            <p className="text-xs text-slate-500">
+              {t('graph.argumentCount', { arguments: contextArguments.length, subArguments: contextSubArguments.length })}
+            </p>
           </div>
+          <button
+            onClick={() => generateArguments(true)}
+            disabled={isGeneratingArguments}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGeneratingArguments ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span>Generate</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -645,12 +1010,16 @@ export function ArgumentGraph() {
         {/* Legend */}
         <div className="absolute top-3 left-3 z-50 bg-white/90 backdrop-blur-sm p-2 rounded-lg border border-slate-200 text-[10px] space-y-1.5">
           <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-lg bg-emerald-100 border-2 border-emerald-400" />
+            <span>{t('graph.legend.subArgument')}</span>
+          </div>
+          <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-lg bg-purple-100 border-2 border-purple-400" />
-            <span>Argument</span>
+            <span>{t('graph.legend.argument')}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-lg border-2 border-blue-500 bg-white" />
-            <span>Standard</span>
+            <span>{t('graph.legend.standard')}</span>
           </div>
         </div>
 
@@ -698,7 +1067,23 @@ export function ArgumentGraph() {
             <InternalConnectionLines
               argumentNodes={argumentNodes}
               standardNodes={standardNodes}
+              subArgumentNodes={subArgumentNodes}
             />
+
+            {/* Sub-argument nodes */}
+            {subArgumentNodes.map(node => (
+              <SubArgumentNodeComponent
+                key={node.id}
+                node={node}
+                isSelected={isSubArgumentHighlighted(node)}
+                onSelect={() => handleSubArgumentSelect(node.id)}
+                onDrag={handleNodeDrag}
+                scale={scale}
+                t={t}
+                onPositionReport={handleSubArgumentPositionReport}
+                transformVersion={transformVersion}
+              />
+            ))}
 
             {/* Argument nodes */}
             {argumentNodes.map(node => (
@@ -710,6 +1095,8 @@ export function ArgumentGraph() {
                 onDrag={handleNodeDrag}
                 scale={scale}
                 onPositionReport={handleArgumentPositionReport}
+                t={t}
+                transformVersion={transformVersion}
               />
             ))}
 
@@ -722,6 +1109,7 @@ export function ArgumentGraph() {
                 onSelect={() => handleStandardSelect(node.id)}
                 onDrag={handleNodeDrag}
                 scale={scale}
+                t={t}
               />
             ))}
           </div>

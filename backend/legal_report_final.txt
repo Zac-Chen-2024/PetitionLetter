@@ -1,0 +1,153 @@
+======================================================================
+LLM + 法律条例驱动 - 最终测试报告
+======================================================================
+
+对比结果:
+| 指标 | 例文(律师) | 新方案 | 匹配 |
+|------|----------|--------|------|
+| 子论点数量 | ~7-8个 | 8个 | ✅ |
+| Membership | 1个 | 1个 | ✅ |
+| Published Material | 3个 | 3个 | ✅ |
+| Original Contribution | 1个 | 1个 | ✅ |
+| Leading Role | 2个 | 2个 | ✅ |
+| Awards | 1个 | 1个 | ✅ |
+
+次级子论点: 21个
+平均每个子论点: 2.6个 SubArguments
+过滤弱证据: 3组
+
+======================================================================
+【MEMBERSHIP】
+▶ Ms. Qu's Membership in the Shanghai Fitness Bodybuilding Association
+  证据强度: strong
+  Snippets: 10个
+  次级子论点 (3个):
+  ├─ 会员资格获取与审查
+  │  关系: 证明资格
+  │  证据: 3个 snippets
+  ├─ 会员资格标准与要求
+  │  关系: 证明难度
+  │  证据: 3个 snippets
+  ├─ 协会权威性与行业地位
+  │  关系: 证明权威
+  │  证据: 4个 snippets
+
+======================================================================
+【PUBLISHED_MATERIAL】
+▶ Major Media Coverage in The Jakarta Post
+  证据强度: strong
+  Snippets: 7个
+  次级子论点 (3个):
+  ├─ 媒体历史与地位
+  │  关系: 奠定权威性
+  │  证据: 3个 snippets
+  ├─ 行业奖项与认可
+  │  关系: 证明专业水准
+  │  证据: 3个 snippets
+  ├─ 相关活动报道
+  │  关系: 展示报道范围
+  │  证据: 1个 snippets
+
+======================================================================
+【PUBLISHED_MATERIAL】
+▶ Major Media Coverage in The Paper (澎湃新闻)
+  证据强度: strong
+  Snippets: 4个
+  次级子论点 (2个):
+  ├─ 媒体地位与权威性
+  │  关系: 确立媒体权威
+  │  证据: 2个 snippets
+  ├─ 行业成就与影响力
+  │  关系: 证明行业领先
+  │  证据: 2个 snippets
+
+======================================================================
+【PUBLISHED_MATERIAL】
+▶ Major Media Coverage in China Sports Daily (中国体育报)
+  证据强度: strong
+  Snippets: 3个
+  次级子论点 (2个):
+  ├─ 媒体权威性与影响力
+  │  关系: 确立媒体地位
+  │  证据: 2个 snippets
+  ├─ 媒体定位与覆盖范围
+  │  关系: 展示媒体性质
+  │  证据: 1个 snippets
+
+======================================================================
+【ORIGINAL_CONTRIBUTIONS】
+▶ Original Contributions of Major Significance: Pioneering Body Alignment Training (BAT) and Popularizing Amateur Weightlifting in China
+  证据强度: strong
+  Snippets: 30个
+  次级子论点 (4个):
+  ├─ 开创性训练体系与方法论
+  │  关系: 证明原创性
+  │  证据: 5个 snippets
+  ├─ 国际影响力与专业认可
+  │  关系: 证明重要性
+  │  证据: 10个 snippets
+  ├─ 推动业余举重普及与发展
+  │  关系: 证明开创性
+  │  证据: 9个 snippets
+  ├─ 行业资源整合与生态建设
+  │  关系: 证明领导力
+  │  证据: 6个 snippets
+
+======================================================================
+【LEADING_ROLE】
+▶ Leading Role as Founder and Legal Representative of Venus Weightlifting Club / Shanghai Yiqing Fitness Management Co., Ltd.
+  证据强度: strong
+  Snippets: 8个
+  次级子论点 (3个):
+  ├─ 组织创立与法律地位
+  │  关系: 确立领导基础
+  │  证据: 4个 snippets
+  ├─ 商业合作与活动组织
+  │  关系: 体现运营能力
+  │  证据: 2个 snippets
+  ├─ 国际拓展与行业影响
+  │  关系: 扩大影响力
+  │  证据: 2个 snippets
+
+======================================================================
+【LEADING_ROLE】
+▶ Critical Role as Shareholder and Founder of ISHTAR HEALTH PTE. LTD. in Singapore
+  证据强度: medium
+  Snippets: 3个
+  次级子论点 (2个):
+  ├─ 组织身份与职责
+  │  关系: 确立领导地位
+  │  证据: 2个 snippets
+  ├─ 战略贡献与成就
+  │  关系: 证明关键作用
+  │  证据: 1个 snippets
+
+======================================================================
+【AWARDS】
+▶ Nationally Recognized Award: Fitness Industry Achievement Award
+  证据强度: medium
+  Snippets: 3个
+  次级子论点 (2个):
+  ├─ 奖项基本信息
+  │  关系: 确立奖项权威性
+  │  证据: 1个 snippets
+  ├─ 颁奖场合与时间
+  │  关系: 佐证奖项真实性
+  │  证据: 2个 snippets
+
+======================================================================
+过滤掉的弱证据:
+  - Ordinary professional certifications (USA Weightlifting Level 1 Coach, NSCA membership) that do not require outstanding achievements for membership and are not selective associations meeting the regulatory standard.
+    Snippets: ['snp_H2_p2_p2_b1_f9f54a64', 'snp_H2_p3_p3_b7_20be1a7e', 'snp_H2_p4_p4_b4_b7194340', 'snp_H2_p6_p6_b4_676df5cc', 'snp_H3_p2_p2_b2_7729f8ea']
+  - Media snippets not selected for the top 3-4 arguments (e.g., Sixth Tone, Titan Sports, People's Daily, Soccer News) or are ancillary descriptions about media/events rather than core proof of major media coverage about the applicant.
+    Snippets: ['snp_D10_p8_p8_b0_8a3c9980', 'snp_F5_p2_p2_b7_67ac0ac0', 'snp_C3_p2_p2_b1_b045c29f', 'snp_C3_p3_p3_b0_f599541f', 'snp_C3_p10_p10_b3_1a62b9f8', 'snp_C4_p2_p2_b3_c5465430', 'snp_C7_p2_p2_b1_c5622781', 'snp_D1_p2_p2_b4_4adc201e', 'snp_D1_p2_p2_b10_f5138544', 'snp_D1_p3_p3_b7_46d14a9e', 'snp_D10_p2_p2_b2_fa4cec1d', 'snp_D10_p6_p6_b3_9b550bb8', 'snp_D8_p2_p2_b9_217fd781', 'snp_D8_p2_p2_b21_54b87384', 'snp_D8_p2_p2_b31_0a3ff767', 'snp_D9_p3_p3_b1_d7c6b969', 'snp_D7_p2_p2_b7_ccc56db9', 'snp_D7_p2_p2_b7_dbc54b14', 'snp_D7_p2_p2_b7_2cbc9611']
+  - Evidence related to original contributions or leading roles that is either redundant, less impactful, or peripheral (e.g., speaking engagements, brand ambassador roles, preliminary plans) and has been consolidated into the stronger, core arguments above.
+    Snippets: ['snp_C3_p9_p9_b2_6b5f7776', 'snp_E2_p10_p10_b18_0168da07', 'snp_F7_p2_p2_b13_3999dc91', 'snp_G2_p2_p2_b4_794116cb', 'snp_G3_p2_p2_b4_326bc810', 'snp_G5_p4_p4_b2_5f9161ea', 'snp_H1_p4_p4_b4_2ddf2815']
+
+======================================================================
+专家评测要点:
+1. 子论点数量是否与例文一致 (~7-8个)?
+2. 每个标准的分布是否合理?
+3. LLM 是否正确过滤了弱证据?
+4. SubArgument 结构是否清晰?
+======================================================================
