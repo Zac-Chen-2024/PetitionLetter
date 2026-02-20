@@ -207,9 +207,6 @@ function ArgumentNodeComponent({
           )}
         </div>
 
-        {/* Subject */}
-        <p className="text-sm text-purple-600 mb-2 line-clamp-1">{node.data.subject}</p>
-
         {/* Stats row */}
         <div className="flex items-center justify-between text-xs">
           <span className="text-purple-500">{t('graph.node.snippets', { count: node.data.snippetCount })}</span>
@@ -412,7 +409,7 @@ function SubArgumentNodeComponent({
     >
       <div
         className={`
-          w-[240px] p-3 rounded-lg border-2 border-emerald-400 bg-emerald-50 shadow-sm transition-all
+          w-[320px] p-3 rounded-lg border-2 border-emerald-400 bg-emerald-50 shadow-sm transition-all
           ${isSelected ? 'ring-2 ring-offset-2 ring-emerald-500 shadow-md border-emerald-500' : 'hover:shadow-md hover:border-emerald-500'}
         `}
       >
@@ -564,9 +561,9 @@ function calculateTreeLayout(
   const ARGUMENT_X = 800;        // Reduced from 1100
   const STANDARD_X = 1200;       // Reduced from 1500
   const START_Y = 100;
-  const MIN_ARGUMENT_SPACING = 180;  // Minimum spacing between arguments
-  const SUBARG_SPACING = 140;    // Vertical spacing between sub-arguments
-  const SUBARG_CARD_HEIGHT = 100; // Approximate height of sub-argument card
+  const MIN_ARGUMENT_SPACING = 280;  // Minimum spacing between arguments (increased)
+  const SUBARG_SPACING = 140;    // Vertical spacing between sub-arguments (visual spacing within same argument)
+  const SUBARG_CARD_HEIGHT = 200; // Approximate height of sub-argument card (increased)
 
   // Pre-calculate sub-argument counts per argument
   const subArgCountByArgument = new Map<string, number>();
@@ -580,7 +577,9 @@ function calculateTreeLayout(
     const subArgCount = subArgCountByArgument.get(argId) || 0;
     if (subArgCount <= 1) return MIN_ARGUMENT_SPACING;
     // Height = (subArgCount - 1) * spacing + card height + buffer
-    return (subArgCount - 1) * SUBARG_SPACING + SUBARG_CARD_HEIGHT + 40;
+    // Add extra buffer for arguments with many sub-arguments
+    const extraBuffer = subArgCount >= 4 ? 380 : 0;
+    return (subArgCount - 1) * SUBARG_SPACING + SUBARG_CARD_HEIGHT + 80 + extraBuffer;
   };
 
   // Group arguments by standardKey
@@ -911,7 +910,7 @@ export function ArgumentGraph() {
   // Handle auto-arrange nodes
   const handleArrangeNodes = useCallback(() => {
     clearArgumentGraphPositions();
-    setScale(0.5);
+    setScale(0.8);
     setOffset({ x: 0, y: 0 });
   }, [clearArgumentGraphPositions]);
 

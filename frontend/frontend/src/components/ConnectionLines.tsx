@@ -174,85 +174,12 @@ function SubArgumentConnectionLines({ subArgumentId }: { subArgumentId: string }
   );
 }
 
-// Connection lines for a focused Standard (show Snippet → SubArgument connections for that standard)
+// Connection lines for a focused Standard - disabled to reduce visual clutter
+// Only highlight argument cards, no connection lines to sub-arguments
 function StandardConnectionLines({ standardId }: { standardId: string }) {
-  const {
-    allSnippets, snippetPositions,
-    arguments: arguments_, subArguments, subArgumentPositions, argumentMappings
-  } = useApp();
-
-  // Find the standardKey that maps to this standardId (reverse lookup)
-  const STANDARD_KEY_TO_ID: Record<string, string> = {
-    'awards': 'std-awards',
-    'membership': 'std-membership',
-    'scholarly_articles': 'std-scholarly',
-    'judging': 'std-judging',
-    'original_contribution': 'std-contribution',
-    'leading_role': 'std-leading',
-    'high_salary': 'std-salary',
-    'published_material': 'std-published',
-  };
-
-  const standardKeyEntry = Object.entries(STANDARD_KEY_TO_ID).find(
-    ([, id]) => id === standardId
-  );
-  const standardKey = standardKeyEntry ? standardKeyEntry[0] : null;
-
-  // Find all arguments mapped to this standard (both AI-generated and manual)
-  const mappedArgumentIds = new Set<string>();
-
-  // 1. AI-generated standardKey mappings
-  arguments_.forEach(arg => {
-    if (arg.standardKey && STANDARD_KEY_TO_ID[arg.standardKey] === standardId) {
-      mappedArgumentIds.add(arg.id);
-    }
-  });
-
-  // 2. Manual drag-drop mappings
-  argumentMappings.filter(m => m.target === standardId).forEach(m => {
-    mappedArgumentIds.add(m.source);
-  });
-
-  // Get the standard color
-  const standardColor = standardKey ? getStandardKeyColor(standardKey) : '#3b82f6';
-
-  // Find all sub-arguments that belong to arguments mapped to this standard
-  const relevantSubArguments = subArguments.filter(sa => mappedArgumentIds.has(sa.argumentId));
-
-  return (
-    <g>
-      {relevantSubArguments.map(subArg => {
-        const subArgPos = subArgumentPositions.get(subArg.id);
-        if (!subArgPos) return null;
-
-        const subArgLeftX = subArgPos.x - (subArgPos.width || 0);
-
-        return (
-          <g key={`std-subarg-group-${subArg.id}`}>
-            {/* Snippet → SubArgument connections */}
-            {(subArg.snippetIds || []).map(snippetId => {
-              const snippet = allSnippets.find(s => s.id === snippetId);
-              const cardPos = snippetPositions.get(snippetId);
-              if (!snippet || !cardPos) return null;
-
-              return (
-                <CurvedLine
-                  key={`std-snip-subarg-${snippetId}-${subArg.id}`}
-                  startX={cardPos.x} // Right side of snippet card
-                  startY={cardPos.y}
-                  endX={subArgLeftX} // Left side of sub-argument
-                  endY={subArgPos.y}
-                  color={standardColor}
-                  strokeWidth={2}
-                  glow={false}
-                />
-              );
-            })}
-          </g>
-        );
-      })}
-    </g>
-  );
+  // Return empty - no connection lines when standard is focused
+  // Arguments are highlighted via ArgumentGraph component
+  return null;
 }
 
 export function ConnectionLines() {

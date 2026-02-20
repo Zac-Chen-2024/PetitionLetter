@@ -256,9 +256,9 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
       `}
     >
       {/* Card content */}
-      <div className="p-3">
+      <div className="p-2">
         {/* Header row */}
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-1.5">
           {/* Drag handle */}
           <div className="flex-shrink-0 mt-0.5 cursor-grab active:cursor-grabbing">
             <DragHandleIcon />
@@ -267,7 +267,7 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
           {/* Main content */}
           <div className="flex-1 min-w-0">
             {/* Summary */}
-            <p className="text-sm font-medium text-slate-900 leading-snug">
+            <p className="text-xs font-medium text-slate-900 leading-snug">
               {snippet.summary}
             </p>
 
@@ -279,23 +279,20 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
             )}
 
             {/* Tags row */}
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <div className="flex items-center gap-1 mt-1 flex-wrap">
               {/* Subject tag (from unified extraction) */}
               {snippet.subject && (
                 <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
                     snippet.isApplicantAchievement
-                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                      : 'bg-slate-100 text-slate-600 border border-slate-200'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-slate-100 text-slate-600'
                   }`}
                   title={snippet.subjectRole || undefined}
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
                   {snippet.subject}
                   {snippet.isApplicantAchievement && (
-                    <svg className="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-2.5 h-2.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
                   )}
@@ -305,7 +302,7 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
               {/* Evidence type tag (from unified extraction) */}
               {snippet.evidenceType && (
                 <span
-                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700"
                 >
                   {snippet.evidenceType}
                 </span>
@@ -314,7 +311,7 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
               {/* Material type tag (fallback if no evidence type) */}
               {!snippet.evidenceType && (
                 <span
-                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
                   style={{
                     backgroundColor: `${snippetColor}15`,
                     color: snippetColor,
@@ -324,13 +321,12 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
                 </span>
               )}
 
-              {/* Assembled indicator */}
+              {/* Assembled indicator - just checkmark */}
               {isAssembled && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700 border border-green-300">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-green-100 text-green-700" title="Assembled">
+                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
-                  Assembled
                 </span>
               )}
 
@@ -339,8 +335,8 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
                 <span
                   key={std.id}
                   className={`
-                    inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs
-                    ${std.isConfirmed ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-500 border border-dashed border-slate-300'}
+                    inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px]
+                    ${std.isConfirmed ? 'bg-slate-100 text-slate-600' : 'bg-slate-50 text-slate-400'}
                   `}
                 >
                   <LinkIcon />
@@ -348,7 +344,7 @@ function EvidenceCard({ snippet }: EvidenceCardProps) {
                 </span>
               ))}
               {connectedStandards.length > 2 && (
-                <span className="text-xs text-slate-400">
+                <span className="text-[10px] text-slate-400">
                   +{connectedStandards.length - 2}
                 </span>
               )}
@@ -403,12 +399,12 @@ function DocumentGroup({ document, snippets, filteredSnippets }: DocumentGroupPr
   };
 
   return (
-    <div className="mb-4">
+    <div className="mb-2">
       {/* Document header */}
       <button
         onClick={handleHeaderClick}
         className={`
-          w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors mb-2
+          w-full flex items-center gap-2 px-2 py-1 rounded text-left transition-colors mb-1
           ${isDocFocused
             ? 'bg-slate-900 text-white'
             : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -693,7 +689,7 @@ export function EvidenceCardPool() {
               </>
             )}
 
-            <div ref={scrollContainerRef} className="h-full overflow-y-auto p-4">
+            <div ref={scrollContainerRef} className="h-full overflow-y-auto p-2">
               {snippetsByDocument.map(({ document, snippets, relatedSnippets }) => (
                 <DocumentGroup
                   key={document.id}
