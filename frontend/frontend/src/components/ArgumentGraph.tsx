@@ -644,6 +644,7 @@ export function ArgumentGraph() {
               width: '4000px',
               height: '3000px',
               pointerEvents: 'none',
+              zIndex: 1,  // Above grid background (z:0) to prevent clipping
             }}
           >
             {/* Internal connection lines */}
