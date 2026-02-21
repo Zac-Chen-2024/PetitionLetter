@@ -466,33 +466,11 @@ def _contains_non_ascii(text: str) -> bool:
     return any(ord(char) > 127 for char in text)
 
 
-# Known Chinese-to-English translations for media names
-CHINESE_TO_ENGLISH = {
-    "澎湃新闻": "The Paper",
-    "中国体育报": "China Sports Daily",
-    "上海健身健美协会": "Shanghai Fitness Bodybuilding Association",
-    "中国健美协会": "China Bodybuilding Association",
-    "中国举重协会": "China Weightlifting Association",
-    "人民日报": "People's Daily",
-    "新华社": "Xinhua News Agency",
-    "中央电视台": "CCTV",
-    "新浪体育": "Sina Sports",
-    "腾讯体育": "Tencent Sports",
-}
-
-
-def _replace_known_chinese(text: str) -> str:
-    """Replace known Chinese media names with their English translations."""
-    if not text:
-        return text
-
-    result = text
-    for chinese, english in CHINESE_TO_ENGLISH.items():
-        # Replace Chinese name including any surrounding parentheses
-        result = result.replace(f"({chinese})", f"({english})")
-        result = result.replace(chinese, english)
-
-    return result
+# Note: Removed hardcoded CHINESE_TO_ENGLISH mapping to avoid overfitting.
+# The system relies on:
+# 1. Prompt Rule 8 requiring 100% English output
+# 2. LLM translation as fallback (via _translate_to_english)
+# 3. _remove_remaining_chinese() as final safety net
 
 
 def _remove_remaining_chinese(text: str) -> str:
@@ -513,19 +491,15 @@ def _remove_remaining_chinese(text: str) -> str:
 
 async def _translate_to_english(text: str) -> str:
     """
-    Translate non-English text to English.
-    Uses known translations first, then LLM as fallback.
+    Translate non-English text to English using LLM.
+    Generic solution - no hardcoded mappings.
     """
     if not _contains_non_ascii(text):
         return text
 
-    # Step 1: Replace known Chinese names
-    result = _replace_known_chinese(text)
-
-    # Step 2: If still contains non-ASCII, try LLM translation
-    if _contains_non_ascii(result):
-        try:
-            prompt = f"""Translate the following text to English.
+    # Try LLM translation
+    try:
+        prompt = f"""Translate the following text to English.
 IMPORTANT:
 1. Keep all exhibit citations (e.g., [Exhibit C-2, p.3]) exactly as they are
 2. Keep all formatting including block quotes (> "...")
@@ -533,25 +507,22 @@ IMPORTANT:
 4. Do NOT add any explanations, just return the translated text
 
 Text to translate:
-{result}"""
+{text}"""
 
-            llm_result = await call_deepseek_text(
-                prompt=prompt,
-                system_prompt="You are a professional translator. Translate to English while preserving legal document formatting.",
-                temperature=0.3,
-                max_tokens=2000
-            )
+        llm_result = await call_deepseek_text(
+            prompt=prompt,
+            system_prompt="You are a professional translator. Translate to English while preserving legal document formatting.",
+            temperature=0.3,
+            max_tokens=2000
+        )
 
-            if llm_result and not _contains_non_ascii(llm_result):
-                return llm_result.strip()
-        except Exception as e:
-            print(f"[ensure_english] LLM translation failed: {e}")
+        if llm_result and not _contains_non_ascii(llm_result):
+            return llm_result.strip()
+    except Exception as e:
+        print(f"[ensure_english] LLM translation failed: {e}")
 
-    # Step 3: If still contains Chinese, remove remaining Chinese characters
-    if _contains_non_ascii(result):
-        result = _remove_remaining_chinese(result)
-
-    return result
+    # Fallback: Remove remaining Chinese characters
+    return _remove_remaining_chinese(text)
 
 
 async def ensure_english_output(llm_output: Dict) -> Dict:
@@ -872,12 +843,12 @@ async def write_petition_section_v3(
     # 4. 扁平化句子列表
     sentences = flatten_sentences(validated_output, context)
 
-    # 4.5 确保扁平化后的句子也是100%英文
+    # 4.5 确保扁平化后的句子也是100%英文（安全网）
+    # Note: LLM translation already happened in ensure_english_output
+    # This is just a final safety net to remove any remaining Chinese
     for sentence in sentences:
         if "text" in sentence and _contains_non_ascii(sentence["text"]):
-            sentence["text"] = _replace_known_chinese(sentence["text"])
-            if _contains_non_ascii(sentence["text"]):
-                sentence["text"] = _remove_remaining_chinese(sentence["text"])
+            sentence["text"] = _remove_remaining_chinese(sentence["text"])
 
     # 5. 构建溯源索引
     provenance_index = build_provenance_index(validated_output, context)
