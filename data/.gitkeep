@@ -1,0 +1,3 @@
+# Place test data zip file here
+# Filename: Test.zip
+# The setup script will extract it to backend/data/projects/

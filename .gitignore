@@ -35,7 +35,10 @@ backend/*.db
 # 项目数据 (用户上传的文档)
 # ===================
 backend/data/
-data/
+
+# Test data folder (keep .gitkeep, ignore zip files)
+data/*
+!data/.gitkeep
 
 # ===================
 # 日志文件

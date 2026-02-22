@@ -23,23 +23,40 @@ git clone https://github.com/Zac-Chen-2024/PetitionLetter2.0.git
 cd PetitionLetter2.0
 ```
 
-#### 2. Backend Setup
+#### 2. One-Click Setup (Recommended)
+
+**Windows:**
+```bash
+# If you have test data, place "Test.zip" in data/ folder first
+setup.bat
+```
+
+**Mac/Linux:**
+```bash
+chmod +x setup.sh
+# If you have test data, place "Test.zip" in data/ folder first
+./setup.sh
+```
+
+The script will:
+- Extract test data to `backend/data/projects/` (if `data/Test.zip` exists)
+- Install backend dependencies
+- Install frontend dependencies
+- Create `.env` from template
+
+#### 3. Manual Setup (Alternative)
+
+##### Backend
 
 ```bash
 cd backend
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Configure API keys
 cp .env.example .env
 # Edit .env and add your DEEPSEEK_API_KEY or OPENAI_API_KEY
-
-# Start backend server
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-#### 3. Frontend Setup (New Terminal)
+##### Frontend (New Terminal)
 
 ```bash
 cd frontend/frontend
@@ -168,31 +185,42 @@ git clone https://github.com/Zac-Chen-2024/PetitionLetter2.0.git
 cd PetitionLetter2.0
 ```
 
-#### 2. 后端部署
+#### 2. 一键部署脚本（推荐）
 
+**Windows:**
+```bash
+# 如有测试数据，先将 "Test.zip" 放入 data/ 文件夹
+setup.bat
+```
+
+**Mac/Linux:**
+```bash
+chmod +x setup.sh
+# 如有测试数据，先将 "Test.zip" 放入 data/ 文件夹
+./setup.sh
+```
+
+脚本会自动：
+- 解压测试数据到 `backend/data/projects/`（如果 `data/Test.zip` 存在）
+- 安装后端依赖
+- 安装前端依赖
+- 从模板创建 `.env` 文件
+
+#### 3. 手动部署（备选）
+
+##### 后端
 ```bash
 cd backend
-
-# 安装依赖
 pip install -r requirements.txt
-
-# 配置 API 密钥
 cp .env.example .env
-# 编辑 .env 文件，填入 DEEPSEEK_API_KEY 或 OPENAI_API_KEY
-
-# 启动后端服务
+# 编辑 .env，填入 DEEPSEEK_API_KEY 或 OPENAI_API_KEY
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-#### 3. 前端部署（新开终端）
-
+##### 前端（新开终端）
 ```bash
 cd frontend/frontend
-
-# 安装依赖
 npm install
-
-# 启动前端开发服务器
 npm run dev
 ```
 

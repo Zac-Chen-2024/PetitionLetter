@@ -4,9 +4,9 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import type { LLMProvider } from '../types';
 
 // LLM Provider options
-const LLM_PROVIDERS: { id: LLMProvider; name: string; icon: string }[] = [
-  { id: 'deepseek', name: 'DeepSeek', icon: '🔮' },
-  { id: 'openai', name: 'OpenAI', icon: '🤖' },
+const LLM_PROVIDERS: { id: LLMProvider; name: string }[] = [
+  { id: 'deepseek', name: 'DeepSeek' },
+  { id: 'openai', name: 'OpenAI' },
 ];
 
 const LogoIcon = () => (
@@ -29,7 +29,7 @@ const LogoIcon = () => (
 );
 
 export function Header() {
-  const { focusState, clearFocus, llmProvider, setLlmProvider, setCurrentPage } = useApp();
+  const { focusState, clearFocus, llmProvider, setLlmProvider } = useApp();
   const { t } = useTranslation();
 
   return (
@@ -63,7 +63,7 @@ export function Header() {
           >
             {LLM_PROVIDERS.map(p => (
               <option key={p.id} value={p.id}>
-                {p.icon} {p.name}
+                {p.name}
               </option>
             ))}
           </select>
@@ -85,15 +85,6 @@ export function Header() {
           </button>
         )}
 
-        <button
-          onClick={() => setCurrentPage('writing')}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          <span>{t('nav.writingCanvas')}</span>
-        </button>
       </div>
     </header>
   );
