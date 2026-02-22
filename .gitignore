@@ -10,6 +10,8 @@ frontend/.env
 # 开发文档 (不公开)
 # ===================
 docs/
+Doc/
+Screen/
 
 # ===================
 # Claude Code 配置
