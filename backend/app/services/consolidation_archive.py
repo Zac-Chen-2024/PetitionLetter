@@ -15,7 +15,7 @@ Consolidation Archive Service - 整合过程存档服务
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -31,7 +31,7 @@ def get_consolidation_logs_dir(project_id: str) -> Path:
 
 def generate_timestamp() -> str:
     """生成时间戳字符串"""
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    return datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
 
 class ConsolidationArchive:
@@ -66,7 +66,7 @@ class ConsolidationArchive:
         """
         filename = f"{self.timestamp}_original_quotes.json"
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "project_id": self.project_id,
             "stage": "original",
             "total_quotes": len(quotes),
@@ -88,7 +88,7 @@ class ConsolidationArchive:
         """
         filename = f"{self.timestamp}_enriched_quotes.json"
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "project_id": self.project_id,
             "stage": "enriched",
             "total_quotes": len(quotes),
@@ -115,7 +115,7 @@ class ConsolidationArchive:
         """
         filename = f"{self.timestamp}_candidate_groups.json"
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "project_id": self.project_id,
             "stage": "candidate_groups",
             "total_groups": len(candidate_groups),
@@ -139,7 +139,7 @@ class ConsolidationArchive:
         """
         filename = f"{self.timestamp}_batch_info.json"
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "project_id": self.project_id,
             "stage": "batch_split",
             "batch_stats": batch_stats,
@@ -173,7 +173,7 @@ class ConsolidationArchive:
         """
         filename = f"{self.timestamp}_llm_batch_{batch_index}.json"
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "project_id": self.project_id,
             "stage": "llm_decision",
             "batch_index": batch_index,
@@ -205,7 +205,7 @@ class ConsolidationArchive:
         """
         filename = f"{self.timestamp}_final_quotes.json"
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "project_id": self.project_id,
             "stage": "final",
             "total_quotes": len(quotes),
@@ -227,7 +227,7 @@ class ConsolidationArchive:
         """
         filename = f"{self.timestamp}_stats.json"
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "project_id": self.project_id,
             "stage": "complete",
             "stats": stats
@@ -303,7 +303,7 @@ def cleanup_old_logs(project_id: str, keep_days: int = 7) -> int:
         删除的文件数量
     """
     logs_dir = get_consolidation_logs_dir(project_id)
-    cutoff = datetime.now().timestamp() - (keep_days * 24 * 60 * 60)
+    cutoff = datetime.now(timezone.utc).timestamp() - (keep_days * 24 * 60 * 60)
     deleted = 0
 
     for filepath in logs_dir.glob("*.json"):

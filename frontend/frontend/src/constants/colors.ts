@@ -8,7 +8,9 @@
 import type { MaterialType } from '../types';
 
 // EB-1A 10 Legal Standards - Official Colors (8 C.F.R. §204.5(h)(3)(i)-(x))
+// + NIW Dhanasar 3-Prong Test Colors
 export const STANDARD_COLORS: Record<string, string> = {
+  // EB-1A
   'std-awards': '#3B82F6',      // blue - (i) Awards
   'std-membership': '#8B5CF6',  // purple - (ii) Membership
   'std-published': '#EC4899',   // pink - (iii) Published Material
@@ -19,6 +21,10 @@ export const STANDARD_COLORS: Record<string, string> = {
   'std-leading': '#EF4444',     // red - (viii) Leading/Critical Role
   'std-salary': '#84CC16',      // lime - (ix) High Salary
   'std-commercial': '#A78BFA',  // violet-400 - (x) Commercial Success
+  // NIW (Dhanasar)
+  'std-prong1_merit': '#3B82F6',      // blue - Prong 1: Substantial Merit
+  'std-prong2_positioned': '#10B981', // emerald - Prong 2: Well Positioned
+  'std-prong3_balance': '#F59E0B',    // amber - Prong 3: Balance of Equities
 } as const;
 
 // MaterialType to Standard ID mapping
@@ -35,7 +41,7 @@ export const MATERIAL_TYPE_TO_STANDARD_ID: Record<MaterialType, string> = {
 
 // Get color for a materialType (inherits from corresponding standard)
 export function getMaterialTypeColor(materialType: MaterialType | string): string {
-  const standardId = MATERIAL_TYPE_TO_STANDARD_ID[materialType as MaterialType];
+  const standardId = MATERIAL_TYPE_TO_STANDARD_ID[materialType as keyof typeof MATERIAL_TYPE_TO_STANDARD_ID];
   if (standardId && STANDARD_COLORS[standardId]) {
     return STANDARD_COLORS[standardId];
   }
@@ -50,6 +56,7 @@ export function getStandardColor(standardId: string): string {
 // standardKey (from backend) to standard_id mapping
 // Backend uses: awards, membership, scholarly_articles, judging, original_contribution(s), leading_role, high_salary, published_material, display, commercial_success
 export const STANDARD_KEY_TO_ID: Record<string, string> = {
+  // EB-1A
   'awards': 'std-awards',
   'membership': 'std-membership',
   'scholarly_articles': 'std-scholarly',
@@ -64,6 +71,10 @@ export const STANDARD_KEY_TO_ID: Record<string, string> = {
   'published_material': 'std-published',
   'commercial_success': 'std-commercial',
   'commercial': 'std-commercial',
+  // NIW (Dhanasar)
+  'prong1_merit': 'std-prong1_merit',
+  'prong2_positioned': 'std-prong2_positioned',
+  'prong3_balance': 'std-prong3_balance',
 } as const;
 
 // Get color for a standardKey (from backend argument)

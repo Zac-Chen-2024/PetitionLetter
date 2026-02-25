@@ -17,7 +17,7 @@ import json
 import uuid
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 
 from .llm_client import call_llm
@@ -151,26 +151,83 @@ CRITICAL RULES:
   * Organization reputation (proves "distinguished" organization)
 - Do NOT skip low-confidence items - include them with appropriate confidence scores
 
-Evidence types for EB-1A (use suggested labels for consistency, or create precise labels when needed):
-- award: Prizes or awards for excellence
+Evidence types organized by EB-1A criterion (use these labels for consistency):
+
+## (i) Awards — 8 C.F.R. §204.5(h)(3)(i)
+- award: Prizes, awards, honors, medals for excellence in the field
+
+## (ii) Membership — 8 C.F.R. §204.5(h)(3)(ii)
 - membership: Membership in associations requiring outstanding achievements
-- membership_criteria: Criteria showing selective membership requirements
-- membership_evaluation: Formal evaluation/assessment leading to membership
-- peer_assessment: Expert peer evaluation of the applicant's work
-- publication: Published material about the person (scholarly)
-- media_coverage: News articles or media mentions about the applicant
-- judging: Participation as a judge
-- contribution: Original contributions of major significance
-- article: Authorship of scholarly articles
-- exhibition: Display of work at exhibitions
+- membership_criteria: Criteria showing selective membership requirements (proves "outstanding achievements" gate)
+- membership_evaluation: Formal evaluation/assessment process leading to membership
+- peer_achievement: Achievements of OTHER members/peers (proves selectivity of the group)
+
+## (iii) Published Material ABOUT the Applicant — 8 C.F.R. §204.5(h)(3)(iii)
+- media_coverage: News articles, press reports, media coverage written BY OTHERS about the applicant
+- source_credibility: Credentials of the media outlet or publication (proves "major" media)
+  CRITICAL: This is material written BY OTHERS about the applicant. NOT applicant's own publications!
+
+## (iv) Judging — 8 C.F.R. §204.5(h)(3)(iv)
+- judging: Participation as a judge, reviewer, or evaluator of others' work
+  Examples: journal peer review, grant proposal review, competition judging, thesis examination,
+  editorial board membership, evaluation committee, certification examiner
+- peer_assessment: Being invited to review/assess/evaluate academic papers, grants, competitions
+
+## (v) Original Contribution — 8 C.F.R. §204.5(h)(3)(v)
+- contribution: Original contributions of major significance in the field
+- scientific_research_project: Research projects, grants, funded research programs
+- quantitative_impact: Metrics, statistics showing impact (NOT salary — use salary/compensation for pay)
+  Examples: page views, citation counts, user numbers, adoption rates, student counts
+- recommendation: Expert recommendation letter confirming originality/significance of contributions
+
+## (vi) Scholarly Articles — 8 C.F.R. §204.5(h)(3)(vi)
+- publication: Scholarly articles, books, textbooks AUTHORED BY the applicant
+  Examples: journal papers, conference papers, book chapters, textbooks, monographs
+  CRITICAL: This is material AUTHORED BY the applicant. NOT media written about the applicant!
+
+## (vii) Display/Exhibition — 8 C.F.R. §204.5(h)(3)(vii)
+- exhibition: Display of work at artistic exhibitions or showcases
+  Examples: gallery shows, museum displays, art installations, film festival screenings,
+  architectural exhibitions, design showcases, performance at major venues
+
+## (viii) Leading/Critical Role — 8 C.F.R. §204.5(h)(3)(viii)
+- leadership: Leading or critical role IN a distinguished organization
+  Examples: founder, CEO, President, Vice Dean, Department Head, Chief Scientist
+  IMPORTANT: Being invited to speak at an event ≠ leadership. Use "invitation" for that.
 - invitation: Invited to speak, participate, or share expertise at events (NOT leadership!)
-- leadership: Leading or critical role IN an organization (founder, CEO, legal representative)
-  IMPORTANT: Being invited to speak ≠ leadership. Use "invitation" for speaking engagements.
-- recommendation: Recommendation or endorsement from recognized expert
-- peer_achievement: Achievements of OTHER members/peers (proves selectivity of group)
-- source_credibility: Credentials of media/organization (proves "major" or "distinguished")
-- quantitative_impact: Metrics, numbers, statistics showing impact
+
+## (ix) High Salary — 8 C.F.R. §204.5(h)(3)(ix)
+- salary: Employment salary, annual income, compensation data of the applicant
+- compensation: Consulting fees, training fees, contract payments to the applicant
+- salary_benchmark: Industry average salary, national wage statistics, peer salary comparisons
+  CRITICAL: Salary/compensation data must NOT be classified as quantitative_impact!
+
+## (x) Commercial Success — 8 C.F.R. §204.5(h)(3)(x)
+- commercial_success: Box office revenue, sales figures, commercial revenue, market performance
+  Examples: box office gross, album/book sales, streaming numbers, commercial licensing revenue
+
+## General
 - other: Other relevant evidence (describe precisely)
+
+CRITICAL DISTINCTIONS — Common Classification Errors:
+1. media_coverage (iii) vs publication (vi):
+   - media_coverage = articles ABOUT the applicant written BY OTHERS (newspaper reports, TV interviews)
+   - publication = scholarly articles AUTHORED BY the applicant (journal papers, textbooks)
+   These are completely different EB-1A criteria!
+
+2. salary/compensation (ix) vs quantitative_impact (v):
+   - salary/compensation = the applicant's PAY (annual income, consulting fees, contract amounts)
+   - quantitative_impact = non-salary metrics (page views, citation counts, user numbers, student counts)
+   Salary data must NEVER be classified as quantitative_impact!
+
+3. leadership (viii) vs invitation:
+   - leadership = formal organizational POSITION (CEO, founder, department head)
+   - invitation = being invited to speak, teach, or participate at events
+   Speaking at a conference ≠ leading an organization!
+
+4. judging (iv) vs recommendation (v):
+   - judging = the applicant evaluating OTHERS' work (peer review, competition judge)
+   - recommendation = others evaluating THE APPLICANT's work (recommendation letters)
 
 CRITICAL - Evidence Purpose (WHY this evidence matters):
 - direct_proof: Directly proves applicant's achievement (e.g., "Applicant founded X")
@@ -182,34 +239,72 @@ CRITICAL - Evidence Purpose (WHY this evidence matters):
 
 The SIGNIFICANCE layer answers: "WHY does this evidence matter?" - This is what separates approved petitions from RFEs!
 
-MUST EXTRACT these patterns:
+MUST EXTRACT these patterns for ALL 10 EB-1A criteria:
 
-1. QUANTITATIVE DATA (impact_proof):
+1. QUANTITATIVE DATA (impact_proof — supports criterion v):
    - Numbers with units: "40,000 copies", "100,000 views", "200,000 coaches", "5,000,000 participants"
    - Percentages: "top 5%", "only 10% accepted"
-   - Currency: "$1M revenue", "¥500万"
+   - Currency (non-salary): "$1M revenue", "¥500万 funding"
    - Counts: "300 athletes from 10 countries", "14 branch stores"
    Pattern: Look for numbers followed by units (copies, views, users, coaches, athletes, participants, stores, countries)
 
-2. ORGANIZATION REPUTATION (credibility_proof):
-   - Credit ratings: "AAA credit rating", "信用等级AAA"
+2. ORGANIZATION REPUTATION (credibility_proof — supports criteria ii, viii):
+   - Credit ratings: "AAA credit rating"
    - Official status: "official partner of", "national association", "government-affiliated"
    - Awards to organization: "won Adam Malik Award", "received IMPA award"
    - Rankings: "leading", "top", "largest", "most influential"
    Pattern: Look for ratings, "official", "national", "leading", organization awards
 
-3. PEER ACHIEVEMENTS (selectivity_proof):
+3. PEER ACHIEVEMENTS (selectivity_proof — supports criterion ii):
    - Other members' credentials: "members include Olympic champion", "other recipients include Nobel laureate"
    - Competition level: "competed against 500 applicants", "selected from 1000 candidates"
    - Evaluator credentials: "reviewed by Vice President", "evaluated by industry experts"
    Pattern: Look for "members include", "other recipients", "reviewed by", prominent titles
 
-4. MEDIA CREDENTIALS (credibility_proof):
+4. MEDIA CREDENTIALS (credibility_proof — supports criterion iii):
    - Circulation data: "circulation of 40,000", "200,000 weekly copies"
    - Media awards: "won journalism award", "received press award"
    - Media ownership: "owned by [parent media group]", "subsidiary of [corporation]"
    - Media reputation: "leading newspaper", "largest English daily", "national publication"
    Pattern: Look for circulation numbers, media awards, ownership info, "leading"/"largest"
+
+5. JUDGING ACTIVITY (direct_proof — supports criterion iv):
+   - Journal review: "reviewed manuscripts for", "served as referee for", "peer reviewer for"
+   - Grant evaluation: "evaluated grant proposals for", "reviewed funding applications"
+   - Competition judging: "served as judge at", "jury member of", "evaluation committee"
+   - Thesis examination: "examined doctoral thesis", "dissertation committee member"
+   - Editorial role: "editorial board member of", "associate editor of"
+   Pattern: Look for "review", "judge", "evaluate", "referee", "committee", "editor", "examine"
+
+6. SCHOLARLY AUTHORSHIP (direct_proof — supports criterion vi):
+   - Publication record: "published in Nature", "authored 12 papers", "textbook adopted by 50 universities"
+   - Citation metrics: "cited 500 times", "h-index of 15", "impact factor 3.5"
+   - Journal reputation: "peer-reviewed journal", "SCI-indexed", "top-tier venue", "Q1 journal"
+   - Books/textbooks: "authored textbook", "published monograph", "edited volume"
+   Pattern: Look for "published", "authored", "cited", "h-index", "impact factor", journal names
+
+7. SALARY & COMPENSATION DATA (direct_proof — supports criterion ix):
+   - Applicant's salary: "annual salary ¥961,710", "monthly income $15,000", "base salary"
+   - Contract fees: "consulting fee ¥150,000", "training contract", "service agreement"
+   - Industry benchmarks: "national average ¥323,032", "industry median salary", "average wage"
+   - Tax records: "tax filing shows", "W-2 income", "income certificate"
+   - Comparison data: "X times the average", "significantly higher than peers", "top percentile"
+   Pattern: Look for currency amounts (¥, $, RMB, USD, 元), "salary", "income", "compensation", "fee", "wage", "average", "benchmark"
+   CRITICAL: Any monetary amount describing someone's PAY = salary/compensation, NOT quantitative_impact!
+
+8. EXHIBITION/DISPLAY (direct_proof — supports criterion vii):
+   - Gallery/museum: "exhibited at", "displayed at", "solo exhibition", "group show"
+   - Film festivals: "screened at Cannes", "selected for Sundance", "premiered at"
+   - Performance venues: "performed at Carnegie Hall", "featured at [venue]"
+   - Design showcases: "showcased at", "presented at [exhibition name]"
+   Pattern: Look for "exhibited", "displayed", "gallery", "museum", "festival", "screening", "showcase"
+
+9. COMMERCIAL SUCCESS DATA (direct_proof — supports criterion x):
+   - Box office: "grossed $50M", "box office revenue", "worldwide gross"
+   - Sales: "sold 1M copies", "bestseller", "platinum record", "gold certification"
+   - Streaming: "1 billion streams", "trending #1", "viral with 50M views"
+   - Market performance: "market share of 30%", "#1 on Billboard", "topped the charts"
+   Pattern: Look for "box office", "grossed", "sold", "revenue", "bestseller", "platinum", "Billboard", "chart"
 
 IMPORTANT: Extract BOTH direct evidence AND supporting evidence that proves WHY the direct evidence matters!
 DO NOT SKIP significance evidence - it is what proves "major", "distinguished", "outstanding" for USCIS!"""
@@ -307,12 +402,46 @@ CRITICAL EXAMPLES:
 12. SELECTIVITY PROOF - "membership requires 10 years experience and review by board of directors":
     → subject="the association", is_applicant_achievement=TRUE, evidence_type="membership_criteria", evidence_purpose="selectivity_proof"
 
-CRITICAL EXTRACTION PATTERNS for SIGNIFICANCE layer:
+13. SALARY (criterion ix) - "The applicant's annual salary was ¥961,710" or "annual income RMB 961,710":
+    → subject="{applicant_name}", is_applicant_achievement=TRUE, evidence_type="salary", evidence_purpose="direct_proof"
+    → NEVER classify salary as quantitative_impact!
+
+14. SALARY BENCHMARK (criterion ix) - "The national average salary for fitness professionals is ¥323,032":
+    → subject="industry", is_applicant_achievement=TRUE, evidence_type="salary_benchmark", evidence_purpose="impact_proof"
+    → Comparison data PROVES the applicant's salary is significantly higher!
+
+15. COMPENSATION (criterion ix) - "iQIYI paid ¥150,000 for the applicant's consulting services":
+    → subject="{applicant_name}", is_applicant_achievement=TRUE, evidence_type="compensation", evidence_purpose="direct_proof"
+
+16. JUDGING (criterion iv) - "The applicant served as a reviewer for the Journal of Sports Science":
+    → subject="{applicant_name}", is_applicant_achievement=TRUE, evidence_type="judging", evidence_purpose="direct_proof"
+
+17. JUDGING (criterion iv) - "Invited to evaluate grant proposals for the National Science Foundation":
+    → subject="{applicant_name}", is_applicant_achievement=TRUE, evidence_type="judging", evidence_purpose="direct_proof"
+
+18. PUBLICATION (criterion vi) - "The applicant authored 'Advanced Training Methods' published in Sports Medicine Journal":
+    → subject="{applicant_name}", is_applicant_achievement=TRUE, evidence_type="publication", evidence_purpose="direct_proof"
+    → This is criterion (vi) because the applicant WROTE it. NOT media_coverage!
+
+19. EXHIBITION (criterion vii) - "The applicant's paintings were displayed at the National Art Museum":
+    → subject="{applicant_name}", is_applicant_achievement=TRUE, evidence_type="exhibition", evidence_purpose="direct_proof"
+
+20. COMMERCIAL SUCCESS (criterion x) - "The film directed by the applicant grossed $50 million at the box office":
+    → subject="{applicant_name}", is_applicant_achievement=TRUE, evidence_type="commercial_success", evidence_purpose="direct_proof"
+
+CRITICAL EXTRACTION PATTERNS — what to look for in EVERY document:
 - Numbers + units: "40,000 copies", "100,000 views", "5M participants", "14 stores", "10 countries"
-- Ratings: "AAA", "credit rating", "信用等级"
+- Currency amounts: ¥, $, RMB, USD, 元 — determine if salary/compensation (→ criterion ix) or other metric (→ criterion v)
+- Salary keywords: "salary", "income", "compensation", "fee", "wage", "pay", "remuneration"
+- Benchmark keywords: "average", "median", "national", "industry", "comparison", "higher than", "X times"
+- Ratings: "AAA", "credit rating"
 - Awards to organizations: "won ... Award", "received ... prize"
 - Peer credentials: "members include", "other recipients", "Olympic", "champion", "gold medal"
-- Media rankings: "leading", "top", "largest", "most", "first"
+- Media rankings: "leading", "top", "largest", "most", "first", "circulation"
+- Review/judging: "reviewed", "referee", "judge", "evaluated", "committee", "editorial board"
+- Authorship: "published in", "authored", "co-authored", "textbook", "monograph", "cited"
+- Exhibition: "exhibited", "displayed", "gallery", "museum", "showcase", "festival screening"
+- Commercial: "box office", "grossed", "sold", "revenue", "bestseller", "platinum"
 
 CRITICAL: Extract BOTH direct evidence AND supporting evidence!
 - Direct evidence: What the applicant did
@@ -364,20 +493,18 @@ UNIFIED_EXTRACTION_SCHEMA = {
                     "is_applicant_achievement": {"type": "boolean"},
                     "evidence_type": {
                         "type": "string",
-                        "description": """Evidence type classification. Suggested labels (use these for consistency, or create more precise labels when needed):
-- award: prizes, awards, honors for excellence
-- membership: membership in selective associations
-- membership_criteria: criteria showing selectivity requirements
-- publication: published material (scholarly)
-- media_coverage: news articles, media mentions about the applicant
-- invitation: invited to speak, participate, or share expertise
-- judging: participation as judge or reviewer
-- contribution: original contributions of major significance
-- leadership: leading or critical role IN an organization (not just invited)
-- recommendation: recommendation from recognized expert
-- source_credibility: credentials of media/organization
-- quantitative_impact: metrics, statistics showing impact
-- other: use specific description if none of above fit precisely"""
+                        "description": """Evidence type by EB-1A criterion (use these labels for consistency):
+(i) award: prizes, awards, honors
+(ii) membership, membership_criteria, membership_evaluation, peer_achievement
+(iii) media_coverage: articles ABOUT applicant; source_credibility: media credentials
+(iv) judging: judge/reviewer of others; peer_assessment: invited peer review
+(v) contribution: original contributions; quantitative_impact: metrics (NOT salary); recommendation; scientific_research_project
+(vi) publication: scholarly articles AUTHORED BY applicant
+(vii) exhibition: display of work at exhibitions
+(viii) leadership: leading role IN organization; invitation: invited to speak (NOT leadership)
+(ix) salary: applicant's pay; compensation: consulting/contract fees; salary_benchmark: industry averages
+(x) commercial_success: box office, sales, revenue data
+General: other"""
                     },
                     "evidence_purpose": {
                         "type": "string",
@@ -470,19 +597,22 @@ def _infer_evidence_layer(item: Dict) -> str:
         return "significance"
 
     # significance 层的证据类型
-    if etype in ["peer_achievement", "source_credibility", "quantitative_impact", "membership_criteria"]:
+    if etype in ["peer_achievement", "source_credibility", "quantitative_impact",
+                  "membership_criteria", "salary_benchmark"]:
         return "significance"
 
     # proof 层：证明申请人的声明
     if etype in ["award", "membership_evaluation", "peer_assessment", "recommendation"]:
         return "proof"
 
-    # context 层：背景信息
-    if etype in ["other"]:
-        return "context"
+    # claim 层：直接声明（主要证据类型）
+    if etype in ["membership", "media_coverage", "judging", "contribution", "publication",
+                  "exhibition", "leadership", "salary", "compensation", "commercial_success",
+                  "scientific_research_project"]:
+        return "claim"
 
-    # 默认 claim 层：直接声明
-    return "claim"
+    # context 层：背景信息
+    return "context"
 
 
 def format_blocks_for_llm(pages: List[Dict]) -> Tuple[str, Dict]:
@@ -624,6 +754,13 @@ async def extract_exhibit_unified(
         "recommendation": 0.4,
         "contribution": 0.4,
         "leadership": 0.4,
+        "judging": 0.4,
+        "publication": 0.4,
+        "salary": 0.3,                   # 低阈值：薪资数据很重要
+        "compensation": 0.3,
+        "salary_benchmark": 0.3,
+        "exhibition": 0.4,
+        "commercial_success": 0.4,
     }
     DEFAULT_THRESHOLD = 0.35  # 默认阈值从 0.5 降低到 0.35
 
@@ -739,7 +876,7 @@ async def extract_exhibit_unified(
     extraction_result = {
         "version": "4.0",
         "exhibit_id": exhibit_id,
-        "extracted_at": datetime.now().isoformat(),
+        "extracted_at": datetime.now(timezone.utc).isoformat(),
         "applicant_name": applicant_name,
 
         "document_summary": document_summary,
@@ -845,7 +982,7 @@ async def extract_all_unified(
     # 保存合并后的结果
     combined_result = {
         "version": "4.0",
-        "extracted_at": datetime.now().isoformat(),
+        "extracted_at": datetime.now(timezone.utc).isoformat(),
         "applicant_name": applicant_name,
         "exhibit_count": total_exhibits,
         "successful": successful,
@@ -877,7 +1014,7 @@ async def extract_all_unified(
 
     snippets_data = {
         "version": "4.0",
-        "extracted_at": datetime.now().isoformat(),
+        "extracted_at": datetime.now(timezone.utc).isoformat(),
         "snippet_count": len(all_snippets),
         "extraction_method": "unified_extraction",
         "model": getattr(settings, 'openai_model', 'gpt-4o'),

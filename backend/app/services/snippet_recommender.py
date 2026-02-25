@@ -9,10 +9,11 @@ Snippet Recommender - 根据标题/描述为新 SubArgument 推荐相关 Snippet
 import json
 from typing import List, Dict, Optional, Set
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
+import portalocker
 
 from .snippet_registry import load_registry
-from .llm_client import call_deepseek, call_deepseek_text
+from .llm_client import call_llm, call_llm_text
 
 
 # 数据存储根目录
@@ -23,23 +24,31 @@ PROJECTS_DIR = DATA_DIR / "projects"
 # ==================== 数据加载 ====================
 
 def load_legal_arguments(project_id: str) -> Dict:
-    """加载 legal_arguments.json"""
+    """加载 legal_arguments.json（共享读锁）"""
     args_file = PROJECTS_DIR / project_id / "arguments" / "legal_arguments.json"
     if not args_file.exists():
         return {"arguments": [], "sub_arguments": []}
 
     with open(args_file, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        portalocker.lock(f, portalocker.LOCK_SH)
+        try:
+            return json.load(f)
+        finally:
+            portalocker.unlock(f)
 
 
 def save_legal_arguments(project_id: str, data: Dict):
-    """保存 legal_arguments.json"""
+    """保存 legal_arguments.json（排他写锁）"""
     args_dir = PROJECTS_DIR / project_id / "arguments"
     args_dir.mkdir(parents=True, exist_ok=True)
     args_file = args_dir / "legal_arguments.json"
 
     with open(args_file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        portalocker.lock(f, portalocker.LOCK_EX)
+        try:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        finally:
+            portalocker.unlock(f)
 
 
 def get_assigned_snippet_ids(project_id: str) -> Set[str]:
@@ -227,7 +236,7 @@ Rank these snippets by their relevance to the sub-argument "{title}".
 Consider how well each snippet supports or provides evidence for this specific sub-argument."""
 
     try:
-        result = await call_deepseek(
+        result = await call_llm(
             prompt=user_prompt,
             system_prompt=system_prompt,
             temperature=0.2,
@@ -302,7 +311,7 @@ def create_subargument(
         "snippet_ids": snippet_ids,
         "is_ai_generated": False,  # 用户手动创建
         "status": "draft",
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
 
     # 添加到 sub_arguments 列表
@@ -371,7 +380,7 @@ What is the relationship? (2-5 words)"""
 
     try:
         # 使用 call_deepseek_text 获取纯文本响应
-        result = await call_deepseek_text(
+        result = await call_llm_text(
             prompt=user_prompt,
             system_prompt=system_prompt,
             temperature=0.2,

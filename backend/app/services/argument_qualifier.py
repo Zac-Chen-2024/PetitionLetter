@@ -38,7 +38,6 @@ QUALIFICATION_RULES = {
         "disqualify_keywords": [
             "renewed as a member",
             "professional membership",
-            "coaching certification",
             "annual membership",
         ],
     },
@@ -316,12 +315,15 @@ def get_qualification_summary(arguments: List[Dict]) -> Dict:
 
 
 if __name__ == "__main__":
-    # 测试
+    # 测试 — 用法: python -m app.services.argument_qualifier <project_id>
+    import sys
     import json
     from pathlib import Path
 
+    project_id = sys.argv[1] if len(sys.argv) > 1 else "test_project"
+
     # 加载测试数据
-    project_dir = Path(__file__).parent.parent.parent / "data" / "projects" / "yaruo_qu"
+    project_dir = Path(__file__).parent.parent.parent / "data" / "projects" / project_id
 
     # 加载 arguments
     args_file = project_dir / "arguments" / "generated_arguments.json"
@@ -346,7 +348,7 @@ if __name__ == "__main__":
 
     # 输出结果
     print("=" * 60)
-    print("Qualification Summary")
+    print(f"Qualification Summary (project: {project_id})")
     print("=" * 60)
     summary = get_qualification_summary(qualified)
     print(f"Total: {summary['total']}")

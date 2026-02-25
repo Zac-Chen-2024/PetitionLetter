@@ -4,7 +4,7 @@
 """
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 
@@ -28,10 +28,80 @@ def get_project_file(project_id: str, filename: str) -> Path:
     return get_project_dir(project_id) / filename
 
 
+# ==================== 项目类型辅助函数 ====================
+
+def _visa_type_to_project_type(visa_type: str) -> str:
+    """Convert legacy visa_type values to projectType."""
+    mapping = {
+        "EB-1A": "EB-1A",
+        "eb1a": "EB-1A",
+        "EB1A": "EB-1A",
+        "NIW": "NIW",
+        "niw": "NIW",
+    }
+    return mapping.get(visa_type, "EB-1A")
+
+
+def _infer_project_type(project_dir: Path) -> str:
+    """Infer project type from metadata.json fallback, default EB-1A."""
+    metadata_file = project_dir / "metadata.json"
+    if metadata_file.exists():
+        try:
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            return _visa_type_to_project_type(metadata.get("visa_type", "EB-1A"))
+        except Exception:
+            pass
+    return "EB-1A"
+
+
+def _generate_project_number(project_type: str) -> str:
+    """Generate a sequential project number like EB1A-2026-001 or NIW-2026-001."""
+    year = datetime.now(timezone.utc).strftime("%Y")
+    prefix = project_type.replace("-", "")  # "EB-1A" -> "EB1A", "NIW" -> "NIW"
+
+    # Count existing projects of this type for the current year
+    count = 0
+    if PROJECTS_DIR.exists():
+        for item in PROJECTS_DIR.iterdir():
+            if item.is_dir():
+                meta_file = item / "meta.json"
+                if meta_file.exists():
+                    try:
+                        with open(meta_file, 'r', encoding='utf-8') as f:
+                            meta = json.load(f)
+                        pn = meta.get("projectNumber", "")
+                        if pn.startswith(f"{prefix}-{year}-"):
+                            count += 1
+                    except Exception:
+                        pass
+
+    return f"{prefix}-{year}-{count + 1:03d}"
+
+
+def get_project_type(project_id: str) -> str:
+    """Get the project type with fallback chain: meta.json → metadata.json → 'EB-1A'."""
+    project_dir = get_project_dir(project_id)
+
+    # Try meta.json first
+    meta_file = project_dir / "meta.json"
+    if meta_file.exists():
+        try:
+            with open(meta_file, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            if "projectType" in meta:
+                return meta["projectType"]
+        except Exception:
+            pass
+
+    # Fallback to metadata.json
+    return _infer_project_type(project_dir)
+
+
 # ==================== 项目管理 ====================
 
 def list_projects() -> List[Dict]:
-    """列出所有项目"""
+    """列出所有项目（兼容 legacy 项目）"""
     ensure_dirs()
     projects = []
 
@@ -41,6 +111,23 @@ def list_projects() -> List[Dict]:
             if meta_file.exists():
                 with open(meta_file, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
+                    # Ensure projectType is present
+                    if "projectType" not in meta:
+                        meta["projectType"] = _infer_project_type(item)
+                    projects.append(meta)
+            else:
+                # Legacy project: no meta.json but has metadata.json
+                metadata_file = item / "metadata.json"
+                if metadata_file.exists():
+                    with open(metadata_file, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
+                    meta = {
+                        "id": item.name,
+                        "name": metadata.get("name", item.name),
+                        "createdAt": metadata.get("created_at", ""),
+                        "updatedAt": metadata.get("updated_at", ""),
+                        "projectType": _visa_type_to_project_type(metadata.get("visa_type", "EB-1A")),
+                    }
                     projects.append(meta)
 
     # 按创建时间倒序
@@ -48,11 +135,11 @@ def list_projects() -> List[Dict]:
     return projects
 
 
-def create_project(name: str) -> Dict:
+def create_project(name: str, project_type: str = "EB-1A") -> Dict:
     """创建新项目"""
     ensure_dirs()
 
-    project_id = f"project-{int(datetime.now().timestamp() * 1000)}"
+    project_id = f"project-{int(datetime.now(timezone.utc).timestamp() * 1000)}"
     project_dir = get_project_dir(project_id)
     project_dir.mkdir(parents=True, exist_ok=True)
 
@@ -61,11 +148,15 @@ def create_project(name: str) -> Dict:
     (project_dir / "relationship").mkdir(exist_ok=True)
     (project_dir / "writing").mkdir(exist_ok=True)
 
+    project_number = _generate_project_number(project_type)
+
     meta = {
         "id": project_id,
         "name": name,
-        "createdAt": datetime.now().isoformat(),
-        "updatedAt": datetime.now().isoformat()
+        "projectType": project_type,
+        "projectNumber": project_number,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "updatedAt": datetime.now(timezone.utc).isoformat()
     }
 
     with open(project_dir / "meta.json", 'w', encoding='utf-8') as f:
@@ -81,11 +172,28 @@ def create_project(name: str) -> Dict:
 def get_project(project_id: str) -> Optional[Dict]:
     """获取项目信息"""
     meta_file = get_project_file(project_id, "meta.json")
-    if not meta_file.exists():
-        return None
+    if meta_file.exists():
+        with open(meta_file, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        # Ensure projectType is present
+        if "projectType" not in meta:
+            meta["projectType"] = _infer_project_type(get_project_dir(project_id))
+        return meta
 
-    with open(meta_file, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    # Legacy: no meta.json but has metadata.json
+    metadata_file = get_project_file(project_id, "metadata.json")
+    if metadata_file.exists():
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        return {
+            "id": project_id,
+            "name": metadata.get("name", project_id),
+            "createdAt": metadata.get("created_at", ""),
+            "updatedAt": metadata.get("updated_at", ""),
+            "projectType": _visa_type_to_project_type(metadata.get("visa_type", "EB-1A")),
+        }
+
+    return None
 
 
 def delete_project(project_id: str) -> bool:
@@ -112,7 +220,7 @@ def update_project_meta(project_id: str, updates: Dict) -> Optional[Dict]:
         if value is not None:
             meta[key] = value
 
-    meta["updatedAt"] = datetime.now().isoformat()
+    meta["updatedAt"] = datetime.now(timezone.utc).isoformat()
 
     with open(meta_file, 'w', encoding='utf-8') as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
@@ -173,7 +281,7 @@ def save_analysis(project_id: str, analysis_data: Dict) -> str:
     analysis_dir.mkdir(parents=True, exist_ok=True)
 
     # 使用时间戳作为版本 ID
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     version_id = timestamp.strftime("%Y%m%d_%H%M%S")
 
     version_data = {
@@ -240,7 +348,7 @@ def save_relationship(project_id: str, relationship_data: Dict) -> str:
     rel_dir = project_dir / "relationship"
     rel_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     version_id = timestamp.strftime("%Y%m%d_%H%M%S")
 
     version_data = {
@@ -271,7 +379,7 @@ def save_quote_index_map(project_id: str, quote_index_map: Dict) -> str:
     rel_dir = project_dir / "relationship"
     rel_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     version_id = timestamp.strftime("%Y%m%d_%H%M%S")
 
     data = {
@@ -411,7 +519,7 @@ def create_relationship_snapshot(
         raise ValueError("No relationship data to snapshot")
 
     # 生成快照 ID
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     snap_id = f"snap_{timestamp.strftime('%Y%m%d_%H%M%S')}"
     version_id = current_rel.get("version_id")
 
@@ -636,7 +744,7 @@ def save_writing(project_id: str, section: str, text: str, citations: List[Dict]
     writing_dir = project_dir / "writing"
     writing_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     version_id = timestamp.strftime("%Y%m%d_%H%M%S")
 
     version_data = {
@@ -756,7 +864,7 @@ def save_chunks(project_id: str, document_id: str, chunks: List[Dict]) -> str:
     chunks_dir = project_dir / "chunks"
     chunks_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
 
     chunk_data = {
         "document_id": document_id,
@@ -792,7 +900,7 @@ def save_l1_analysis(project_id: str, chunk_analyses: List[Dict]) -> str:
     l1_dir = project_dir / "l1_analysis"
     l1_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     version_id = timestamp.strftime("%Y%m%d_%H%M%S")
 
     analysis_data = {
@@ -913,7 +1021,7 @@ def save_l1_summary(project_id: str, summary: Dict) -> str:
     l1_dir = project_dir / "l1_analysis"
     l1_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     version_id = timestamp.strftime("%Y%m%d_%H%M%S")
 
     summary["version_id"] = version_id
@@ -1100,7 +1208,7 @@ def _update_project_time(project_id: str):
         with open(meta_file, 'r', encoding='utf-8') as f:
             meta = json.load(f)
 
-        meta["updatedAt"] = datetime.now().isoformat()
+        meta["updatedAt"] = datetime.now(timezone.utc).isoformat()
 
         with open(meta_file, 'w', encoding='utf-8') as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
@@ -1146,7 +1254,7 @@ def save_style_template(section: str, name: str, original_text: str, parsed_stru
     section_dir = templates_dir / section
     section_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     template_id = f"tpl_{int(timestamp.timestamp() * 1000)}"
 
     template_data = {
@@ -1372,7 +1480,7 @@ def update_style_template(template_id: str, updates: Dict) -> Optional[Dict]:
                     if key in ['name', 'original_text', 'parsed_structure'] and value is not None:
                         template[key] = value
 
-                template['updated_at'] = datetime.now().isoformat()
+                template['updated_at'] = datetime.now(timezone.utc).isoformat()
 
                 with open(filepath, 'w', encoding='utf-8') as f:
                     json.dump(template, f, ensure_ascii=False, indent=2)

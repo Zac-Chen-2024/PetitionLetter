@@ -256,10 +256,10 @@ def save_links(project_id: str, links: List[Dict]):
     snippets_dir = get_snippets_dir(project_id)
     links_file = snippets_dir / "links.json"
 
-    from datetime import datetime
+    from datetime import datetime, timezone
     data = {
         "version": "1.0",
-        "updated_at": datetime.now().isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
         "link_count": len(links),
         "links": links
     }

@@ -13,7 +13,7 @@ import hashlib
 import json
 from typing import List, Dict, Optional
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # 数据存储根目录
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
@@ -193,7 +193,7 @@ def save_registry(project_id: str, snippets: List[Dict]):
 
     data = {
         "version": "1.0",
-        "updated_at": datetime.now().isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
         "snippet_count": len(snippets),
         "snippets": snippets
     }

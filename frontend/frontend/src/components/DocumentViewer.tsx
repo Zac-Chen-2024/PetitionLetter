@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { useApp } from '../context/AppContext';
-import { apiClient } from '../services/api';
+import { apiClient, BACKEND_URL } from '../services/api';
 import type { Snippet, BoundingBox, MaterialType } from '../types';
 import { SnippetCreationModal } from './SnippetCreationModal';
 import { Magnifier } from './Magnifier';
@@ -252,8 +252,9 @@ function PDFViewer({
     }
   }, [selectedSnippetId, snippets]);
 
-  // Filter snippets for this exhibit
-  const exhibitSnippets = snippets.filter(s => s.exhibitId === exhibitId);
+  // Filter snippets for this exhibit (case-insensitive)
+  const exhibitIdLower = exhibitId.toLowerCase();
+  const exhibitSnippets = snippets.filter(s => s.exhibitId?.toLowerCase() === exhibitIdLower);
 
   const handleSnippetClick = (e: React.MouseEvent, snippet: Snippet) => {
     if (isSelectMode) return;
@@ -267,9 +268,7 @@ function PDFViewer({
     }
   };
 
-  // Get backend URL
-  const backendUrl = 'http://localhost:8000';
-  const fullPdfUrl = `${backendUrl}${pdfUrl}`;
+  const fullPdfUrl = `${BACKEND_URL}${pdfUrl}`;
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -566,10 +565,11 @@ export function DocumentViewer({ compact = false }: DocumentViewerProps) {
     setPendingSelection(null);
   }, [pendingSelection, addSnippet]);
 
-  // Get selected exhibit
+  // Get selected exhibit (case-insensitive match — exhibit IDs may differ in case)
   const selectedExhibitId = selectedDocumentId?.replace('doc_', '');
-  const selectedExhibit = exhibits.find(e => e.id === selectedExhibitId);
-  const selectedSnippets = allSnippets.filter(s => s.exhibitId === selectedExhibitId);
+  const selectedExhibitIdLower = selectedExhibitId?.toLowerCase();
+  const selectedExhibit = exhibits.find(e => e.id.toLowerCase() === selectedExhibitIdLower);
+  const selectedSnippets = allSnippets.filter(s => s.exhibitId?.toLowerCase() === selectedExhibitIdLower);
 
   return (
     <div className="flex flex-col h-full bg-slate-50">

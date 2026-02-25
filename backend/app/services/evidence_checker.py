@@ -320,6 +320,8 @@ def print_evidence_report(results: Dict[str, Any]):
 
 
 if __name__ == "__main__":
-    # 测试
-    results = check_project_evidence("yaruo_qu")
+    # 测试 — 用法: python -m app.services.evidence_checker <project_id>
+    import sys
+    project_id = sys.argv[1] if len(sys.argv) > 1 else "test_project"
+    results = check_project_evidence(project_id)
     print_evidence_report(results)

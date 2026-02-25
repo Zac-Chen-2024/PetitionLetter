@@ -16,7 +16,7 @@ import json
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from collections import defaultdict
 import uuid
@@ -355,7 +355,7 @@ class ArgumentGenerator:
                             snippet_ids=real_sub_snippet_ids,
                             is_ai_generated=True,
                             status="draft",
-                            created_at=datetime.now().isoformat()
+                            created_at=datetime.now(timezone.utc).isoformat()
                         )
                         sub_arguments.append(sub_arg)
                         sub_arg_ids.append(sub_arg_id)
@@ -367,7 +367,7 @@ class ArgumentGenerator:
                     snippet_ids=real_snippet_ids,
                     standard_key=standard_key,
                     confidence=arg.get('confidence', 0.8),
-                    created_at=datetime.now().isoformat(),
+                    created_at=datetime.now(timezone.utc).isoformat(),
                     is_ai_generated=True,
                     sub_argument_ids=sub_arg_ids
                 )
@@ -433,7 +433,7 @@ class ArgumentGenerator:
             snippet_ids=snippet_ids,
             is_ai_generated=True,
             status="draft",
-            created_at=datetime.now().isoformat()
+            created_at=datetime.now(timezone.utc).isoformat()
         )
 
         argument = GeneratedArgument(
@@ -443,7 +443,7 @@ class ArgumentGenerator:
             snippet_ids=snippet_ids,
             standard_key=standard_key,
             confidence=round(avg_confidence, 2),
-            created_at=datetime.now().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
             is_ai_generated=True,
             sub_argument_ids=[sub_arg_id]
         )
@@ -640,7 +640,7 @@ class ArgumentGenerator:
         # Save results
         result = {
             "success": True,
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "main_subject": main_subject,
             "arguments": [asdict(a) for a in arguments],
             "sub_arguments": [asdict(sa) for sa in all_sub_arguments],
@@ -776,7 +776,7 @@ class ArgumentGenerator:
                 snippet_ids=snippet_ids,
                 standard_key="",  # Empty - user maps to standard manually
                 confidence=round(avg_confidence, 2),
-                created_at=datetime.now().isoformat(),
+                created_at=datetime.now(timezone.utc).isoformat(),
                 is_ai_generated=True
             )
             arguments.append(argument)
@@ -784,7 +784,7 @@ class ArgumentGenerator:
         # Save results
         result = {
             "success": True,
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "main_subject": main_subject,
             "arguments": [asdict(a) for a in arguments],
             "stats": {

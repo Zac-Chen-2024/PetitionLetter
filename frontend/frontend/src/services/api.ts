@@ -4,10 +4,14 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api';
 
+// Backend origin (without /api path) for direct resource URLs (e.g. PDF files)
+export const BACKEND_URL = API_BASE.replace(/\/api\/?$/, '');
+
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: unknown;
   headers?: Record<string, string>;
+  signal?: AbortSignal;
 }
 
 class ApiError extends Error {
@@ -22,7 +26,7 @@ class ApiError extends Error {
 }
 
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, headers = {} } = options;
+  const { method = 'GET', body, headers = {}, signal } = options;
 
   const config: RequestInit = {
     method,
@@ -30,6 +34,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
       'Content-Type': 'application/json',
       ...headers,
     },
+    signal,
   };
 
   if (body) {
@@ -52,20 +57,20 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 }
 
 export const apiClient = {
-  get: <T>(endpoint: string, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: 'GET', headers }),
+  get: <T>(endpoint: string, options?: { headers?: Record<string, string>; signal?: AbortSignal }) =>
+    request<T>(endpoint, { method: 'GET', ...options }),
 
-  post: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: 'POST', body, headers }),
+  post: <T>(endpoint: string, body?: unknown, options?: { headers?: Record<string, string>; signal?: AbortSignal }) =>
+    request<T>(endpoint, { method: 'POST', body, ...options }),
 
-  put: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: 'PUT', body, headers }),
+  put: <T>(endpoint: string, body?: unknown, options?: { headers?: Record<string, string>; signal?: AbortSignal }) =>
+    request<T>(endpoint, { method: 'PUT', body, ...options }),
 
-  patch: <T>(endpoint: string, body?: unknown, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: 'PATCH', body, headers }),
+  patch: <T>(endpoint: string, body?: unknown, options?: { headers?: Record<string, string>; signal?: AbortSignal }) =>
+    request<T>(endpoint, { method: 'PATCH', body, ...options }),
 
-  delete: <T>(endpoint: string, headers?: Record<string, string>) =>
-    request<T>(endpoint, { method: 'DELETE', headers }),
+  delete: <T>(endpoint: string, options?: { headers?: Record<string, string>; signal?: AbortSignal }) =>
+    request<T>(endpoint, { method: 'DELETE', ...options }),
 };
 
 export { ApiError };

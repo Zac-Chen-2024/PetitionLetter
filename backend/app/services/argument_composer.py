@@ -40,15 +40,9 @@ STANDARD_FORMAL_NAMES = {
 }
 
 # 通用的不合格会员组织 (作为 fallback)
-DEFAULT_DISQUALIFIED_MEMBERSHIPS = {
-    "usa weightlifting",
-    "nsca",
-    "national strength and conditioning association",
-    "ace",
-    "american council on exercise",
-    "nasm",
-    "issa",
-}
+# Empty by default — disqualified memberships are determined dynamically
+# by the entity_analyzer LLM per project (stored in project_metadata.json)
+DEFAULT_DISQUALIFIED_MEMBERSHIPS: set = set()
 
 
 @dataclass
@@ -340,17 +334,19 @@ class ArgumentComposer:
             if pattern in text_lower:
                 return canonical
 
-        # 备用：从文本中识别常见媒体
+        # 备用：从文本中识别常见国际媒体
         media_patterns = {
-            "jakarta post": "The Jakarta Post",
-            "china sports daily": "China Sports Daily",
-            "sixth tone": "Sixth Tone",
-            "the paper": "The Paper",
             "new york times": "The New York Times",
             "washington post": "The Washington Post",
+            "wall street journal": "The Wall Street Journal",
             "bbc": "BBC",
             "cnn": "CNN",
             "reuters": "Reuters",
+            "associated press": "Associated Press",
+            "guardian": "The Guardian",
+            "financial times": "Financial Times",
+            "people's daily": "People's Daily",
+            "xinhua": "Xinhua News Agency",
         }
         for pattern, name in media_patterns.items():
             if pattern in text_lower:
@@ -725,7 +721,10 @@ if __name__ == "__main__":
     import sys
     sys.stdout.reconfigure(encoding='utf-8')
 
-    result = compose_project_arguments("yaruo_qu", "Ms. Yaruo Qu")
+    project_id = sys.argv[1] if len(sys.argv) > 1 else "test_project"
+    applicant = sys.argv[2] if len(sys.argv) > 2 else "the Applicant"
+
+    result = compose_project_arguments(project_id, applicant)
     print(result["lawyer_output"])
     print("\n" + "=" * 60)
     print("Statistics:", json.dumps(result["statistics"], indent=2, ensure_ascii=False))

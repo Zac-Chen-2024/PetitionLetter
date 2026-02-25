@@ -2,7 +2,7 @@ import { useMemo, useRef, useEffect, useState } from 'react';
 import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
 import type { SankeyNode, SankeyLink } from 'd3-sankey';
 import { useApp } from '../context/AppContext';
-import { legalStandards } from '../data/legalStandards';
+import { useLegalStandards } from '../hooks/useLegalStandards';
 
 interface SankeyNodeData {
   id: string;
@@ -24,6 +24,7 @@ type SNode = SankeyNode<SankeyNodeData, SankeyLinkData>;
 type SLink = SankeyLink<SankeyNodeData, SankeyLinkData>;
 
 export function SankeyView() {
+  const legalStandards = useLegalStandards();
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const {

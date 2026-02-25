@@ -244,6 +244,15 @@ def load_subargument_context(
         return {"standard": None, "arguments": []}
 
     snippet_registry = load_registry(project_id)
+
+    # If registry is empty, fall back to combined extraction data
+    if not snippet_registry:
+        combined_file = PROJECTS_DIR / project_id / "extraction" / "combined_extraction.json"
+        if combined_file.exists():
+            with open(combined_file, 'r', encoding='utf-8') as f:
+                combined_data = json.load(f)
+            snippet_registry = combined_data.get("snippets", [])
+
     # 构建双向查找表（支持新旧两种 ID 格式）
     snippet_lookup = _build_snippet_lookup(snippet_registry)
     snippet_map = snippet_lookup["by_new_id"]
@@ -359,122 +368,287 @@ def _build_writing_prompt(context: Dict) -> str:
     return "\n".join(args_text)
 
 
-async def generate_structured_paragraph(
-    context: Dict,
-    additional_instructions: str = None
-) -> Dict:
-    """
-    基于 SubArgument 结构生成段落
+# ============================================
+# 三步流水线：分拆生成 → 润色整合 → 首尾生成
+# ============================================
 
-    使用一步生成策略，要求 LLM 同时输出内容和溯源信息。
-    DeepSeek 不支持 strict schema，需要在 Prompt 中强调格式。
+async def _step1_generate_subargument_body(
+    standard: Dict,
+    argument_title: str,
+    subargument: Dict,
+    additional_instructions: str = None
+) -> List[Dict]:
+    """
+    Step 1: 为单个 SubArgument 生成 3-5 句正文。
+
+    每个 SubArgument 独立调用 LLM，保证 100% 覆盖率。
 
     Returns:
-        {
-            "argument_id": str,
-            "opening_sentence": {"text": str, "snippet_ids": []},
-            "subargument_paragraphs": [
-                {
-                    "subargument_id": str,
-                    "sentences": [
-                        {"text": str, "snippet_ids": [...], "exhibit_refs": [...]}
-                    ]
-                }
-            ],
-            "closing_sentence": {"text": str}
-        }
+        [{"text": str, "snippet_ids": [...], "exhibit_refs": [...]}]
     """
-    standard = context.get("standard", {})
-    arguments = context.get("arguments", [])
+    # 构建该 SubArgument 的证据文本（给足内容，不过分截断）
+    evidence_lines = []
+    snippet_ids_list = []
+    for snip in subargument.get("snippets", []):
+        text = snip["text"][:600] + "..." if len(snip["text"]) > 600 else snip["text"]
+        evidence_lines.append(
+            f'  SNIPPET {snip["id"]} (Exhibit {snip["exhibit"]}, p.{snip["page"]}):\n    "{text}"'
+        )
+        snippet_ids_list.append(snip["id"])
+    evidence_text = "\n\n".join(evidence_lines) if evidence_lines else "(no evidence provided)"
+    snippet_ids_str = ", ".join(f'"{sid}"' for sid in snippet_ids_list)
 
-    if not arguments:
-        return {"error": "No arguments provided"}
+    system_prompt = """You are a Senior Immigration Attorney at a top-tier law firm drafting an immigration petition letter.
 
-    # 目前只处理第一个 Argument（后续可扩展为多个）
-    argument = arguments[0]
-    evidence_context = _build_writing_prompt(context)
+ABSOLUTE RULES:
+1. Every fact, date, name, number MUST come from the EVIDENCE snippets. NEVER invent or infer facts.
+2. Always write in THIRD PERSON about the Beneficiary ("the Beneficiary", "Mr./Ms. [Name]"). Never use "I" or "we".
+3. Do NOT copy snippet text verbatim. Instead, ARGUE: state a legal point, then cite the evidence that supports it.
+4. Use direct quotes sparingly — only the most impactful short phrases, embedded naturally in your argument."""
 
-    system_prompt = """You are a Senior Immigration Attorney at a top-tier law firm writing an EB-1A petition letter.
-You write persuasive, well-structured legal arguments with precise evidence citations.
-Your writing follows professional legal drafting conventions with rich detail and compelling narrative."""
+    user_prompt = f"""Draft 2-4 sentences for this sub-argument in a petition letter.
 
-    user_prompt = f"""Write a comprehensive paragraph for the "{standard.get('name', '')}" criterion ({standard.get('legal_ref', '')}).
+SUB-ARGUMENT: {subargument['title']}
+PARENT ARGUMENT: {argument_title}
 
-EVIDENCE STRUCTURE:
-{evidence_context}
-
-WRITING REQUIREMENTS:
-
-1. OPENING SENTENCE (CRITICAL):
-   - MUST explicitly cite the regulation: "{standard.get('legal_ref', '')}"
-   - State the main legal conclusion clearly
-   - Example: "The Beneficiary satisfies {standard.get('legal_ref', '')} by demonstrating..."
-
-2. FOR EACH SubArgument, write 3-5 RICH sentences that:
-   - Provide CONTEXT and BACKGROUND (organization history, significance, industry standing)
-   - Include SPECIFIC EVIDENCE with direct citations
-   - When evidence contains important testimony or official language, use BLOCK QUOTES:
-     > "[Exact quote from the document]" [Exhibit X, p.Y]
-   - Use COMPARATIVE ARGUMENTS when relevant ("The Association's membership includes [other distinguished person] who [achievement]...")
-   - Build LAYERED ARGUMENTS ("Not only... but also... Moreover...")
-   - Reference exhibits naturally with page numbers: [Exhibit C-2, p.3]
-
-3. CLOSING SENTENCE:
-   - Reinforce why this clearly meets the legal standard
-   - Use confident, conclusive language
-
-4. ADVANCED TECHNIQUES:
-   - Add organizational/media BACKGROUND: founding year, circulation, awards received
-   - Include NUMERICAL EVIDENCE: membership numbers, circulation figures, years of operation
-   - Use AUTHORITY ENDORSEMENTS: "reviewed and approved by [Title] [Name]"
-   - Employ COMPARATIVE EVIDENCE: other notable members, industry benchmarks
+EVIDENCE SNIPPETS:
+{evidence_text}
 
 {f"ADDITIONAL INSTRUCTIONS: {additional_instructions}" if additional_instructions else ""}
 
-OUTPUT FORMAT (JSON):
-Return a JSON object with this EXACT structure:
+WRITING STYLE — Each sentence must follow this pattern:
+  [Legal argumentative claim] + [evidence from snippet with Exhibit citation]
+
+  GOOD: "The organization's longstanding commitment to excellence is evidenced by its receipt of [Award Name] on multiple occasions [Exhibit X, p.Y]."
+  BAD:  "[Organization] wins [Award]." (raw snippet headline, no argumentation)
+
+  GOOD: "The Beneficiary's formal authority within [Organization] is confirmed by her role as legal representative [Exhibit X, p.Y]."
+  BAD:  "I serve as the legal representative of [Organization]." (first person, raw snippet copy)
+
+RULES:
+1. Use ONLY facts from the snippets above. Do NOT invent dates, statistics, or names.
+2. Each sentence must cite [Exhibit X, p.Y] and reference snippet_id(s). Valid IDs: [{snippet_ids_str}]
+3. Embed 1-2 short direct quotes from snippets naturally within sentences (do NOT use block quote format).
+4. Professional legal tone, 100% English (translate non-English source text).
+5. Write 2-4 sentences — match the evidence available. No filler.
+
+Return JSON:
 {{
-    "argument_id": "{argument.get('id', '')}",
-    "opening_sentence": {{
-        "text": "opening sentence text with explicit legal citation",
-        "snippet_ids": []
-    }},
-    "subargument_paragraphs": [
-        {{
-            "subargument_id": "subarg-xxx",
-            "sentences": [
-                {{
-                    "text": "sentence text with [Exhibit X, p.Y] citations. May include block quotes: > \\"exact quote\\" [Exhibit X, p.Y]",
-                    "snippet_ids": ["snip_xxx", "snip_yyy"],
-                    "exhibit_refs": ["X-Y"]
-                }}
-            ]
-        }}
-    ],
-    "closing_sentence": {{
-        "text": "closing sentence text"
+  "sentences": [
+    {{
+      "text": "Argumentative sentence with evidence [Exhibit X, p.Y].",
+      "snippet_ids": ["{snippet_ids_list[0] if snippet_ids_list else 'snip_xxx'}"],
+      "exhibit_refs": ["X-Y"]
     }}
+  ]
 }}
 
-CRITICAL RULES:
-1. ONLY use snippet_ids from the evidence provided above
-2. Keep SubArgument boundaries clear - each subargument_paragraphs entry corresponds to ONE SubArgument
-3. Every factual claim must reference at least one snippet_id
-4. Use professional legal tone with rich, persuasive language
-5. Generate 3-5 sentences per SubArgument (NOT just 1-2)
-6. Include at least one block quote per SubArgument when source material contains direct testimony
-7. Return ONLY valid JSON, no markdown or extra text
-8. OUTPUT MUST BE 100% ENGLISH. If source evidence contains non-English text (Chinese, etc.), TRANSLATE it to English. Do NOT copy non-English characters. Use English translations only (e.g., "People's Daily" not "人民日报", "Xinhua News" not "新华社")."""
+Return ONLY valid JSON, no markdown."""
 
     result = await call_llm(
         prompt=user_prompt,
         system_prompt=system_prompt,
-        json_schema={},  # DeepSeek 会使用 json_object 模式
-        temperature=0.5,
-        max_tokens=8192
+        json_schema={},
+        temperature=0.3,
+        max_tokens=4000
     )
 
-    return result
+    if "error" in result:
+        return []
+
+    sentences = result.get("sentences", [])
+
+    # 校验 snippet_ids：只保留该 SubArgument 实际有的 snippet
+    valid_ids = {s["id"] for s in subargument.get("snippets", [])}
+    import logging
+    _logger = logging.getLogger(__name__)
+    for sent in sentences:
+        raw_ids = sent.get("snippet_ids", [])
+        sent["snippet_ids"] = [sid for sid in raw_ids if sid in valid_ids]
+        if raw_ids and not sent["snippet_ids"]:
+            _logger.warning(f"Step1 snippet_ids ALL invalid: raw={raw_ids}, valid={valid_ids}")
+        sent["exhibit_refs"] = sent.get("exhibit_refs", [])
+
+    return sentences
+
+
+async def _step2_polish_argument(
+    standard: Dict,
+    argument: Dict,
+    subargument_bodies: List[Dict]
+) -> List[Dict]:
+    """
+    Step 2: 将同一 Argument 下多个 SubArgument 的段落润色整合。
+
+    LLM 添加过渡句、调整语序，但必须保持 SubArgument 分组结构和引用。
+
+    Args:
+        subargument_bodies: [{"subargument_id": str, "sentences": [...]}]
+
+    Returns:
+        润色后的 subargument_bodies（同结构）
+    """
+    if len(subargument_bodies) <= 1:
+        # 只有一个 SubArgument，不需要润色过渡
+        return subargument_bodies
+
+    # 构建输入文本（包含 snippet_ids 以便 LLM 知道它们）
+    input_blocks = []
+    subarg_ids = []
+    for body in subargument_bodies:
+        subarg_id = body["subargument_id"]
+        subarg_ids.append(subarg_id)
+        title = body.get("title", "")
+        sentences_text = "\n".join(
+            f'    - "{s["text"]}"' for s in body["sentences"]
+        )
+        input_blocks.append(f'  SubArgument [{subarg_id}] "{title}":\n{sentences_text}')
+
+    input_text = "\n\n".join(input_blocks)
+
+    system_prompt = """You are a Senior Immigration Attorney polishing a petition letter section for coherence.
+Your task is to add smooth transitions between sub-argument paragraphs while preserving ALL factual content, evidence citations, and direct quotes exactly as written."""
+
+    user_prompt = f"""Polish the following sub-argument paragraphs for the "{standard.get('name', '')}" section.
+
+CURRENT TEXT (grouped by SubArgument):
+
+{input_text}
+
+INSTRUCTIONS:
+1. Add transition phrases BETWEEN SubArgument groups ("Furthermore,", "In addition to the above,", "Moreover,", etc.)
+2. PRESERVE all [Exhibit X, p.Y] citations and direct quotes EXACTLY — do not change any facts, dates, names, or numbers
+3. MUST keep the same SubArgument grouping — do NOT merge or split SubArguments
+4. MUST keep the same number of sentences per SubArgument group
+5. Only change: word order, transition words, connective phrases. Do NOT add new facts.
+6. 100% English output
+
+Return JSON with the SAME structure:
+{{
+  "subargument_paragraphs": [
+    {{
+      "subargument_id": "{subarg_ids[0]}",
+      "sentences": [
+        {{"text": "polished sentence...", "snippet_ids": ["snip_xxx"], "exhibit_refs": ["X-Y"]}}
+      ]
+    }},
+    {{
+      "subargument_id": "{subarg_ids[1] if len(subarg_ids) > 1 else 'subarg-yyy'}",
+      "sentences": [
+        {{"text": "Furthermore, polished sentence...", "snippet_ids": ["snip_yyy"], "exhibit_refs": ["X-Y"]}}
+      ]
+    }}
+  ]
+}}
+
+CRITICAL: Return ALL {len(subarg_ids)} SubArgument groups. Do NOT skip any.
+Return ONLY valid JSON."""
+
+    try:
+        result = await call_llm(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            json_schema={},
+            temperature=0.3,
+            max_tokens=8192
+        )
+
+        polished = result.get("subargument_paragraphs", [])
+
+        # 验证润色结果：如果 SubArgument 数量不对，回退到原始版本
+        if len(polished) != len(subargument_bodies):
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Polish returned {len(polished)} subargs, expected {len(subargument_bodies)}. Using originals."
+            )
+            return subargument_bodies
+
+        # 将原始的 subargument_id、title、snippet_ids、exhibit_refs 覆盖回去（不信任 LLM）
+        for i, body in enumerate(polished):
+            body["subargument_id"] = subargument_bodies[i]["subargument_id"]
+            body["title"] = subargument_bodies[i].get("title", "")
+            # 恢复原始 snippet_ids 和 exhibit_refs（按句子索引一一对应）
+            original_sents = subargument_bodies[i].get("sentences", [])
+            polished_sents = body.get("sentences", [])
+            for j, psent in enumerate(polished_sents):
+                if j < len(original_sents):
+                    psent["snippet_ids"] = original_sents[j].get("snippet_ids", [])
+                    psent["exhibit_refs"] = original_sents[j].get("exhibit_refs", [])
+
+        return polished
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Polish failed, using originals: {e}")
+        return subargument_bodies
+
+
+async def _step3_generate_section_frame(
+    standard: Dict,
+    arguments: List[Dict]
+) -> Dict:
+    """
+    Step 3: 生成段落的 opening 和 closing 句子。
+
+    看到所有 Argument + SubArgument 的标题来写全局性的首尾。
+
+    Returns:
+        {"opening_text": str, "closing_text": str}
+    """
+    # 构建 Argument/SubArgument 概要
+    summary_lines = []
+    for arg in arguments:
+        summary_lines.append(f"  Argument: {arg.get('title', '')}")
+        for sa in arg.get("sub_arguments", []):
+            summary_lines.append(f"    - {sa.get('title', '')}")
+    summary_text = "\n".join(summary_lines)
+
+    system_prompt = """You are a Senior Immigration Attorney writing an EB-1A petition letter."""
+
+    user_prompt = f"""Write an opening sentence and a closing sentence for the "{standard.get('name', '')}" ({standard.get('legal_ref', '')}) section of a petition letter.
+
+The section contains these arguments and sub-arguments:
+{summary_text}
+
+OPENING SENTENCE:
+- MUST explicitly cite the regulation: "{standard.get('legal_ref', '')}"
+- Briefly introduce the scope — do NOT include specific facts, dates, or names (the body handles that)
+- Keep it to ONE concise sentence
+
+CLOSING SENTENCE:
+- Summarize the argument scope in ONE sentence
+- Confident, conclusive legal language
+- Do NOT introduce any new facts not covered in the body
+
+Return JSON:
+{{
+  "opening_text": "The Beneficiary satisfies {standard.get('legal_ref', '')} by demonstrating...",
+  "closing_text": "In sum, the foregoing evidence clearly establishes..."
+}}
+
+100% English. Return ONLY valid JSON."""
+
+    try:
+        result = await call_llm(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            json_schema={},
+            temperature=0.4,
+            max_tokens=1000
+        )
+        return {
+            "opening_text": result.get("opening_text", ""),
+            "closing_text": result.get("closing_text", "")
+        }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Section frame generation failed: {e}")
+        legal_ref = standard.get('legal_ref', '')
+        name = standard.get('name', '')
+        return {
+            "opening_text": f"The Beneficiary satisfies {legal_ref} ({name}) as demonstrated by the following evidence.",
+            "closing_text": "In sum, the foregoing evidence clearly establishes that the Beneficiary meets this criterion."
+        }
 
 
 def _contains_non_ascii(text: str) -> bool:
@@ -842,15 +1016,11 @@ async def write_petition_section_v3(
     additional_instructions: str = None
 ) -> Dict:
     """
-    V3 版本的写作入口 — 支持多 Argument 循环生成
+    V3 版本的写作入口 — 三步流水线
 
-    一个 Standard 下可能有多个 Argument（如 published_material 对应 3 家媒体），
-    每个 Argument 独立调用 LLM 生成，然后合并为一篇完整的段落。
-
-    结构：
-      opening（来自第一个 Argument） +
-      所有 Argument 的 body 句子 +
-      closing（来自最后一个 Argument）
+    Step 1: 逐 SubArgument 生成正文（3-5 句/SubArgument，保证 100% 覆盖）
+    Step 2: 逐 Argument 润色整合（加过渡句，保持连贯性）
+    Step 3: 生成全局 Opening/Closing（引用法规 + 总结）
 
     Args:
         project_id: 项目 ID
@@ -859,7 +1029,10 @@ async def write_petition_section_v3(
         subargument_ids: 可选，指定要生成的 SubArgument IDs（用于局部重新生成）
         additional_instructions: 可选，额外指令
     """
-    # 1. 加载 SubArgument 上下文
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # 0. 加载上下文
     context = load_subargument_context(project_id, standard_key, argument_ids, subargument_ids)
 
     if not context.get("arguments"):
@@ -872,52 +1045,56 @@ async def write_petition_section_v3(
         }
 
     all_arguments = context["arguments"]
+    standard = context["standard"]
     all_warnings = []
 
-    # 2. 按 Argument 逐个生成，收集每个 Argument 的扁平句子列表
-    per_argument_sentences: List[List[Dict]] = []
+    # ========== Step 1: 逐 SubArgument 生成正文 ==========
+    # 按 Argument 分组收集，同时记录对应的原始 argument
+    per_argument_bodies: List[List[Dict]] = []  # [[{subargument_id, title, sentences}]]
+    per_argument_refs: List[Dict] = []  # 与 per_argument_bodies 一一对应的原始 argument
 
     for argument in all_arguments:
-        # 跳过没有 SubArgument 的 Argument
-        if not argument.get("sub_arguments"):
-            all_warnings.append(f"Skipped argument {argument.get('id')}: no sub_arguments")
+        arg_id = argument.get("id", "")
+        arg_title = argument.get("title", "")
+        sub_arguments = argument.get("sub_arguments", [])
+
+        if not sub_arguments:
+            all_warnings.append(f"Skipped argument {arg_id}: no sub_arguments")
             continue
 
-        # 构建单 Argument 上下文
-        single_context = {
-            "standard": context["standard"],
-            "arguments": [argument]
-        }
+        arg_bodies = []
+        for subarg in sub_arguments:
+            logger.info(f"Step1: Generating body for {subarg['id']} ({subarg.get('title', '')})")
 
-        # 2a. 生成
-        llm_output = await generate_structured_paragraph(single_context, additional_instructions)
-
-        if "error" in llm_output:
-            all_warnings.append(
-                f"Generation failed for argument {argument.get('id')}: {llm_output.get('error')}"
+            raw_sentences = await _step1_generate_subargument_body(
+                standard=standard,
+                argument_title=arg_title,
+                subargument=subarg,
+                additional_instructions=additional_instructions
             )
-            continue
 
-        # 2b. 确保英文
-        llm_output = await ensure_english_output(llm_output)
+            if not raw_sentences:
+                all_warnings.append(f"No sentences generated for SubArgument {subarg['id']}")
+                continue
 
-        # 2c. 验证溯源
-        validation_result = validate_provenance(llm_output, single_context)
-        validated_output = validation_result.get("fixed_output", llm_output)
-        all_warnings.extend(validation_result.get("warnings", []))
+            # 确保英文
+            for sent in raw_sentences:
+                if _contains_non_ascii(sent.get("text", "")):
+                    sent["text"] = await _translate_to_english(sent["text"])
+                    if _contains_non_ascii(sent["text"]):
+                        sent["text"] = _remove_remaining_chinese(sent["text"])
 
-        # 2d. 扁平化（此时 argument_id 来自 LLM 输出，对应当前 Argument）
-        arg_sentences = flatten_sentences(validated_output, single_context)
+            arg_bodies.append({
+                "subargument_id": subarg["id"],
+                "title": subarg.get("title", ""),
+                "sentences": raw_sentences
+            })
 
-        # 2e. 中文安全网
-        for sentence in arg_sentences:
-            if "text" in sentence and _contains_non_ascii(sentence["text"]):
-                sentence["text"] = _remove_remaining_chinese(sentence["text"])
+        if arg_bodies:
+            per_argument_bodies.append(arg_bodies)
+            per_argument_refs.append(argument)
 
-        per_argument_sentences.append(arg_sentences)
-
-    # 3. 合并：第一个 Argument 的 opening + 所有 body + 最后一个 Argument 的 closing
-    if not per_argument_sentences:
+    if not per_argument_bodies:
         return {
             "success": False,
             "error": f"No content generated for standard: {standard_key}",
@@ -926,31 +1103,102 @@ async def write_petition_section_v3(
             "sentences": []
         }
 
-    merged_sentences = []
-    for i, arg_sentences in enumerate(per_argument_sentences):
-        is_first = (i == 0)
-        is_last = (i == len(per_argument_sentences) - 1)
+    # ========== Step 2: 逐 Argument 润色整合 ==========
+    polished_bodies: List[List[Dict]] = []
 
-        for sent in arg_sentences:
-            stype = sent.get("sentence_type", "body")
-            # 只保留第一个 Argument 的 opening
-            if stype == "opening" and not is_first:
-                continue
-            # 只保留最后一个 Argument 的 closing
-            if stype == "closing" and not is_last:
-                continue
-            merged_sentences.append(sent)
+    for i, arg_bodies in enumerate(per_argument_bodies):
+        argument_ref = per_argument_refs[i]
+        logger.info(f"Step2: Polishing argument group {i+1}/{len(per_argument_bodies)} ({len(arg_bodies)} subargs, arg={argument_ref.get('id', '')})")
 
-    # 4. 从合并后的句子列表构建溯源索引
-    provenance_index = _build_provenance_from_sentences(merged_sentences)
+        polished = await _step2_polish_argument(
+            standard=standard,
+            argument=argument_ref,
+            subargument_bodies=arg_bodies
+        )
 
-    # 5. 组装段落文本
-    paragraph_text = " ".join(s["text"] for s in merged_sentences)
+        # 确保润色后的文本也是英文
+        for body in polished:
+            for sent in body.get("sentences", []):
+                if _contains_non_ascii(sent.get("text", "")):
+                    sent["text"] = _remove_remaining_chinese(sent["text"])
 
-    # 6. 统计
-    total_sentences = len(merged_sentences)
+        polished_bodies.append(polished)
+
+    # ========== Step 3: 生成 Opening/Closing ==========
+    logger.info("Step3: Generating opening/closing")
+    frame = await _step3_generate_section_frame(
+        standard=standard,
+        arguments=all_arguments
+    )
+
+    # 确保英文
+    for key in ("opening_text", "closing_text"):
+        if _contains_non_ascii(frame.get(key, "")):
+            frame[key] = _remove_remaining_chinese(frame[key])
+
+    # ========== 组装最终句子列表 ==========
+    all_sentences = []
+
+    # Opening
+    all_sentences.append({
+        "text": frame["opening_text"],
+        "snippet_ids": [],
+        "subargument_id": None,
+        "argument_id": all_arguments[0].get("id", ""),
+        "exhibit_refs": [],
+        "sentence_type": "opening"
+    })
+
+    # Body: 按 Argument → SubArgument 顺序
+    for arg_idx, arg_polished in enumerate(polished_bodies):
+        arg_id = per_argument_refs[arg_idx].get("id", "") if arg_idx < len(per_argument_refs) else ""
+
+        for body in arg_polished:
+            subarg_id = body["subargument_id"]
+            for sent in body.get("sentences", []):
+                all_sentences.append({
+                    "text": sent.get("text", ""),
+                    "snippet_ids": sent.get("snippet_ids", []),
+                    "subargument_id": subarg_id,
+                    "argument_id": arg_id,
+                    "exhibit_refs": sent.get("exhibit_refs", []),
+                    "sentence_type": "body"
+                })
+
+    # Closing
+    all_sentences.append({
+        "text": frame["closing_text"],
+        "snippet_ids": [],
+        "subargument_id": None,
+        "argument_id": all_arguments[-1].get("id", ""),
+        "exhibit_refs": [],
+        "sentence_type": "closing"
+    })
+
+    # 溯源校验：重新校验 snippet_ids 合法性
+    valid_snippet_ids = set()
+    for arg in all_arguments:
+        for sa in arg.get("sub_arguments", []):
+            for snip in sa.get("snippets", []):
+                valid_snippet_ids.add(snip["id"])
+
+    for sent in all_sentences:
+        original_ids = sent.get("snippet_ids", [])
+        valid_ids = [sid for sid in original_ids if sid in valid_snippet_ids]
+        if len(valid_ids) != len(original_ids):
+            all_warnings.append(f"Removed invalid snippet_ids from sentence")
+        sent["snippet_ids"] = valid_ids
+
+    # 构建溯源索引
+    provenance_index = _build_provenance_from_sentences(all_sentences)
+
+    # 组装段落文本
+    paragraph_text = " ".join(s["text"] for s in all_sentences)
+
+    # 统计
+    total_sentences = len(all_sentences)
     traced_sentences = sum(
-        1 for s in merged_sentences
+        1 for s in all_sentences
         if s.get("snippet_ids") or s.get("subargument_id")
     )
 
@@ -958,7 +1206,7 @@ async def write_petition_section_v3(
         "success": True,
         "section": standard_key,
         "paragraph_text": paragraph_text,
-        "sentences": merged_sentences,
+        "sentences": all_sentences,
         "provenance_index": provenance_index,
         "validation": {
             "total_sentences": total_sentences,

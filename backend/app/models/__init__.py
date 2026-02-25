@@ -1,2 +1,1 @@
-from .document import Document, DocumentAnalysis, OCRStatus
-from .ocr_checkpoint import OCRCheckpoint
+# Models for archived pipeline (document.py, ocr_checkpoint.py) moved to /Archive/models/

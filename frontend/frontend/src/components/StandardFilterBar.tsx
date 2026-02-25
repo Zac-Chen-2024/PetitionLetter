@@ -6,10 +6,11 @@
 
 import { useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { legalStandards } from '../data/legalStandards';
+import { useLegalStandards } from '../hooks/useLegalStandards';
 import { STANDARD_KEY_TO_ID } from '../constants/colors';
 
 export default function StandardFilterBar() {
+  const legalStandards = useLegalStandards();
   const {
     arguments: arguments_,
     argumentMappings,
@@ -49,7 +50,7 @@ export default function StandardFilterBar() {
     });
 
     return counts;
-  }, [arguments_, argumentMappings]);
+  }, [arguments_, argumentMappings, legalStandards]);
 
   // 按 argument 数量排序（有 argument 的优先）
   const sortedStandards = useMemo(() => {
@@ -59,7 +60,7 @@ export default function StandardFilterBar() {
       if (countA !== countB) return countB - countA;
       return a.order - b.order;
     });
-  }, [standardCounts]);
+  }, [standardCounts, legalStandards]);
 
   const handleClick = (standardId: string) => {
     if (focusState.type === 'standard' && focusState.id === standardId) {

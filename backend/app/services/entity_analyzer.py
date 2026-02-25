@@ -13,7 +13,7 @@ Entity Analyzer - LLM 动态实体分析服务
 import json
 from typing import Dict, List, Any, Optional
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .llm_client import call_llm
 from .unified_extractor import load_combined_extraction
@@ -160,7 +160,7 @@ Based on this data, generate a JSON configuration. You MUST output valid JSON in
   "entity_merges": [
     {{"canonical": "Official Name", "variants": ["Variant1", "Variant2"]}}
   ],
-  "disqualified_memberships": ["NSCA", "USA Weightlifting"],
+  "disqualified_memberships": ["Example Cert Body"],
   "key_achievements": {{
     "original_contribution": "Name of the main contribution",
     "awards": ["Award 1", "Award 2"]
@@ -386,7 +386,7 @@ async def analyze_project_entities(
 
     # 添加元数据
     result["_metadata"] = {
-        "generated_at": datetime.now().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "provider": provider,
         "entity_count": len(entities),
         "snippet_count": len(snippets)

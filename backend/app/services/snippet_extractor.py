@@ -14,7 +14,7 @@ import json
 import uuid
 from typing import List, Dict, Optional
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .llm_client import call_llm
 from ..core.config import settings
@@ -353,7 +353,7 @@ def save_extracted_snippets(project_id: str, snippets: List[Dict]):
 
     data = {
         "version": "3.0",  # 升级版本号，标识新的精确定位格式
-        "extracted_at": datetime.now().isoformat(),
+        "extracted_at": datetime.now(timezone.utc).isoformat(),
         "snippet_count": len(snippets),
         "extraction_method": "llm_openai_block_level",
         "model": getattr(settings, 'openai_model', 'gpt-4o'),
@@ -377,7 +377,7 @@ def update_project_pipeline_stage(project_id: str, stage: str):
         metadata = json.load(f)
 
     metadata["pipeline_stage"] = stage
-    metadata["stage_updated_at"] = datetime.now().isoformat()
+    metadata["stage_updated_at"] = datetime.now(timezone.utc).isoformat()
 
     with open(metadata_file, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=2)

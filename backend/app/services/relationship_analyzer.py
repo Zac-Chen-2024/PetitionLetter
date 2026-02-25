@@ -16,7 +16,7 @@ import json
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from collections import defaultdict
 
@@ -202,7 +202,7 @@ class RelationshipAnalyzer:
                 "entity_count": len(self.entities),
                 "relation_count": len(self.relations),
                 "main_subject": main_subject,
-                "analyzed_at": datetime.now().isoformat()
+                "analyzed_at": datetime.now(timezone.utc).isoformat()
             }
         }
 

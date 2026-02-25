@@ -9,7 +9,7 @@ Quote Merger Service - 引用汇总服务 (本地处理，不调用 LLM)
 """
 
 from typing import List, Dict, Any, Set
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 
 
@@ -164,7 +164,7 @@ def generate_summary(
 
     return {
         "project_id": project_id,
-        "summary_timestamp": datetime.utcnow().isoformat(),
+        "summary_timestamp": datetime.now(timezone.utc).isoformat(),
         "total_quotes": total_quotes,
         "by_standard": merged,
         "statistics": {

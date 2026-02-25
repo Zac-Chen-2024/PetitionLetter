@@ -17,7 +17,7 @@ import json
 import uuid
 from typing import List, Dict, Optional
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, asdict
 
 from .llm_client import call_llm
@@ -229,7 +229,7 @@ async def suggest_entity_merges(
     suggestions_file = entities_dir / "merge_suggestions.json"
 
     suggestions_data = {
-        "generated_at": datetime.now().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "applicant_name": applicant_name,
         "total_entities": len(entities),
         "suggestions": suggestions
@@ -272,7 +272,7 @@ def update_merge_suggestion_status(
     for s in suggestions:
         if s.get("id") == suggestion_id:
             s["status"] = status
-            s["updated_at"] = datetime.now().isoformat()
+            s["updated_at"] = datetime.now(timezone.utc).isoformat()
             updated = True
             break
 
@@ -384,7 +384,7 @@ def apply_entity_merges(project_id: str) -> Dict:
     combined["entities"] = new_entities
     combined["snippets"] = snippets
     combined["relations"] = relations
-    combined["merge_applied_at"] = datetime.now().isoformat()
+    combined["merge_applied_at"] = datetime.now(timezone.utc).isoformat()
 
     # 更新统计
     combined["stats"]["total_entities"] = len(new_entities)
@@ -403,7 +403,7 @@ def apply_entity_merges(project_id: str) -> Dict:
             snippets_data = json.load(f)
 
         snippets_data["snippets"] = snippets
-        snippets_data["merge_applied_at"] = datetime.now().isoformat()
+        snippets_data["merge_applied_at"] = datetime.now(timezone.utc).isoformat()
 
         with open(snippets_file, 'w', encoding='utf-8') as f:
             json.dump(snippets_data, f, ensure_ascii=False, indent=2)
@@ -417,15 +417,15 @@ def apply_entity_merges(project_id: str) -> Dict:
             "merged_entity_names": merge.get("merge_entity_names"),
             "merge_reason": merge.get("reason"),
             "is_ai_suggested": True,
-            "created_at": merge.get("created_at", datetime.now().isoformat()),
-            "confirmed_at": datetime.now().isoformat()
+            "created_at": merge.get("created_at", datetime.now(timezone.utc).isoformat()),
+            "confirmed_at": datetime.now(timezone.utc).isoformat()
         }
         merge_history.append(record)
 
     history_file = get_entities_dir(project_id) / "merge_history.json"
     with open(history_file, 'w', encoding='utf-8') as f:
         json.dump({
-            "applied_at": datetime.now().isoformat(),
+            "applied_at": datetime.now(timezone.utc).isoformat(),
             "merges": merge_history
         }, f, ensure_ascii=False, indent=2)
 
@@ -433,7 +433,7 @@ def apply_entity_merges(project_id: str) -> Dict:
     entities_file = get_entities_dir(project_id) / "entities.json"
     with open(entities_file, 'w', encoding='utf-8') as f:
         json.dump({
-            "updated_at": datetime.now().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "entity_count": len(new_entities),
             "entities": new_entities
         }, f, ensure_ascii=False, indent=2)
@@ -470,7 +470,7 @@ def add_manual_merge(
         "confidence": 1.0,
         "status": "accepted",
         "is_manual": True,
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
 
     # 加载现有建议
@@ -481,7 +481,7 @@ def add_manual_merge(
             data = json.load(f)
     else:
         data = {
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "suggestions": []
         }
 

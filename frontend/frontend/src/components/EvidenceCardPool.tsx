@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
-import { materialTypeLabels, getStandardById, legalStandards } from '../data/legalStandards';
+import { materialTypeLabels, getStandardById } from '../data/legalStandards';
+import { useLegalStandards } from '../hooks/useLegalStandards';
 import { RelationshipGraphModal } from './RelationshipGraphModal';
 import type { Snippet } from '../types';
 import { getStandardKeyColor, STANDARD_KEY_TO_ID } from '../constants/colors';
@@ -177,8 +178,10 @@ function EvidenceCard({ snippet, isEditMode, isSelectedForEdit, onToggleSelect }
 
   // Check if a sub-argument is focused and this snippet is NOT part of that sub-argument
   // Must check both snippetIds AND pendingSnippetIds for new SubArguments
+  // In edit mode, skip this filter — DocumentGroup already handles filtering
   const isFilteredOutBySubArgument = useMemo(() => {
     if (focusState.type !== 'subargument' || !focusState.id) return false;
+    if (isEditMode) return false; // Don't hide cards in edit mode; DocumentGroup controls visibility
 
     const focusedSubArg = subArguments.find(sa => sa.id === focusState.id);
     if (!focusedSubArg) return true;
@@ -188,7 +191,7 @@ function EvidenceCard({ snippet, isEditMode, isSelectedForEdit, onToggleSelect }
     const inPendingIds = focusedSubArg.pendingSnippetIds?.includes(snippet.id) || false;
 
     return !inSnippetIds && !inPendingIds;
-  }, [focusState, subArguments, snippet.id]);
+  }, [focusState, subArguments, snippet.id, isEditMode]);
 
   const isFilteredOut = isFilteredOutByStandard || isFilteredOutByArgument || isFilteredOutBySubArgument;
 
@@ -219,19 +222,20 @@ function EvidenceCard({ snippet, isEditMode, isSelectedForEdit, onToggleSelect }
   }, [snippet.id, updateSnippetPosition, isExpanded, focusState]);
 
   const handleClick = () => {
-    // In edit mode, toggle selection
-    if (isEditMode && onToggleSelect) {
-      onToggleSelect(snippet.id);
-      return;
-    }
-
-    // Clicking Evidence Card only sets selectedSnippetId for PDF highlight
-    // It does NOT change focusState (which controls filtering)
+    // Clicking card body always navigates to PDF preview (even in edit mode)
     if (selectedSnippetId === snippet.id) {
       setSelectedSnippetId(null);
     } else {
       setSelectedSnippetId(snippet.id);
       setSelectedDocumentId(snippet.documentId);
+    }
+  };
+
+  // Checkbox click handler (edit mode only)
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't trigger card click (PDF navigation)
+    if (onToggleSelect) {
+      onToggleSelect(snippet.id);
     }
   };
 
@@ -265,7 +269,7 @@ function EvidenceCard({ snippet, isEditMode, isSelectedForEdit, onToggleSelect }
       onClick={handleClick}
       className={`
         relative bg-white rounded-lg border transition-all duration-200
-        ${isEditMode ? 'cursor-pointer' : 'cursor-grab'}
+        ${isEditMode ? 'cursor-default' : 'cursor-grab'}
         ${isDragging ? 'opacity-50 scale-95 cursor-grabbing' : ''}
         ${isEditMode && isSelectedForEdit ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-300' : ''}
         ${!isEditMode && isAssembled ? 'opacity-60 border-green-400 bg-green-50/50' : ''}
@@ -283,9 +287,12 @@ function EvidenceCard({ snippet, isEditMode, isSelectedForEdit, onToggleSelect }
         <div className="flex items-start gap-1.5">
           {/* Checkbox in edit mode, drag handle otherwise */}
           {isEditMode ? (
-            <div className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center ${
-              isSelectedForEdit ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 bg-white'
-            }`}>
+            <div
+              onClick={handleCheckboxClick}
+              className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer hover:border-emerald-400 transition-colors ${
+                isSelectedForEdit ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 bg-white'
+              }`}
+            >
               {isSelectedForEdit && (
                 <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -501,6 +508,7 @@ const GraphIcon = () => (
 
 export function EvidenceCardPool() {
   const { t } = useTranslation();
+  const legalStandards = useLegalStandards();
   const { focusState, snippetPositions, connections, viewMode, setSnippetPanelBounds, allSnippets, arguments: arguments_, argumentMappings, subArguments, updateSubArgument, projectId } = useApp();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
@@ -607,10 +615,12 @@ export function EvidenceCardPool() {
       const focusedSubArg = subArguments.find(sa => sa.id === focusState.id);
       if (!focusedSubArg) return false;
 
-      // In edit mode, show ALL snippets from the parent Argument (for selection)
+      // In edit mode, show snippets from parent Argument + pendingSnippetIds
       if (isEditingSnippets) {
         const parentArg = arguments_.find(arg => arg.id === focusedSubArg.argumentId);
-        return parentArg?.snippetIds?.includes(snippetId) || false;
+        if (parentArg?.snippetIds?.includes(snippetId)) return true;
+        if (focusedSubArg.pendingSnippetIds?.includes(snippetId)) return true;
+        return false;
       }
 
       // Normal mode: check both snippetIds and pendingSnippetIds

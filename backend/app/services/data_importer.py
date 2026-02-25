@@ -14,7 +14,7 @@ import os
 import re
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .snippet_registry import generate_snippet_id, save_registry
 
@@ -261,6 +261,38 @@ def save_exhibit_document(project_id: str, exhibit_data: Dict):
         json.dump(exhibit_data, f, ensure_ascii=False, indent=2)
 
 
+def _find_ocr_exhibit_dirs(person_dir: Path) -> List[Path]:
+    """
+    Find all OCR exhibit directories under person_dir.
+
+    Handles multiple layouts:
+      - data/{Name}/OCR/{ExhibitId}/page_*.json          (Yaruo Qu)
+      - data/{Name}/OCR/ocr_results_l/{exhibit_id}/page_*.json  (Dehuan Liu)
+      - data/{Name}/{ExhibitId}/page_*.json               (flat layout)
+    """
+    candidates: List[Path] = []
+
+    # Strategy: recursively find dirs that contain page_*.json files
+    ocr_dir = person_dir / "OCR"
+    search_roots = []
+    if ocr_dir.exists():
+        search_roots.append(ocr_dir)
+    else:
+        search_roots.append(person_dir)
+
+    for root in search_roots:
+        for dirpath in root.rglob("*"):
+            if not dirpath.is_dir():
+                continue
+            # A valid exhibit dir has at least one page_*.json
+            if any(dirpath.glob("page_*.json")):
+                candidates.append(dirpath)
+
+    # Sort by exhibit name for deterministic order
+    candidates.sort(key=lambda p: p.name.lower())
+    return candidates
+
+
 def import_person_data(person_name: str) -> Dict:
     """
     导入指定人的完整数据
@@ -291,28 +323,24 @@ def import_person_data(person_name: str) -> Dict:
 
     # 统计信息
     exhibits_imported = 0
-    all_snippets = []
+    total_blocks = 0
     exhibit_list = []
 
-    # 遍历所有 exhibit 目录
-    for exhibit_dir in sorted(person_dir.iterdir()):
-        if not exhibit_dir.is_dir():
-            continue
+    # 自动发现 OCR exhibit 目录
+    exhibit_dirs = _find_ocr_exhibit_dirs(person_dir)
 
-        # 导入 exhibit
+    for exhibit_dir in exhibit_dirs:
+        # 导入 exhibit (OCR 文档数据)
         exhibit_data = import_exhibit(exhibit_dir)
 
         if exhibit_data["pages"]:
-            # 保存 exhibit 文档
+            # Normalize exhibit_id to uppercase (a1 → A1)
+            exhibit_data["exhibit_id"] = exhibit_data["exhibit_id"].upper()
+
+            # 保存 exhibit 文档到 documents/ 目录
             save_exhibit_document(project_id, exhibit_data)
             exhibits_imported += 1
-
-            # 转换为 snippets
-            snippets = ocr_blocks_to_snippets(
-                exhibit_data["exhibit_id"],
-                exhibit_data["pages"]
-            )
-            all_snippets.extend(snippets)
+            total_blocks += exhibit_data["total_blocks"]
 
             exhibit_list.append({
                 "exhibit_id": exhibit_data["exhibit_id"],
@@ -320,21 +348,21 @@ def import_person_data(person_name: str) -> Dict:
                 "block_count": exhibit_data["total_blocks"]
             })
 
-    # 保存 snippet registry
-    save_registry(project_id, all_snippets)
+    # NOTE: 不在此处创建 snippets。
+    # Snippets 由 Extract All (unified_extractor) 通过 LLM 分析 OCR 数据后生成。
 
     # 保存项目元数据
     metadata = {
         "project_id": project_id,
         "person_name": person_name,
         "visa_type": "EB-1A",  # 默认 EB-1A
-        "created_at": datetime.now().isoformat(),
+        "pipeline_stage": "ocr_complete",
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "source_path": str(person_dir),
         "exhibits": exhibit_list,
         "stats": {
             "exhibit_count": exhibits_imported,
-            "snippet_count": len(all_snippets),
-            "snippets_with_bbox": sum(1 for s in all_snippets if s.get("bbox"))
+            "total_blocks": total_blocks,
         }
     }
     save_project_metadata(project_id, metadata)
@@ -343,8 +371,7 @@ def import_person_data(person_name: str) -> Dict:
         "success": True,
         "project_id": project_id,
         "exhibits_imported": exhibits_imported,
-        "snippets_created": len(all_snippets),
-        "snippets_with_bbox": metadata["stats"]["snippets_with_bbox"]
+        "total_blocks": total_blocks,
     }
 
 

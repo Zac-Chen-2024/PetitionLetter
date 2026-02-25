@@ -11,14 +11,12 @@ Endpoints:
 NOTE: standard_key 分类已移至 Argument 层，Snippet 不再具备 standard 分类
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from typing import List, Dict, Optional
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..services.snippet_extractor import (
     extract_all_snippets,
-    extract_snippets_for_exhibit,
     load_extracted_snippets,
     save_extracted_snippets,
     get_project_pipeline_stage,
@@ -43,11 +41,6 @@ class ExtractionResult(BaseModel):
     skipped_count: int      # 跳过的已提取文档数
     extracted_count: int    # 新提取的文档数
     message: str
-
-
-class SnippetConfirmUpdate(BaseModel):
-    """Snippet 确认更新（不含 standard_key，分类在 Argument 层）"""
-    is_confirmed: bool = True
 
 
 class PipelineStage(BaseModel):
@@ -98,38 +91,6 @@ async def extract_project_snippets(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/extract/{project_id}/{exhibit_id}")
-async def extract_exhibit_snippets(project_id: str, exhibit_id: str):
-    """
-    提取单个 exhibit 的证据 snippets 并保存到 registry
-    """
-    try:
-        snippets = await extract_snippets_for_exhibit(project_id, exhibit_id)
-
-        # 加载现有 snippets 并合并
-        existing = load_extracted_snippets(project_id)
-
-        # 过滤掉同一 exhibit 的旧 snippets
-        filtered = [s for s in existing if s.get("exhibit_id") != exhibit_id]
-
-        # 添加新提取的 snippets
-        all_snippets = filtered + snippets
-
-        # 保存到 extracted_snippets.json
-        save_extracted_snippets(project_id, all_snippets)
-
-        return {
-            "success": True,
-            "project_id": project_id,
-            "exhibit_id": exhibit_id,
-            "snippet_count": len(snippets),
-            "snippets": snippets
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 # ============================================
 # Snippet Query Endpoints
 # ============================================
@@ -164,79 +125,6 @@ async def get_snippets(
     }
 
 
-@router.get("/{project_id}/snippets/stats")
-async def get_snippets_stats(project_id: str):
-    """
-    获取 snippets 统计信息
-
-    NOTE: by_standard 已移除，分类在 Argument 层进行
-    """
-    snippets = load_extracted_snippets(project_id)
-
-    if not snippets:
-        return {
-            "project_id": project_id,
-            "total": 0,
-            "confirmed": 0,
-            "ai_suggested": 0
-        }
-
-    confirmed = 0
-    ai_suggested = 0
-
-    for s in snippets:
-        if s.get("is_confirmed"):
-            confirmed += 1
-        if s.get("is_ai_suggested"):
-            ai_suggested += 1
-
-    return {
-        "project_id": project_id,
-        "total": len(snippets),
-        "confirmed": confirmed,
-        "ai_suggested": ai_suggested,
-        "confirmation_rate": round(confirmed / len(snippets) * 100, 1) if snippets else 0
-    }
-
-
-# ============================================
-# Snippet Update Endpoints
-# ============================================
-
-@router.put("/{project_id}/snippets/{snippet_id}/confirm")
-async def confirm_snippet(
-    project_id: str,
-    snippet_id: str,
-    update: SnippetConfirmUpdate
-):
-    """
-    确认 snippet
-
-    NOTE: standard_key 分类已移至 Argument 层，此端点仅用于确认 snippet
-    """
-    snippets = load_extracted_snippets(project_id)
-
-    found = False
-    for s in snippets:
-        if s.get("snippet_id") == snippet_id:
-            s["is_confirmed"] = update.is_confirmed
-            s["confirmed_at"] = datetime.now().isoformat()
-            found = True
-            break
-
-    if not found:
-        raise HTTPException(status_code=404, detail=f"Snippet not found: {snippet_id}")
-
-    # 保存更新
-    save_extracted_snippets(project_id, snippets)
-
-    return {
-        "success": True,
-        "snippet_id": snippet_id,
-        "is_confirmed": update.is_confirmed
-    }
-
-
 @router.post("/{project_id}/snippets/confirm-all")
 async def confirm_all_snippets(project_id: str):
     """确认所有 AI 提取的 snippets"""
@@ -246,7 +134,7 @@ async def confirm_all_snippets(project_id: str):
     for s in snippets:
         if not s.get("is_confirmed"):
             s["is_confirmed"] = True
-            s["confirmed_at"] = datetime.now().isoformat()
+            s["confirmed_at"] = datetime.now(timezone.utc).isoformat()
             confirmed_count += 1
 
     save_extracted_snippets(project_id, snippets)
@@ -278,32 +166,3 @@ async def get_pipeline_stage(project_id: str):
     )
 
 
-@router.put("/{project_id}/stage/{new_stage}")
-async def set_pipeline_stage(project_id: str, new_stage: str):
-    """手动设置 pipeline 阶段 (调试用)"""
-    valid_stages = [
-        "ocr_complete",
-        "extracting",
-        "snippets_ready",
-        "confirming",
-        "mapping_confirmed",
-        "generating",
-        "petition_ready"
-    ]
-
-    if new_stage not in valid_stages:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid stage. Valid stages: {valid_stages}"
-        )
-
-    update_project_pipeline_stage(project_id, new_stage)
-
-    return {
-        "success": True,
-        "project_id": project_id,
-        "stage": new_stage
-    }
-
-
-# NOTE: /standards endpoint removed - EB-1A standards info is now handled by frontend

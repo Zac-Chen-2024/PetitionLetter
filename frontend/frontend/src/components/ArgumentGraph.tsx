@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
-import { legalStandards } from '../data/legalStandards';
+import { useLegalStandards } from '../hooks/useLegalStandards';
 import { STANDARD_KEY_TO_ID } from '../constants/colors';
 import { apiClient } from '../services/api';
 import type { Position, Argument, SubArgument } from '../types';
@@ -717,7 +717,8 @@ function InternalConnectionLines({ argumentNodes, standardNodes, subArgumentNode
 function calculateTreeLayout(
   arguments_: Argument[],
   subArguments: SubArgument[],
-  savedPositions: Map<string, Position>
+  savedPositions: Map<string, Position>,
+  legalStandards: import('../types').LegalStandard[]
 ): { argumentNodes: ArgumentNode[]; standardNodes: StandardNode[]; subArgumentNodes: SubArgumentNode[] } {
   // Position layout with sub-arguments on the left
   const SUBARG_X = 200;          // Base X for sub-arguments (reduced from 500)
@@ -927,6 +928,7 @@ function calculateTreeLayout(
 
 export function ArgumentGraph() {
   const { t } = useTranslation();
+  const legalStandards = useLegalStandards();
   const {
     arguments: contextArguments,
     subArguments: contextSubArguments,
@@ -966,7 +968,8 @@ export function ArgumentGraph() {
   const { argumentNodes, standardNodes, subArgumentNodes } = calculateTreeLayout(
     contextArguments,
     contextSubArguments,
-    argumentGraphPositions
+    argumentGraphPositions,
+    legalStandards
   );
 
   // Handle node drag
@@ -1062,8 +1065,8 @@ export function ArgumentGraph() {
         updateSubArgument(subArgumentId, { relationship });
       }
 
-      // Update pending snippets (recommendations)
-      if (snippetsResponse.success && snippetsResponse.recommended_snippets) {
+      // Update pending snippets (recommendations) — only if there are actual results
+      if (snippetsResponse.success && snippetsResponse.recommended_snippets && snippetsResponse.recommended_snippets.length > 0) {
         pendingSnippetIds = snippetsResponse.recommended_snippets.map(s => s.snippet_id);
         needsSnippetConfirmation = true;
         updateSubArgument(subArgumentId, {
@@ -1222,8 +1225,16 @@ export function ArgumentGraph() {
   }, [handleWheel]);
 
   // Auto-center on SubArgument when focused from LetterPanel
+  // Track last centered ID to avoid re-centering on every render
+  const lastCenteredSubArgId = useRef<string | null>(null);
   useEffect(() => {
-    if (focusState.type !== 'subargument' || !focusState.id) return;
+    if (focusState.type !== 'subargument' || !focusState.id) {
+      lastCenteredSubArgId.current = null;
+      return;
+    }
+
+    // Only center once per focus change
+    if (lastCenteredSubArgId.current === focusState.id) return;
 
     // Find the focused SubArgument node
     const targetNode = subArgumentNodes.find(n => n.id === focusState.id);
@@ -1231,6 +1242,8 @@ export function ArgumentGraph() {
 
     const container = containerRef.current;
     if (!container) return;
+
+    lastCenteredSubArgId.current = focusState.id;
 
     // Get container dimensions
     const containerRect = container.getBoundingClientRect();
@@ -1241,9 +1254,6 @@ export function ArgumentGraph() {
     setScale(targetScale);
 
     // Calculate offset to center the node vertically only
-    // Node world position -> screen position: screenY = (nodeY * scale) + offsetY
-    // We want: screenY = containerHeight / 2
-    // So: offsetY = containerHeight / 2 - (nodeY * scale)
     const targetY = targetNode.position.y;
     const newOffsetY = (containerHeight / 2) - (targetY * targetScale);
 

@@ -1,221 +1,93 @@
 """
-Documents Router - PDF 文件服务
-
-Endpoints:
-- GET /api/documents/{project_id}/exhibits - 获取项目的所有 exhibit 列表
-- GET /api/documents/{project_id}/pdf/{exhibit_id} - 获取 PDF 文件
-- GET /api/documents/{project_id}/exhibit/{exhibit_id} - 获取 exhibit 详情（页数、OCR 数据等）
+Document / Exhibit API
+Serves exhibit PDFs and metadata from the project's source data directory.
+Frontend expects:
+  GET /api/documents/{project_id}/exhibits  → exhibit list with pdf_url
+  GET /api/documents/{project_id}/pdf/{exhibit_id} → PDF file
 """
+import json
+import logging
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from pathlib import Path
-from typing import List, Dict, Optional
-import json
+
+from app.services import storage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-# 数据目录
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent  # PetitionLetter/
-DATA_DIR = PROJECT_ROOT / "data"
-BACKEND_DATA_DIR = Path(__file__).parent.parent.parent / "data"
+
+def _get_source_path(project_id: str) -> Path:
+    """Read source_path from project metadata.json, raise 404 on failure."""
+    metadata_file = storage.get_project_dir(project_id) / "metadata.json"
+    if not metadata_file.exists():
+        raise HTTPException(status_code=404, detail="Project metadata not found")
+
+    with open(metadata_file, "r", encoding="utf-8") as f:
+        metadata = json.load(f)
+
+    source_path = metadata.get("source_path", "")
+    if not source_path:
+        raise HTTPException(
+            status_code=404, detail="No source_path in project metadata"
+        )
+    return Path(source_path)
 
 
-def get_person_dir(project_id: str) -> Optional[Path]:
-    """根据 project_id 获取人员数据目录"""
-    # project_id 格式: yaruo_qu -> "Yaruo Qu"
-    # 遍历 data 目录找到匹配的
-    if not DATA_DIR.exists():
-        return None
-
-    for item in DATA_DIR.iterdir():
-        if item.is_dir() and item.name != "projects":
-            # 转换为 project_id 格式比较
-            normalized = item.name.lower().replace(" ", "_")
-            if normalized == project_id:
-                return item
-    return None
+def _exhibit_to_frontend(project_id: str, exhibit: dict) -> dict:
+    """Convert metadata exhibit entry to the shape the frontend expects."""
+    eid = exhibit.get("exhibit_id", "")
+    category = eid[0].upper() if eid else "?"
+    return {
+        "id": eid,
+        "name": eid,
+        "category": category,
+        "pdf_url": f"/api/documents/{project_id}/pdf/{eid}",
+        "page_count": exhibit.get("page_count", 0),
+    }
 
 
 @router.get("/{project_id}/exhibits")
-async def get_exhibits(project_id: str):
-    """
-    获取项目的所有 exhibit 列表
+def list_exhibits(project_id: str):
+    """List all exhibit documents for a project."""
+    metadata_file = storage.get_project_dir(project_id) / "metadata.json"
+    if not metadata_file.exists():
+        raise HTTPException(status_code=404, detail="Project metadata not found")
 
-    Returns:
-        {
-            "project_id": str,
-            "exhibits": [
-                {
-                    "id": "A1",
-                    "name": "Exhibit A-1",
-                    "category": "A",
-                    "pdf_url": "/api/documents/{project_id}/pdf/A1",
-                    "page_count": 3
-                }
-            ]
-        }
-    """
-    person_dir = get_person_dir(project_id)
-    if not person_dir:
-        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+    with open(metadata_file, "r", encoding="utf-8") as f:
+        metadata = json.load(f)
 
-    pdf_dir = person_dir / "PDF"
-    if not pdf_dir.exists():
-        raise HTTPException(status_code=404, detail="PDF directory not found")
-
-    exhibits = []
-
-    # 遍历所有类别目录 (A, B, C, D, E, F, G, H)
-    for category_dir in sorted(pdf_dir.iterdir()):
-        if not category_dir.is_dir() or category_dir.name.startswith("_"):
-            continue
-
-        category = category_dir.name
-
-        # 获取该类别下的所有 PDF
-        for pdf_file in sorted(category_dir.glob("*.pdf")):
-            exhibit_id = pdf_file.stem  # e.g., "A1", "B2"
-
-            # 尝试从 OCR 数据获取页数
-            page_count = get_exhibit_page_count(project_id, exhibit_id)
-
-            exhibits.append({
-                "id": exhibit_id,
-                "name": f"Exhibit {exhibit_id[0]}-{exhibit_id[1:]}",
-                "category": category,
-                "pdf_url": f"/api/documents/{project_id}/pdf/{exhibit_id}",
-                "page_count": page_count,
-            })
+    raw_exhibits = metadata.get("exhibits", [])
+    exhibits = [_exhibit_to_frontend(project_id, e) for e in raw_exhibits]
 
     return {
         "project_id": project_id,
         "total": len(exhibits),
-        "exhibits": exhibits
+        "exhibits": exhibits,
     }
 
 
 @router.get("/{project_id}/pdf/{exhibit_id}")
-async def get_pdf(project_id: str, exhibit_id: str):
-    """
-    获取 PDF 文件
+def get_exhibit_pdf(project_id: str, exhibit_id: str):
+    """Serve exhibit PDF file from the project's source data directory."""
+    source = _get_source_path(project_id)
+    letter = exhibit_id[0].upper()
 
-    Args:
-        project_id: 项目 ID (e.g., "yaruo_qu")
-        exhibit_id: Exhibit ID (e.g., "A1", "B2")
+    # Try multiple naming conventions: A1.pdf, a1.pdf
+    candidates = [
+        source / "PDF" / letter / f"{exhibit_id}.pdf",
+        source / "PDF" / letter / f"{exhibit_id.lower()}.pdf",
+        source / "PDF" / letter / f"{exhibit_id.upper()}.pdf",
+    ]
 
-    Returns:
-        PDF 文件
-    """
-    person_dir = get_person_dir(project_id)
-    if not person_dir:
-        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
+    for pdf_path in candidates:
+        if pdf_path.exists():
+            return FileResponse(
+                path=str(pdf_path),
+                media_type="application/pdf",
+                filename=f"{exhibit_id}.pdf",
+            )
 
-    # exhibit_id 格式: A1 -> PDF/A/A1.pdf
-    category = exhibit_id[0].upper()
-    pdf_path = person_dir / "PDF" / category / f"{exhibit_id}.pdf"
-
-    if not pdf_path.exists():
-        raise HTTPException(status_code=404, detail=f"PDF not found: {exhibit_id}")
-
-    return FileResponse(
-        path=pdf_path,
-        media_type="application/pdf",
-        filename=f"{exhibit_id}.pdf"
-    )
-
-
-@router.get("/{project_id}/exhibit/{exhibit_id}")
-async def get_exhibit_details(project_id: str, exhibit_id: str):
-    """
-    获取 exhibit 详细信息，包括 OCR 数据
-
-    Returns:
-        {
-            "id": "A1",
-            "name": "Exhibit A-1",
-            "pdf_url": str,
-            "page_count": int,
-            "pages": [{page_number, text_blocks, markdown_text}]
-        }
-    """
-    # 从 backend/data/projects/{project_id}/documents/{exhibit_id}.json 读取
-    doc_path = BACKEND_DATA_DIR / "projects" / project_id / "documents" / f"{exhibit_id}.json"
-
-    if not doc_path.exists():
-        raise HTTPException(status_code=404, detail=f"Exhibit not found: {exhibit_id}")
-
-    with open(doc_path, 'r', encoding='utf-8') as f:
-        doc_data = json.load(f)
-
-    return {
-        "id": exhibit_id,
-        "name": f"Exhibit {exhibit_id[0]}-{exhibit_id[1:]}",
-        "pdf_url": f"/api/documents/{project_id}/pdf/{exhibit_id}",
-        "page_count": len(doc_data.get("pages", [])),
-        "pages": doc_data.get("pages", [])
-    }
-
-
-def get_exhibit_page_count(project_id: str, exhibit_id: str) -> int:
-    """获取 exhibit 的页数"""
-    doc_path = BACKEND_DATA_DIR / "projects" / project_id / "documents" / f"{exhibit_id}.json"
-
-    if doc_path.exists():
-        try:
-            with open(doc_path, 'r', encoding='utf-8') as f:
-                doc_data = json.load(f)
-                return len(doc_data.get("pages", []))
-        except:
-            pass
-
-    return 0
-
-
-@router.get("/{project_id}/categories")
-async def get_exhibit_categories(project_id: str):
-    """
-    获取 exhibit 分类信息
-
-    Returns:
-        {
-            "A": {"name": "Resume/CV", "count": 1},
-            "B": {"name": "Recommendation Letters", "count": 5},
-            ...
-        }
-    """
-    # 类别描述
-    CATEGORY_NAMES = {
-        "A": "Resume/CV",
-        "B": "Recommendation Letters",
-        "C": "Awards & Recognition",
-        "D": "Original Contributions",
-        "E": "Scholarly Articles",
-        "F": "Membership",
-        "G": "Judging",
-        "H": "Exhibitions/Leading Role"
-    }
-
-    person_dir = get_person_dir(project_id)
-    if not person_dir:
-        raise HTTPException(status_code=404, detail=f"Project not found: {project_id}")
-
-    pdf_dir = person_dir / "PDF"
-    if not pdf_dir.exists():
-        return {"categories": {}}
-
-    categories = {}
-    for category_dir in sorted(pdf_dir.iterdir()):
-        if not category_dir.is_dir() or category_dir.name.startswith("_"):
-            continue
-
-        category = category_dir.name
-        pdf_count = len(list(category_dir.glob("*.pdf")))
-
-        if pdf_count > 0:
-            categories[category] = {
-                "name": CATEGORY_NAMES.get(category, category),
-                "count": pdf_count
-            }
-
-    return {"categories": categories}
+    raise HTTPException(status_code=404, detail=f"PDF not found: {exhibit_id}")

@@ -13,14 +13,15 @@ import json
 from typing import List, Dict, Optional
 from collections import defaultdict
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .llm_client import call_llm_text, call_llm
 from .snippet_registry import load_registry
 from .snippet_linker import load_links
+from .standards_registry import get_standard_name, get_standards_for_type
 
 
-# EB-1A 标准名称映射
+# EB-1A 标准名称映射 (kept for backward compat with writing router import)
 EB1A_STANDARDS = {
     "awards": "Awards",
     "membership": "Membership",
@@ -79,8 +80,10 @@ async def generate_petition_prose(
     # 构建结构化上下文
     context = _build_structured_context(relevant_snippets, snippet_links)
 
-    # 获取标准名称
-    standard_name = EB1A_STANDARDS.get(section) or L1_STANDARDS.get(section, section)
+    # 获取标准名称 (try registry first, then legacy dicts)
+    standard_name = get_standard_name("EB-1A", section)
+    if standard_name == section:
+        standard_name = EB1A_STANDARDS.get(section) or L1_STANDARDS.get(section, section)
 
     prompt = f"""You are a Senior Immigration Attorney writing an EB-1A petition.
 
@@ -338,7 +341,7 @@ def save_constrained_writing(
     writing_dir = project_dir / "writing_v2"
     writing_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     version_id = timestamp.strftime("%Y%m%d_%H%M%S")
 
     data = {

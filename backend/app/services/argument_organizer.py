@@ -242,7 +242,10 @@ def organize_project_arguments(project_id: str) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    result = organize_project_arguments("yaruo_qu")
+    # 用法: python -m app.services.argument_organizer <project_id>
+    import sys
+    project_id = sys.argv[1] if len(sys.argv) > 1 else "test_project"
+    result = organize_project_arguments(project_id)
     print(result["lawyer_format"])
     print("\n" + "=" * 60)
     print("Statistics:", json.dumps(result["statistics"], indent=2))

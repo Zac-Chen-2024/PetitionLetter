@@ -3,9 +3,9 @@ LLM Client - 统一的 LLM API 客户端
 
 只使用 API 调用，不使用本地模型。
 支持多个 LLM 提供商：
-- DeepSeek (默认，便宜且好用)
+- DeepSeek (便宜且好用)
 - OpenAI (GPT-4、GPT-4o-mini 等)
-- Claude (预留)
+- Ollama (本地模型，OpenAI 兼容 API)
 """
 
 import json
@@ -32,10 +32,12 @@ async def call_openai(
     json_schema: Dict = None,
     temperature: float = DEFAULT_TEMPERATURE,
     max_tokens: int = DEFAULT_MAX_TOKENS,
-    timeout: float = DEFAULT_TIMEOUT
+    timeout: float = DEFAULT_TIMEOUT,
+    api_base_override: str = None,
+    api_key_override: str = None,
 ) -> Dict:
     """
-    调用 OpenAI API
+    调用 OpenAI 兼容 API
 
     Args:
         prompt: 用户提示词
@@ -45,12 +47,14 @@ async def call_openai(
         temperature: 采样温度
         max_tokens: 最大输出 token 数
         timeout: 超时时间（秒）
+        api_base_override: 覆盖 API base URL（用于 Ollama 等兼容提供商）
+        api_key_override: 覆盖 API key
 
     Returns:
         解析后的 JSON 响应，或 {"content": str} 如果不是 JSON
     """
-    api_key = settings.openai_api_key
-    api_base = settings.openai_api_base.rstrip('/')
+    api_key = api_key_override or settings.openai_api_key
+    api_base = (api_base_override or settings.openai_api_base).rstrip('/')
 
     if not api_key:
         raise ValueError("OpenAI API key not configured. Set OPENAI_API_KEY in .env")
@@ -115,18 +119,20 @@ async def call_openai_text(
     system_prompt: str = None,
     temperature: float = 0.7,
     max_tokens: int = DEFAULT_MAX_TOKENS,
-    timeout: float = DEFAULT_TIMEOUT
+    timeout: float = DEFAULT_TIMEOUT,
+    api_base_override: str = None,
+    api_key_override: str = None,
 ) -> str:
     """
-    调用 OpenAI API 获取纯文本响应（不要求 JSON）
+    调用 OpenAI 兼容 API 获取纯文本响应（不要求 JSON）
 
     用于自由写作等场景
 
     Returns:
         纯文本响应
     """
-    api_key = settings.openai_api_key
-    api_base = settings.openai_api_base.rstrip('/')
+    api_key = api_key_override or settings.openai_api_key
+    api_base = (api_base_override or settings.openai_api_base).rstrip('/')
 
     if not api_key:
         raise ValueError("OpenAI API key not configured. Set OPENAI_API_KEY in .env")
@@ -293,34 +299,6 @@ async def call_deepseek_text(
     return message.get("content", "")
 
 
-async def call_claude(
-    prompt: str,
-    model: str = "claude-sonnet-4-20250514",
-    system_prompt: str = None,
-    temperature: float = 0.7,
-    max_tokens: int = DEFAULT_MAX_TOKENS,
-    timeout: float = DEFAULT_TIMEOUT
-) -> str:
-    """
-    调用 Claude API (预留)
-
-    当前使用 DeepSeek 占位，后续可切换到真正的 Claude API
-
-    Returns:
-        纯文本响应
-    """
-    # 暂时使用 DeepSeek 作为占位
-    # TODO: 实现真正的 Claude API 调用
-    return await call_deepseek_text(
-        prompt=prompt,
-        model=DEEPSEEK_CHAT_MODEL,
-        system_prompt=system_prompt,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        timeout=timeout
-    )
-
-
 # ==================== 统一调用接口 ====================
 
 async def call_llm(
@@ -336,7 +314,7 @@ async def call_llm(
     """
     统一的 LLM 调用接口
 
-    根据配置自动选择提供商，默认使用 DeepSeek（便宜）
+    根据配置自动选择提供商，默认读取 settings.llm_provider
 
     Args:
         prompt: 用户提示词
@@ -346,12 +324,12 @@ async def call_llm(
         temperature: 采样温度
         max_tokens: 最大输出 token 数
         timeout: 超时时间（秒）
-        provider: 提供商 ("deepseek", "openai")，默认 deepseek
+        provider: 提供商 ("deepseek", "openai", "ollama")，默认读取配置
 
     Returns:
         解析后的 JSON 响应
     """
-    provider = provider or "deepseek"  # 默认使用 DeepSeek
+    provider = provider or settings.llm_provider
 
     if provider == "deepseek":
         return await call_deepseek(
@@ -373,6 +351,18 @@ async def call_llm(
             max_tokens=max_tokens,
             timeout=timeout
         )
+    elif provider == "ollama":
+        return await call_openai(
+            prompt=prompt,
+            model=model or settings.ollama_model,
+            system_prompt=system_prompt,
+            json_schema=json_schema,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            api_base_override=settings.ollama_api_base,
+            api_key_override="ollama",
+        )
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
@@ -392,7 +382,7 @@ async def call_llm_text(
     Returns:
         纯文本响应
     """
-    provider = provider or "deepseek"
+    provider = provider or settings.llm_provider
 
     if provider == "deepseek":
         return await call_deepseek_text(
@@ -411,6 +401,17 @@ async def call_llm_text(
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout
+        )
+    elif provider == "ollama":
+        return await call_openai_text(
+            prompt=prompt,
+            model=model or settings.ollama_model,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            api_base_override=settings.ollama_api_base,
+            api_key_override="ollama",
         )
     else:
         raise ValueError(f"Unknown provider: {provider}")

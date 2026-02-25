@@ -3,6 +3,7 @@
  */
 
 import apiClient from './api';
+import type { ProjectType } from '../types';
 
 export interface Project {
   id: string;
@@ -10,7 +11,8 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
   beneficiary_name?: string;
-  visa_type?: 'eb1a' | 'l1';
+  projectType?: ProjectType;
+  projectNumber?: string;
 }
 
 export interface Document {
@@ -32,8 +34,8 @@ export const projectService = {
   /**
    * 创建新项目
    */
-  create: (name: string) =>
-    apiClient.post<Project>('/projects', { name }),
+  create: (name: string, projectType: ProjectType = 'EB-1A') =>
+    apiClient.post<Project>('/projects', { name, projectType }),
 
   /**
    * 获取项目详情

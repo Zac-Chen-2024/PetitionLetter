@@ -38,10 +38,11 @@ ORGANIZATION_SUFFIXES = {
 
 # 组织关键词 - 包含这些词的可能是组织
 ORGANIZATION_KEYWORDS = {
-    "weightlifting", "fitness", "sports", "athletic",
+    "sports", "athletic",
     "healthcare", "health", "medical",
     "media", "press", "publishing", "daily", "post", "times",
     "government", "ministry", "administration",
+    "technology", "engineering", "research", "education",
 }
 
 # 媒体关键词
@@ -54,14 +55,12 @@ MEDIA_KEYWORDS = {
 
 # 已知媒体 (常见的)
 KNOWN_MEDIA = {
-    # 项目相关媒体
-    "the jakarta post", "jakarta post", "china sports daily", "sixth tone",
-    "the paper", "people's daily", "titan sports", "oriental morning post",
-    "shanghai united media group", "jiefang daily", "wenhui xinmin",
     # 国际媒体
+    "the jakarta post", "jakarta post",
     "new york times", "washington post", "wall street journal",
     "reuters", "associated press", "bbc", "cnn", "guardian",
     "financial times", "economist", "forbes", "bloomberg",
+    "people's daily", "xinhua",
 }
 
 # 垃圾模式 - 匹配这些的一定是垃圾
@@ -87,7 +86,7 @@ GARBAGE_PATTERNS = [
 # 排除的"组织" - 这些看起来像组织但不是
 EXCLUDED_NAMES = {
     "her effort", "on behalf of", "s first", "found a",
-    "coach gaby", "ms. qu", "the applicant",
+    "the applicant",
     "the event", "the competition", "the program",
 }
 

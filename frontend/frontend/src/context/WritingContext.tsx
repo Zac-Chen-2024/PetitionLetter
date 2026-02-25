@@ -559,11 +559,8 @@ export function WritingProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const section = letterSections.find(s => s.standardId === arg.standardKey);
-    if (!section) {
-      console.error(`LetterSection for standard ${arg.standardKey} not found`);
-      return;
-    }
+    const standardKey = arg.standardKey;
+    const argId = arg.id;
 
     try {
       const response = await apiClient.post<{
@@ -581,7 +578,7 @@ export function WritingProvider({ children }: { children: ReactNode }) {
           by_argument: Record<string, number[]>;
           by_snippet: Record<string, number[]>;
         };
-      }>(`/write/v3/${projectId}/${arg.standardKey}`, {
+      }>(`/write/v3/${projectId}/${standardKey}`, {
         subargument_ids: [subArgumentId],
       });
 
@@ -599,17 +596,17 @@ export function WritingProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const indicesToReplace = section.provenanceIndex?.bySubArgument?.[subArgumentId] || [];
-      const isNewSubArgument = indicesToReplace.length === 0;
-
       setLetterSections(prev => prev.map(s => {
-        if (s.id !== section.id) return s;
+        if (s.standardId !== standardKey) return s;
+
+        const indicesToReplace = s.provenanceIndex?.bySubArgument?.[subArgumentId] || [];
+        const isNewSubArgument = indicesToReplace.length === 0;
 
         const oldSentences = [...s.sentences!];
         let newSentences: typeof oldSentences;
 
         if (isNewSubArgument) {
-          const argumentIndices = s.provenanceIndex?.byArgument?.[arg.id] || [];
+          const argumentIndices = s.provenanceIndex?.byArgument?.[argId] || [];
           if (argumentIndices.length > 0) {
             const insertAfterIdx = Math.max(...argumentIndices);
             newSentences = [
@@ -682,7 +679,7 @@ export function WritingProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to regenerate SubArgument:', error);
     }
-  }, [letterSections]);
+  }, []);
 
   // Remove sub-argument sentences from letter (with cascade visualization)
   const removeSubArgumentFromLetter = useCallback((

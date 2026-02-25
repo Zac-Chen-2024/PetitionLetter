@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { legalStandards } from '../data/legalStandards';
+import { useLegalStandards } from '../hooks/useLegalStandards';
 import type { Snippet, LegalStandard, Connection } from '../types';
 
 // Mini snippet card for embedded view
@@ -186,6 +186,7 @@ function StandardBlock({
 }
 
 export function EmbeddedView() {
+  const legalStandards = useLegalStandards();
   const { allSnippets, connections } = useApp();
 
   return (

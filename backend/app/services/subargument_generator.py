@@ -14,7 +14,7 @@ import json
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import uuid
 
@@ -166,13 +166,13 @@ async def subdivide_argument(
             sub_arg = GeneratedSubArgument(
                 id=f"subarg-{uuid.uuid4().hex[:8]}",
                 argument_id=argument_id,
-                title=raw_sa.get('title', '证据组'),
+                title=raw_sa.get('title', 'Evidence Group'),
                 purpose=raw_sa.get('purpose', ''),
-                relationship=raw_sa.get('relationship', '支持论点'),
+                relationship=raw_sa.get('relationship', 'Supports argument'),
                 snippet_ids=real_ids,
                 is_ai_generated=True,
                 status="draft",
-                created_at=datetime.now().isoformat()
+                created_at=datetime.now(timezone.utc).isoformat()
             )
             sub_arguments.append(sub_arg)
 
@@ -187,13 +187,13 @@ async def subdivide_argument(
             catch_all = GeneratedSubArgument(
                 id=f"subarg-{uuid.uuid4().hex[:8]}",
                 argument_id=argument_id,
-                title="其他证据",
-                purpose="补充支持材料",
-                relationship="补充证明",
+                title="Additional Evidence",
+                purpose="Supplementary supporting materials",
+                relationship="Additional support",
                 snippet_ids=[s.get('snippet_id', s.get('id', '')) for s in unassigned],
                 is_ai_generated=True,
                 status="draft",
-                created_at=datetime.now().isoformat()
+                created_at=datetime.now(timezone.utc).isoformat()
             )
             sub_arguments.append(catch_all)
 
@@ -211,24 +211,29 @@ def _create_single_subarg(argument_id: str, snippets: List[Dict], standard: str)
 
     # Generate relationship based on standard
     relationship_map = {
-        "membership": "证明会员资格",
-        "published_material": "证明媒体报道",
-        "original_contribution": "证明原创贡献",
-        "leading_role": "证明领导角色",
-        "awards": "证明获奖成就",
+        "membership": "Proves membership qualification",
+        "published_material": "Demonstrates media coverage",
+        "original_contribution": "Demonstrates original contribution",
+        "leading_role": "Proves leadership role",
+        "awards": "Proves award achievement",
+        "judging": "Proves judging activity",
+        "scholarly_articles": "Demonstrates scholarly authorship",
+        "display": "Shows exhibition display",
+        "high_salary": "Proves high remuneration",
+        "commercial_success": "Demonstrates commercial success",
     }
-    relationship = relationship_map.get(standard, "支持论点")
+    relationship = relationship_map.get(standard, "Supports argument")
 
     return GeneratedSubArgument(
         id=f"subarg-{uuid.uuid4().hex[:8]}",
         argument_id=argument_id,
-        title="主要证据",
-        purpose="支持主论点的核心证据",
+        title="Primary Evidence",
+        purpose="Core evidence supporting the main argument",
         relationship=relationship,
         snippet_ids=snippet_ids,
         is_ai_generated=True,
         status="draft",
-        created_at=datetime.now().isoformat()
+        created_at=datetime.now(timezone.utc).isoformat()
     )
 
 

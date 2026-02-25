@@ -29,6 +29,8 @@ export function PipelineControls() {
     canConfirm,
     canGenerate,
     allSnippets,
+    generateArguments,
+    isGeneratingArguments,
   } = useApp();
 
   const { stage, progress, snippetCount, error } = pipelineState;
@@ -37,7 +39,7 @@ export function PipelineControls() {
   const [showApplicantInput, setShowApplicantInput] = useState(false);
   const [applicantName, setApplicantName] = useState('');
   const [showMergeModal, setShowMergeModal] = useState(false);
-  const [extractionStep, setExtractionStep] = useState<'idle' | 'extracting' | 'suggesting' | 'reviewing' | 'applying'>('idle');
+  const [extractionStep, setExtractionStep] = useState<'idle' | 'extracting' | 'suggesting' | 'reviewing' | 'applying' | 'generating_args'>('idle');
 
   // Stage display names
   const stageNames: Record<PipelineStage, string> = {
@@ -78,15 +80,22 @@ export function PipelineControls() {
       // Step 1: Run unified extraction
       await unifiedExtract(applicantName);
 
-      // Step 2: Generate merge suggestions
+      // Step 2: Generate merge suggestions (relationship analysis)
       setExtractionStep('suggesting');
       const suggestions = await generateMergeSuggestions(applicantName);
 
-      // Step 3: Show merge modal if there are suggestions
+      // Step 3: Show merge modal if there are suggestions, otherwise auto-generate arguments
       if (suggestions.length > 0) {
         setExtractionStep('reviewing');
         setShowMergeModal(true);
       } else {
+        // No merge needed — auto-generate Writing Tree
+        setExtractionStep('generating_args');
+        try {
+          await generateArguments(false, applicantName.trim());
+        } catch (genErr) {
+          console.error('Auto argument generation failed:', genErr);
+        }
         setExtractionStep('idle');
       }
     } catch (err) {
@@ -105,6 +114,14 @@ export function PipelineControls() {
 
       // Apply the accepted merges
       await applyMerges();
+
+      // Auto-generate Writing Tree after merges are applied
+      setExtractionStep('generating_args');
+      try {
+        await generateArguments(false, applicantName.trim());
+      } catch (genErr) {
+        console.error('Auto argument generation failed:', genErr);
+      }
 
       setExtractionStep('idle');
     } catch (err) {
@@ -125,6 +142,7 @@ export function PipelineControls() {
       case 'suggesting': return 'Generating merge suggestions...';
       case 'reviewing': return 'Review merge suggestions';
       case 'applying': return 'Applying merges...';
+      case 'generating_args': return 'Generating Writing Tree...';
       default: return '';
     }
   };
