@@ -658,12 +658,14 @@ async def _step1_generate_argument_body(
 
 ARGUMENTATION METHOD — For each piece of evidence, build a COMPLETE argument chain:
 1. FACT: State what the applicant did / what happened (cite Exhibit)
-2. AUTHORITY: Prove the organization/award/journal is prestigious (cite Exhibit)
-3. RIGOR: Describe the evaluation/selection process and its strictness (cite Exhibit)
-4. SCALE/RARITY: Provide numbers — how many competed, how few won, what percentages (cite Exhibit)
-5. PEER COMPARISON: Who else has this distinction? What caliber of peers? (cite Exhibit)
+2. AUTHORITY: Prove the organization/award/journal is prestigious — state WHO runs it, WHEN it was founded, and WHY it is recognized (cite Exhibit)
+3. RIGOR: Describe the evaluation/selection process — how are candidates nominated, who reviews, what criteria are used (cite Exhibit)
+4. SCALE/RARITY: Provide numbers — how many applied/competed, how few won, compute percentages when both numerator and denominator are available (cite Exhibit)
+5. PEER COMPARISON: Name specific co-recipients, fellow members, or past winners mentioned in the source materials to show the caliber of the peer group (cite Exhibit). Use ONLY names found in source materials.
 
 Not every evidence needs all 5 layers, but the strongest arguments have most of them.
+
+DEFENSIVE ARGUMENTATION: If any evidence could be perceived as a weakness (e.g., a lower prize tier, a regional rather than international scope), proactively address it by contextualizing — explain the award structure, the total number of tiers, and what percentage of candidates reach that tier. Do NOT ignore potential weaknesses; reframe them as strengths using facts from the source materials.
 
 ABSOLUTE RULES:
 1. Every fact MUST come from the SOURCE MATERIALS below. NEVER invent facts.
