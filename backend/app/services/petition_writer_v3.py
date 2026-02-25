@@ -17,11 +17,12 @@ LLM 按 SubArgument 结构生成
 import json
 from typing import List, Dict, Optional, Any
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 
-from .llm_client import call_deepseek, call_deepseek_text
+from .llm_client import call_llm, call_llm_text
 from .snippet_registry import load_registry
+from .standards_registry import get_standard_name
 import re
 
 
@@ -176,6 +177,17 @@ LEGAL_REFS = {
 }
 
 
+def _get_standard_display_name(standard_key: str) -> str:
+    """Get display name for a standard key, trying registry first then legacy dict."""
+    # Try all project types via registry
+    for ptype in ("EB-1A", "NIW"):
+        name = get_standard_name(ptype, standard_key)
+        if name != standard_key:
+            return name
+    # Fallback to legacy dict
+    return EB1A_STANDARDS.get(standard_key, standard_key)
+
+
 # ============================================
 # 数据加载函数
 # ============================================
@@ -302,7 +314,7 @@ def load_subargument_context(
     return {
         "standard": {
             "key": standard_key,
-            "name": EB1A_STANDARDS.get(standard_key, standard_key),
+            "name": _get_standard_display_name(standard_key),
             "legal_ref": LEGAL_REFS.get(standard_key, "")
         },
         "arguments": result_arguments
@@ -452,14 +464,14 @@ CRITICAL RULES:
 5. Generate 3-5 sentences per SubArgument (NOT just 1-2)
 6. Include at least one block quote per SubArgument when source material contains direct testimony
 7. Return ONLY valid JSON, no markdown or extra text
-8. OUTPUT MUST BE 100% ENGLISH. If source evidence contains non-English text (Chinese, etc.), TRANSLATE it to English. Do NOT copy non-English characters. Use English translations only (e.g., "The Paper" not "澎湃新闻", "China Sports Daily" not "中国体育报")."""
+8. OUTPUT MUST BE 100% ENGLISH. If source evidence contains non-English text (Chinese, etc.), TRANSLATE it to English. Do NOT copy non-English characters. Use English translations only (e.g., "People's Daily" not "人民日报", "Xinhua News" not "新华社")."""
 
-    result = await call_deepseek(
+    result = await call_llm(
         prompt=user_prompt,
         system_prompt=system_prompt,
         json_schema={},  # DeepSeek 会使用 json_object 模式
         temperature=0.5,
-        max_tokens=4000
+        max_tokens=8192
     )
 
     return result
@@ -515,7 +527,7 @@ IMPORTANT:
 Text to translate:
 {text}"""
 
-        llm_result = await call_deepseek_text(
+        llm_result = await call_llm_text(
             prompt=prompt,
             system_prompt="You are a professional translator. Translate to English while preserving legal document formatting.",
             temperature=0.3,
@@ -792,6 +804,36 @@ def flatten_sentences(
 # 主入口函数
 # ============================================
 
+def _build_provenance_from_sentences(sentences: List[Dict]) -> Dict:
+    """
+    从扁平句子列表构建溯源索引。
+
+    与 build_provenance_index() 不同，此函数直接从句子列表读取
+    argument_id（支持多 Argument 场景），不依赖单一顶层 argument_id。
+    """
+    by_subargument = defaultdict(list)
+    by_argument = defaultdict(list)
+    by_snippet = defaultdict(list)
+
+    for idx, sent in enumerate(sentences):
+        subarg_id = sent.get("subargument_id")
+        if subarg_id:
+            by_subargument[subarg_id].append(idx)
+
+        arg_id = sent.get("argument_id")
+        if arg_id:
+            by_argument[arg_id].append(idx)
+
+        for snip_id in sent.get("snippet_ids", []):
+            by_snippet[snip_id].append(idx)
+
+    return {
+        "by_subargument": dict(by_subargument),
+        "by_argument": dict(by_argument),
+        "by_snippet": dict(by_snippet)
+    }
+
+
 async def write_petition_section_v3(
     project_id: str,
     standard_key: str,
@@ -800,7 +842,15 @@ async def write_petition_section_v3(
     additional_instructions: str = None
 ) -> Dict:
     """
-    V3 版本的写作入口
+    V3 版本的写作入口 — 支持多 Argument 循环生成
+
+    一个 Standard 下可能有多个 Argument（如 published_material 对应 3 家媒体），
+    每个 Argument 独立调用 LLM 生成，然后合并为一篇完整的段落。
+
+    结构：
+      opening（来自第一个 Argument） +
+      所有 Argument 的 body 句子 +
+      closing（来自最后一个 Argument）
 
     Args:
         project_id: 项目 ID
@@ -808,20 +858,6 @@ async def write_petition_section_v3(
         argument_ids: 可选，指定要生成的 Argument IDs
         subargument_ids: 可选，指定要生成的 SubArgument IDs（用于局部重新生成）
         additional_instructions: 可选，额外指令
-
-    Returns:
-        {
-            "success": bool,
-            "section": str,
-            "paragraph_text": str,
-            "sentences": [...],
-            "provenance_index": {...},
-            "validation": {
-                "total_sentences": int,
-                "traced_sentences": int,
-                "warnings": [...]
-            }
-        }
     """
     # 1. 加载 SubArgument 上下文
     context = load_subargument_context(project_id, standard_key, argument_ids, subargument_ids)
@@ -835,55 +871,99 @@ async def write_petition_section_v3(
             "sentences": []
         }
 
-    # 2. 生成结构化段落
-    llm_output = await generate_structured_paragraph(context, additional_instructions)
+    all_arguments = context["arguments"]
+    all_warnings = []
 
-    if "error" in llm_output:
+    # 2. 按 Argument 逐个生成，收集每个 Argument 的扁平句子列表
+    per_argument_sentences: List[List[Dict]] = []
+
+    for argument in all_arguments:
+        # 跳过没有 SubArgument 的 Argument
+        if not argument.get("sub_arguments"):
+            all_warnings.append(f"Skipped argument {argument.get('id')}: no sub_arguments")
+            continue
+
+        # 构建单 Argument 上下文
+        single_context = {
+            "standard": context["standard"],
+            "arguments": [argument]
+        }
+
+        # 2a. 生成
+        llm_output = await generate_structured_paragraph(single_context, additional_instructions)
+
+        if "error" in llm_output:
+            all_warnings.append(
+                f"Generation failed for argument {argument.get('id')}: {llm_output.get('error')}"
+            )
+            continue
+
+        # 2b. 确保英文
+        llm_output = await ensure_english_output(llm_output)
+
+        # 2c. 验证溯源
+        validation_result = validate_provenance(llm_output, single_context)
+        validated_output = validation_result.get("fixed_output", llm_output)
+        all_warnings.extend(validation_result.get("warnings", []))
+
+        # 2d. 扁平化（此时 argument_id 来自 LLM 输出，对应当前 Argument）
+        arg_sentences = flatten_sentences(validated_output, single_context)
+
+        # 2e. 中文安全网
+        for sentence in arg_sentences:
+            if "text" in sentence and _contains_non_ascii(sentence["text"]):
+                sentence["text"] = _remove_remaining_chinese(sentence["text"])
+
+        per_argument_sentences.append(arg_sentences)
+
+    # 3. 合并：第一个 Argument 的 opening + 所有 body + 最后一个 Argument 的 closing
+    if not per_argument_sentences:
         return {
             "success": False,
-            "error": llm_output.get("error"),
+            "error": f"No content generated for standard: {standard_key}",
             "section": standard_key,
             "paragraph_text": "",
             "sentences": []
         }
 
-    # 2.5 确保输出为100%英文（后处理翻译）
-    llm_output = await ensure_english_output(llm_output)
+    merged_sentences = []
+    for i, arg_sentences in enumerate(per_argument_sentences):
+        is_first = (i == 0)
+        is_last = (i == len(per_argument_sentences) - 1)
 
-    # 3. 验证和修正溯源
-    validation_result = validate_provenance(llm_output, context)
-    validated_output = validation_result.get("fixed_output", llm_output)
+        for sent in arg_sentences:
+            stype = sent.get("sentence_type", "body")
+            # 只保留第一个 Argument 的 opening
+            if stype == "opening" and not is_first:
+                continue
+            # 只保留最后一个 Argument 的 closing
+            if stype == "closing" and not is_last:
+                continue
+            merged_sentences.append(sent)
 
-    # 4. 扁平化句子列表
-    sentences = flatten_sentences(validated_output, context)
+    # 4. 从合并后的句子列表构建溯源索引
+    provenance_index = _build_provenance_from_sentences(merged_sentences)
 
-    # 4.5 确保扁平化后的句子也是100%英文（安全网）
-    # Note: LLM translation already happened in ensure_english_output
-    # This is just a final safety net to remove any remaining Chinese
-    for sentence in sentences:
-        if "text" in sentence and _contains_non_ascii(sentence["text"]):
-            sentence["text"] = _remove_remaining_chinese(sentence["text"])
+    # 5. 组装段落文本
+    paragraph_text = " ".join(s["text"] for s in merged_sentences)
 
-    # 5. 构建溯源索引
-    provenance_index = build_provenance_index(validated_output, context)
-
-    # 6. 组装段落文本
-    paragraph_text = " ".join(s["text"] for s in sentences)
-
-    # 7. 统计
-    total_sentences = len(sentences)
-    traced_sentences = sum(1 for s in sentences if s.get("snippet_ids") or s.get("subargument_id"))
+    # 6. 统计
+    total_sentences = len(merged_sentences)
+    traced_sentences = sum(
+        1 for s in merged_sentences
+        if s.get("snippet_ids") or s.get("subargument_id")
+    )
 
     return {
         "success": True,
         "section": standard_key,
         "paragraph_text": paragraph_text,
-        "sentences": sentences,
+        "sentences": merged_sentences,
         "provenance_index": provenance_index,
         "validation": {
             "total_sentences": total_sentences,
             "traced_sentences": traced_sentences,
-            "warnings": validation_result.get("warnings", [])
+            "warnings": all_warnings
         }
     }
 
@@ -902,7 +982,7 @@ def save_writing_v3(
     writing_dir = project_dir / "writing_v3"
     writing_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now()
+    timestamp = datetime.now(timezone.utc)
     version_id = timestamp.strftime("%Y%m%d_%H%M%S")
 
     data = {
@@ -933,6 +1013,185 @@ def load_latest_writing_v3(
 
     with open(files[0], 'r', encoding='utf-8') as f:
         return json.load(f)
+
+
+# ============================================
+# SubArgument 变更级联函数
+# ============================================
+
+def remove_subargument_from_writing(
+    project_id: str, subargument_id: str, standard_key: str
+) -> Dict:
+    """
+    从 writing_v3 文件中移除 SubArgument 的句子，重建索引，保存新版本。
+
+    Returns:
+        {
+          "changed": bool,
+          "removed_indices": [int],
+          "new_sentences": [...],
+          "new_paragraph_text": str
+        }
+    """
+    existing = load_latest_writing_v3(project_id, standard_key)
+    if not existing:
+        return {"changed": False, "removed_indices": [], "new_sentences": [], "new_paragraph_text": ""}
+
+    sentences = existing.get("sentences", [])
+    if not sentences:
+        return {"changed": False, "removed_indices": [], "new_sentences": [], "new_paragraph_text": ""}
+
+    # Find indices of sentences belonging to this SubArgument
+    removed_indices = [
+        i for i, s in enumerate(sentences)
+        if s.get("subargument_id") == subargument_id
+    ]
+
+    if not removed_indices:
+        return {"changed": False, "removed_indices": [], "new_sentences": sentences, "new_paragraph_text": existing.get("paragraph_text", "")}
+
+    # Filter out removed sentences
+    new_sentences = [s for i, s in enumerate(sentences) if i not in removed_indices]
+
+    # Rebuild provenance_index
+    new_provenance = {"by_subargument": {}, "by_argument": {}, "by_snippet": {}}
+    for idx, sent in enumerate(new_sentences):
+        subarg_id = sent.get("subargument_id")
+        if subarg_id:
+            new_provenance["by_subargument"].setdefault(subarg_id, []).append(idx)
+        arg_id = sent.get("argument_id")
+        if arg_id:
+            new_provenance["by_argument"].setdefault(arg_id, []).append(idx)
+        for snip_id in sent.get("snippet_ids", []):
+            new_provenance["by_snippet"].setdefault(snip_id, []).append(idx)
+
+    # Rebuild paragraph text
+    new_paragraph_text = " ".join(s["text"] for s in new_sentences)
+
+    # Rebuild validation
+    total = len(new_sentences)
+    traced = sum(1 for s in new_sentences if s.get("snippet_ids") or s.get("subargument_id"))
+
+    # Build updated result for saving
+    updated_result = {
+        "section": standard_key,
+        "paragraph_text": new_paragraph_text,
+        "sentences": new_sentences,
+        "provenance_index": new_provenance,
+        "validation": {
+            "total_sentences": total,
+            "traced_sentences": traced,
+            "warnings": []
+        }
+    }
+
+    # Save new version
+    save_writing_v3(project_id, standard_key, updated_result)
+
+    return {
+        "changed": True,
+        "removed_indices": removed_indices,
+        "new_sentences": new_sentences,
+        "new_paragraph_text": new_paragraph_text
+    }
+
+
+async def analyze_change_impact(
+    project_id: str, standard_key: str,
+    change_type: str,  # "deletion" | "addition"
+    affected_subargument_id: str,
+    affected_title: str = ""
+) -> Dict:
+    """
+    分析 SubArgument 变更对整段文章的间接影响。
+
+    调用 LLM，传入当前文章全文 + 变更描述，
+    让 LLM 识别哪些句子需要调整。
+
+    Returns:
+        {
+          "suggestions": [
+            {
+              "sentence_index": 0,
+              "original_text": "...",
+              "suggested_text": "...",
+              "reason": "..."
+            }
+          ]
+        }
+    """
+    existing = load_latest_writing_v3(project_id, standard_key)
+    if not existing:
+        return {"suggestions": []}
+
+    sentences = existing.get("sentences", [])
+    if not sentences:
+        return {"suggestions": []}
+
+    # Build indexed text for LLM
+    indexed_lines = []
+    for i, s in enumerate(sentences):
+        stype = s.get("sentence_type", "body")
+        indexed_lines.append(f"[{i}] ({stype}) {s['text']}")
+    indexed_text = "\n".join(indexed_lines)
+
+    action = "deleted from" if change_type == "deletion" else "added to"
+
+    system_prompt = """You are a legal document editor. Analyze how a structural change to a petition letter section affects the remaining text. Return ONLY valid JSON."""
+
+    user_prompt = f"""A sub-argument was just {action} this petition letter section.
+
+CURRENT TEXT (after mechanical {change_type}):
+{indexed_text}
+
+CHANGE DESCRIPTION:
+- {change_type.capitalize()}d SubArgument: "{affected_title}"
+- SubArgument ID: {affected_subargument_id}
+
+TASK: Identify sentences that need adjustment due to this change.
+Check for:
+1. Opening paragraph references to deleted content (e.g., count changes like "three aspects" → "two aspects")
+2. Closing paragraph summaries that reference removed points
+3. Transition sentences ("Furthermore...", "In addition...") that now dangle
+4. Cross-references to removed exhibits
+
+Return JSON:
+{{
+  "suggestions": [
+    {{
+      "sentence_index": 0,
+      "original_text": "exact current text",
+      "suggested_text": "revised text",
+      "reason": "brief explanation"
+    }}
+  ]
+}}
+Only return suggestions where changes are actually needed. Return empty array if no changes needed."""
+
+    try:
+        result = await call_llm(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+            json_schema={},
+            temperature=0.3,
+            max_tokens=2000
+        )
+
+        suggestions = result.get("suggestions", [])
+
+        # Validate suggestion indices
+        valid_suggestions = []
+        for s in suggestions:
+            idx = s.get("sentence_index")
+            if isinstance(idx, int) and 0 <= idx < len(sentences):
+                valid_suggestions.append(s)
+
+        return {"suggestions": valid_suggestions}
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"analyze_change_impact failed: {e}")
+        return {"suggestions": []}
 
 
 # ============================================
@@ -991,7 +1250,7 @@ Please revise the text according to the instruction. Return a JSON object:
 
 Return ONLY valid JSON, no markdown or extra text."""
 
-    result = await call_deepseek(
+    result = await call_llm(
         prompt=user_prompt,
         system_prompt=system_prompt,
         json_schema={},

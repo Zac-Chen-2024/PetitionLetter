@@ -17,8 +17,9 @@ from app.services.petition_writer import (
     load_constrained_writing,
     load_all_constrained_writing,
     EB1A_STANDARDS,
-    L1_STANDARDS
+    L1_STANDARDS,
 )
+from app.services.standards_registry import get_all_types_with_standards
 from app.services.snippet_registry import (
     load_registry,
     get_registry_stats,
@@ -246,12 +247,14 @@ async def get_available_standards():
     获取可用的法律标准列表
 
     Returns:
-        eb1a: EB-1A 10 个标准
-        l1: L-1 4 个标准
+        eb1a: EB-1A legacy dict
+        l1: L-1 legacy dict
+        types: All types with full standard definitions from registry
     """
     return {
         "eb1a": EB1A_STANDARDS,
-        "l1": L1_STANDARDS
+        "l1": L1_STANDARDS,
+        "types": get_all_types_with_standards(),
     }
 
 
@@ -259,9 +262,9 @@ async def get_available_standards():
 
 from app.services.petition_writer_v3 import (
     write_petition_section_v3,
-    load_subargument_context,
     save_writing_v3,
-    load_latest_writing_v3
+    load_latest_writing_v3,
+    analyze_change_impact,
 )
 
 router_v3 = APIRouter(prefix="/api/write/v3", tags=["Writing V3"])
@@ -308,6 +311,62 @@ class WriteV3Response(BaseModel):
     provenance_index: ProvenanceIndex
     validation: ValidationResult
     error: Optional[str] = None
+
+
+@router_v3.get("/{project_id}/sections")
+async def get_all_v3_sections(project_id: str):
+    """
+    获取所有已保存的 V3 写作章节（每个 standard_key 取最新版本）
+
+    Returns:
+        sections: [{section, paragraph_text, sentences, provenance_index, ...}]
+    """
+    try:
+        # Dynamically discover standard_keys from saved writing_v3 files
+        from pathlib import Path
+        projects_dir = Path(__file__).parent.parent.parent / "data" / "projects"
+        writing_dir = projects_dir / project_id / "writing_v3"
+        standard_keys = set()
+        if writing_dir.exists():
+            for f in writing_dir.glob("*.json"):
+                # Extract standard_key from filename pattern: writing_{key}_{version}.json
+                parts = f.stem.split("_", 1)  # split off "writing" prefix
+                if len(parts) >= 2:
+                    # Remove version suffix: e.g. "membership_20240101_120000" -> "membership"
+                    rest = parts[1]
+                    # Version is last two _-separated parts (date_time)
+                    rest_parts = rest.rsplit("_", 2)
+                    if len(rest_parts) >= 3:
+                        key = rest_parts[0]
+                    else:
+                        key = rest
+                    standard_keys.add(key)
+
+        sections = []
+        seen = set()
+        for key in standard_keys:
+            result = load_latest_writing_v3(project_id, key)
+            if result and key not in seen:
+                seen.add(key)
+                sections.append({
+                    "section": result.get("section", key),
+                    "paragraph_text": result.get("paragraph_text", ""),
+                    "sentences": result.get("sentences", []),
+                    "provenance_index": result.get("provenance_index"),
+                    "validation": result.get("validation"),
+                    "version_id": result.get("version_id"),
+                    "timestamp": result.get("timestamp"),
+                })
+
+        return {
+            "success": True,
+            "project_id": project_id,
+            "sections": sections,
+            "section_count": len(sections),
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router_v3.post("/{project_id}/{standard_key}", response_model=WriteV3Response)
@@ -369,122 +428,34 @@ async def write_petition_v3(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router_v3.get("/{project_id}/{standard_key}")
-async def get_writing_v3(project_id: str, standard_key: str):
+class AnalyzeImpactRequest(BaseModel):
+    """分析变更影响请求"""
+    standard_key: str
+    change_type: str = "deletion"  # "deletion" | "addition"
+    affected_subargument_id: str
+    affected_title: str = ""
+
+
+@router_v3.post("/{project_id}/analyze-impact")
+async def analyze_writing_impact(project_id: str, request: AnalyzeImpactRequest):
     """
-    获取已生成的 V3 写作结果
-    """
-    try:
-        result = load_latest_writing_v3(project_id, standard_key)
-        if not result:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No V3 writing found for {standard_key}"
-            )
+    分析 SubArgument 变更对文章的间接影响。
 
-        return {
-            "success": True,
-            **result
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router_v3.get("/{project_id}/{standard_key}/context")
-async def get_subargument_context(
-    project_id: str,
-    standard_key: str,
-    argument_ids: str = None,
-    subargument_ids: str = None
-):
-    """
-    获取用于写作的 SubArgument 上下文
-
-    用于调试和预览将要发送给 LLM 的数据
+    前端在 DELETE SubArgument 完成后调用此端点获取调整建议。
     """
     try:
-        arg_ids = argument_ids.split(",") if argument_ids else None
-        subarg_ids = subargument_ids.split(",") if subargument_ids else None
-        context = load_subargument_context(project_id, standard_key, arg_ids, subarg_ids)
-
-        return {
-            "success": True,
-            "context": context,
-            "argument_count": len(context.get("arguments", [])),
-            "subargument_count": sum(
-                len(a.get("sub_arguments", []))
-                for a in context.get("arguments", [])
-            )
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==================== Edit Endpoint ====================
-
-class ChatMessageIn(BaseModel):
-    """对话消息"""
-    role: str  # 'user' or 'assistant'
-    content: str
-
-
-class EditRequest(BaseModel):
-    """编辑请求"""
-    section_id: str
-    original_text: str
-    instruction: str
-    conversation_history: List[ChatMessageIn] = []
-
-
-class EditResponse(BaseModel):
-    """编辑响应"""
-    success: bool
-    revised_text: str
-    explanation: Optional[str] = None
-    error: Optional[str] = None
-
-
-@router_v3.post("/{project_id}/edit", response_model=EditResponse)
-async def edit_text_with_ai(
-    project_id: str,
-    request: EditRequest
-):
-    """
-    AI 辅助文本编辑
-
-    支持多轮对话，根据用户指令修改选中的文本。
-
-    Args:
-        project_id: 项目 ID
-        request: 编辑请求，包含原文、指令和对话历史
-
-    Returns:
-        EditResponse: 修改后的文本和说明
-    """
-    try:
-        from app.services.petition_writer_v3 import edit_text_with_instruction
-
-        result = await edit_text_with_instruction(
+        result = await analyze_change_impact(
             project_id=project_id,
-            original_text=request.original_text,
-            instruction=request.instruction,
-            conversation_history=[
-                {"role": m.role, "content": m.content}
-                for m in request.conversation_history
-            ]
+            standard_key=request.standard_key,
+            change_type=request.change_type,
+            affected_subargument_id=request.affected_subargument_id,
+            affected_title=request.affected_title,
         )
-
-        return EditResponse(
-            success=True,
-            revised_text=result.get("revised_text", ""),
-            explanation=result.get("explanation")
-        )
-
+        return {
+            "success": True,
+            "suggestions": result.get("suggestions", [])
+        }
     except Exception as e:
-        return EditResponse(
-            success=False,
-            revised_text="",
-            error=str(e)
-        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+

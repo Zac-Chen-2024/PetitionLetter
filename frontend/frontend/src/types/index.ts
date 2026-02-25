@@ -327,6 +327,11 @@ export interface SentenceWithProvenance {
   sentence_type?: 'opening' | 'body' | 'closing';  // V3: Sentence position
   isEdited?: boolean;              // V3: Has been manually edited
   originalText?: string;           // V3: Original text before edit
+
+  // Change cascade tracking
+  changeStatus?: 'removed' | 'needs_adjustment' | 'suggested_replacement' | null;
+  suggestedText?: string;          // LLM suggested replacement text
+  changeReason?: string;           // Why this sentence needs adjustment
 }
 
 // Provenance index for fast lookups
@@ -355,17 +360,96 @@ export interface LetterSection {
 
   // V3: UI state
   isExpanded?: boolean;
+
+  // Change cascade tracking
+  isStale?: boolean;                        // Has pending SubArgument changes
+  pendingSuggestions?: Array<{              // LLM adjustment suggestions
+    sentenceIndex: number;
+    originalText: string;
+    suggestedText: string;
+    reason: string;
+  }>;
 }
 
 // ============================================
 // LLM Provider Types
 // ============================================
 
-export type LLMProvider = 'deepseek' | 'openai';
+export type ProjectType = 'EB-1A' | 'NIW';
+
+export type LLMProvider = 'deepseek' | 'openai' | 'ollama';
 
 export interface LLMProviderInfo {
   id: LLMProvider;
   name: string;
   description: string;
   models: string[];
+}
+
+// ============================================
+// Type Validation Functions
+// ============================================
+
+const ARGUMENT_CLAIM_TYPES: readonly string[] = [
+  'award', 'membership', 'publication', 'contribution', 'salary',
+  'judging', 'media', 'leading_role', 'exhibition', 'commercial', 'other',
+];
+
+const VIEW_MODES: readonly string[] = ['line', 'sankey'];
+const ARGUMENT_VIEW_MODES: readonly string[] = ['list', 'graph'];
+const LLM_PROVIDER_IDS: readonly string[] = ['deepseek', 'openai', 'ollama'];
+const MATERIAL_TYPES: readonly string[] = [
+  'salary', 'leadership', 'contribution', 'award',
+  'membership', 'publication', 'judging', 'other',
+];
+
+export function toArgumentClaimType(value: string | undefined | null, fallback: ArgumentClaimType = 'other'): ArgumentClaimType {
+  return ARGUMENT_CLAIM_TYPES.includes(value as string) ? (value as ArgumentClaimType) : fallback;
+}
+
+export function toViewMode(value: string | null, fallback: ViewMode = 'line'): ViewMode {
+  return VIEW_MODES.includes(value as string) ? (value as ViewMode) : fallback;
+}
+
+export function toArgumentViewMode(value: string | null, fallback: ArgumentViewMode = 'graph'): ArgumentViewMode {
+  return ARGUMENT_VIEW_MODES.includes(value as string) ? (value as ArgumentViewMode) : fallback;
+}
+
+export function toLLMProvider(value: string | null, fallback: LLMProvider = 'deepseek'): LLMProvider {
+  return LLM_PROVIDER_IDS.includes(value as string) ? (value as LLMProvider) : fallback;
+}
+
+export function toMaterialType(value: string | null, fallback: MaterialType = 'other'): MaterialType {
+  return MATERIAL_TYPES.includes(value as string) ? (value as MaterialType) : fallback;
+}
+
+// ============================================
+// Pipeline & Extraction Types (shared across contexts)
+// ============================================
+
+export type PipelineStage =
+  | 'ocr_complete'
+  | 'extracting'
+  | 'snippets_ready'
+  | 'confirming'
+  | 'mapping_confirmed'
+  | 'generating'
+  | 'petition_ready';
+
+export interface PipelineState {
+  stage: PipelineStage;
+  progress?: number;
+  snippetCount?: number;
+  confirmedMappings?: number;
+  error?: string;
+}
+
+export interface MergeSuggestion {
+  id: string;
+  primary_entity_name: string;
+  primary_entity_type: string;
+  merge_entity_names: string[];
+  reason: string;
+  confidence: number;
+  status: 'pending' | 'accepted' | 'rejected';
 }

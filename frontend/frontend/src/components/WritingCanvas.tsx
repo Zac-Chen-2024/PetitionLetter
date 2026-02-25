@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
-import { legalStandards } from '../data/legalStandards';
+import { useLegalStandards } from '../hooks/useLegalStandards';
 import type { Position, Argument, WritingEdge, LetterSection } from '../types';
 
 // ============================================
@@ -543,9 +543,13 @@ interface LetterSectionComponentProps {
   onEdit: (id: string, content: string) => void;
   onSentenceClick?: (snippetIds: string[]) => void;
   highlightedSnippetIds?: string[];
+  onAcceptSuggestion?: (sectionId: string, sentenceIndex: number) => void;
+  onRejectSuggestion?: (sectionId: string, sentenceIndex: number) => void;
+  onCommitChanges?: (sectionId: string) => void;
+  onDismissChanges?: (sectionId: string) => void;
 }
 
-function LetterSectionComponent({ section, isHighlighted, onHover, onEdit, onSentenceClick, highlightedSnippetIds = [] }: LetterSectionComponentProps) {
+function LetterSectionComponent({ section, isHighlighted, onHover, onEdit, onSentenceClick, highlightedSnippetIds = [], onAcceptSuggestion, onRejectSuggestion, onCommitChanges, onDismissChanges }: LetterSectionComponentProps) {
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(section.content);
@@ -554,6 +558,20 @@ function LetterSectionComponent({ section, isHighlighted, onHover, onEdit, onSen
   const handleSave = () => {
     onEdit(section.id, editContent);
     setIsEditing(false);
+  };
+
+  // Get CSS class based on sentence changeStatus
+  const getChangeStyle = (sentence: { changeStatus?: string | null }) => {
+    switch (sentence.changeStatus) {
+      case 'removed':
+        return 'bg-red-100 line-through text-red-500';
+      case 'needs_adjustment':
+        return 'bg-amber-100 border-b-2 border-amber-400';
+      case 'suggested_replacement':
+        return 'bg-green-100 border-b-2 border-green-400';
+      default:
+        return '';
+    }
   };
 
   // Render content with sentence-level provenance highlighting
@@ -575,6 +593,7 @@ function LetterSectionComponent({ section, isHighlighted, onHover, onEdit, onSen
           const isHovered = hoveredSentenceIdx === idx;
           const isHighlightedSentence = hasProvenance &&
             sentence.snippet_ids.some(id => highlightedSnippetIds.includes(id));
+          const changeStyle = getChangeStyle(sentence);
 
           return (
             <span
@@ -583,18 +602,44 @@ function LetterSectionComponent({ section, isHighlighted, onHover, onEdit, onSen
               onMouseEnter={() => setHoveredSentenceIdx(idx)}
               onMouseLeave={() => setHoveredSentenceIdx(null)}
               className={`
+                relative group
                 ${hasProvenance ? 'cursor-pointer' : ''}
-                ${isHovered && hasProvenance ? 'bg-blue-100 rounded' : ''}
-                ${isHighlightedSentence ? 'bg-yellow-100 rounded' : ''}
+                ${changeStyle || (isHovered && hasProvenance ? 'bg-blue-100 rounded' : '')}
+                ${!changeStyle && isHighlightedSentence ? 'bg-yellow-100 rounded' : ''}
                 transition-colors
               `}
-              title={hasProvenance ? `Sources: ${sentence.snippet_ids.length} snippet(s)` : undefined}
+              title={
+                sentence.changeStatus === 'removed' ? 'This sentence will be removed' :
+                sentence.changeReason ? `Suggestion: ${sentence.changeReason}` :
+                hasProvenance ? `Sources: ${sentence.snippet_ids.length} snippet(s)` : undefined
+              }
             >
               {sentence.text}
-              {hasProvenance && (
+              {hasProvenance && !sentence.changeStatus && (
                 <sup className="text-[10px] text-blue-500 ml-0.5">
                   [{sentence.snippet_ids.length}]
                 </sup>
+              )}
+              {/* Suggestion tooltip on hover */}
+              {sentence.changeStatus === 'needs_adjustment' && sentence.suggestedText && isHovered && (
+                <span className="absolute z-10 left-0 top-full mt-1 w-80 p-2 bg-white border border-amber-300 rounded-lg shadow-lg text-xs">
+                  <p className="text-slate-700 mb-1"><strong>Suggestion:</strong> {sentence.suggestedText}</p>
+                  <p className="text-slate-500 mb-2">{sentence.changeReason}</p>
+                  <span className="flex gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onAcceptSuggestion?.(section.id, idx); }}
+                      className="px-2 py-0.5 bg-green-500 text-white rounded hover:bg-green-600"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRejectSuggestion?.(section.id, idx); }}
+                      className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded hover:bg-slate-300"
+                    >
+                      Reject
+                    </button>
+                  </span>
+                </span>
               )}
               {' '}
             </span>
@@ -637,6 +682,25 @@ function LetterSectionComponent({ section, isHighlighted, onHover, onEdit, onSen
         </div>
       </div>
 
+      {/* Stale section action bar */}
+      {section.isStale && (
+        <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg mb-2">
+          <span className="text-xs text-amber-700 flex-1">Content changed - review suggestions</span>
+          <button
+            onClick={() => onCommitChanges?.(section.id)}
+            className="text-xs px-2 py-1 bg-amber-500 text-white rounded hover:bg-amber-600"
+          >
+            Apply All
+          </button>
+          <button
+            onClick={() => onDismissChanges?.(section.id)}
+            className="text-xs px-2 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {isEditing ? (
         <div className="space-y-2">
           <textarea
@@ -675,6 +739,7 @@ function LetterSectionComponent({ section, isHighlighted, onHover, onEdit, onSen
 
 export function WritingCanvas() {
   const { t } = useTranslation();
+  const legalStandards = useLegalStandards();
   const {
     allSnippets,
     arguments: contextArguments,
@@ -688,6 +753,10 @@ export function WritingCanvas() {
     removeWritingEdge,
     updateLetterSection,
     updateWritingNodePosition,
+    acceptSuggestion,
+    rejectSuggestion,
+    commitChanges,
+    dismissChanges,
   } = useApp();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1159,6 +1228,10 @@ export function WritingCanvas() {
                 onEdit={updateLetterSection}
                 onSentenceClick={handleSentenceClick}
                 highlightedSnippetIds={highlightedSnippetIds}
+                onAcceptSuggestion={acceptSuggestion}
+                onRejectSuggestion={rejectSuggestion}
+                onCommitChanges={commitChanges}
+                onDismissChanges={dismissChanges}
               />
             ))}
           </div>
