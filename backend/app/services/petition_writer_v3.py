@@ -1046,6 +1046,84 @@ async def ensure_english_output(llm_output: Dict) -> Dict:
 
 
 # ============================================
+# 溯源回填：从文本中解析 Exhibit 引用，反查 snippet
+# ============================================
+
+# Pattern: matches "Exhibit X, p.Y" anywhere (handles [Exhibit D1, p.1; Exhibit D4, p.1])
+_EXHIBIT_REF_PATTERN = re.compile(r'Exhibit\s+([A-Za-z0-9-]+),\s*p\.?\s*(\d+)')
+
+
+def _backfill_snippet_ids(
+    sentences: List[Dict],
+    snippet_registry: List[Dict]
+) -> int:
+    """
+    对 snippet_ids 为空的句子，从文本中解析 [Exhibit X, p.Y] 引用，
+    反查 snippet registry 回填 snippet_id。
+
+    这是确定性后处理，不依赖 LLM——溯源链由代码保证。
+
+    Args:
+        sentences: [{"text", "snippet_ids", "exhibit_refs", ...}]
+        snippet_registry: snippet 列表，每个包含 {snippet_id, exhibit_id, page}
+
+    Returns:
+        回填的句子数量
+
+    Mutates sentences in-place.
+    """
+    if not snippet_registry:
+        return 0
+
+    # Build lookup: (exhibit_id, page) -> [snippet_ids]
+    exhibit_page_to_snippets: Dict[tuple, List[str]] = defaultdict(list)
+    for snip in snippet_registry:
+        key = (snip.get("exhibit_id", ""), snip.get("page", 0))
+        exhibit_page_to_snippets[key].append(snip.get("snippet_id", ""))
+
+    backfilled = 0
+    for sent in sentences:
+        if sent.get("snippet_ids"):
+            continue  # Already has snippet_ids, skip
+        if sent.get("sentence_type") in ("opening", "closing"):
+            continue  # Opening/closing don't need snippet tracing
+
+        text = sent.get("text", "")
+        refs = _EXHIBIT_REF_PATTERN.findall(text)
+        if not refs:
+            continue
+
+        # Match refs to snippets
+        matched_ids = []
+        matched_exhibit_refs = []
+        for exhibit_id, page_str in refs:
+            page = int(page_str)
+            key = (exhibit_id, page)
+            snip_ids = exhibit_page_to_snippets.get(key, [])
+            matched_ids.extend(snip_ids)
+            matched_exhibit_refs.append(f"{exhibit_id}-{page}")
+
+        if matched_ids:
+            # Deduplicate while preserving order
+            seen = set()
+            unique_ids = []
+            for sid in matched_ids:
+                if sid not in seen:
+                    seen.add(sid)
+                    unique_ids.append(sid)
+            sent["snippet_ids"] = unique_ids
+            if not sent.get("exhibit_refs"):
+                sent["exhibit_refs"] = matched_exhibit_refs
+            backfilled += 1
+            logger.debug(
+                f"Backfilled snippet_ids for sentence: "
+                f"{len(unique_ids)} snippets from {len(refs)} exhibit refs"
+            )
+
+    return backfilled
+
+
+# ============================================
 # 验证和修正函数
 # ============================================
 
@@ -1483,6 +1561,18 @@ async def write_petition_section_v3(
         if len(valid_ids) != len(original_ids):
             all_warnings.append(f"Removed invalid snippet_ids from sentence")
         sent["snippet_ids"] = valid_ids
+
+    # 溯源回填：对 snippet_ids 为空的句子，从文本中解析 exhibit 引用反查 snippet
+    snippet_registry = load_registry(project_id)
+    if not snippet_registry:
+        # Fallback to combined extraction data (unified_extractor output)
+        combined_file = PROJECTS_DIR / project_id / "extraction" / "combined_extraction.json"
+        if combined_file.exists():
+            with open(combined_file, 'r', encoding='utf-8') as f:
+                snippet_registry = json.load(f).get("snippets", [])
+    backfilled_count = _backfill_snippet_ids(all_sentences, snippet_registry)
+    if backfilled_count:
+        logger.info(f"Backfilled snippet_ids for {backfilled_count} sentences via exhibit ref parsing")
 
     # 构建溯源索引
     provenance_index = _build_provenance_from_sentences(all_sentences)
