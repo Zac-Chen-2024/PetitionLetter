@@ -1,20 +1,21 @@
 """
-Petition Writer V3 - SubArgument 感知的写作服务
+Petition Writer V3 - OCR 回溯写作
 
-核心改进：
-1. 基于 SubArgument 结构生成内容（而非直接从 Snippet）
-2. 输出包含完整溯源链：句子 → SubArgument → Argument → Standard
-3. 使用 DeepSeek 生成，增强后端验证
+核心改进（v3.1 — OCR Traceback）：
+1. snippet 是索引指针，写作时回溯 OCR 原文
+2. 写作粒度从 per-SubArgument 提升到 per-Argument
+3. LLM 看到完整 OCR 页面，从中提取所有细节
 
 数据流：
-Standard → Arguments → SubArguments → Snippets
-    ↓
-LLM 按 SubArgument 结构生成
-    ↓
+Argument → SubArgument结构(大纲) + snippet指针
+         → 加载所有引用exhibit的OCR完整页面
+         → LLM按大纲、看原文、写深度论证
+
 输出：{text, snippet_ids, subargument_id, argument_id, exhibit_refs}[]
 """
 
 import json
+import logging
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime, timezone
@@ -24,6 +25,8 @@ from .llm_client import call_llm, call_llm_text
 from .snippet_registry import load_registry
 from .standards_registry import get_standard_name
 import re
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================
@@ -186,6 +189,124 @@ def _get_standard_display_name(standard_key: str) -> str:
             return name
     # Fallback to legacy dict
     return EB1A_STANDARDS.get(standard_key, standard_key)
+
+
+# ============================================
+# Exhibit OCR 缓存和加载
+# ============================================
+
+_exhibit_cache: Dict[str, Dict] = {}
+
+
+def _load_exhibit_json(project_id: str, exhibit_id: str) -> Optional[Dict]:
+    """
+    加载并缓存 exhibit JSON，避免同一 exhibit 被多个 argument 重复读取。
+
+    Returns:
+        exhibit dict with {exhibit_id, pages: [{page_number, text_blocks, markdown_text}], ...}
+        or None if file not found
+    """
+    cache_key = f"{project_id}:{exhibit_id}"
+    if cache_key in _exhibit_cache:
+        return _exhibit_cache[cache_key]
+
+    path = PROJECTS_DIR / project_id / "documents" / f"{exhibit_id}.json"
+    if not path.exists():
+        logger.warning(f"Exhibit file not found: {path}")
+        return None
+
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        _exhibit_cache[cache_key] = data
+        return data
+    except Exception as e:
+        logger.warning(f"Failed to load exhibit {exhibit_id}: {e}")
+        return None
+
+
+def _extract_page_text(exhibit_data: Dict, page_numbers: set) -> str:
+    """
+    从 exhibit JSON 中提取指定页面的文本内容。
+
+    对于每个请求的页面，也包含相邻页（page±1）以提供上下文。
+
+    Returns:
+        格式化的页面文本 "[Page N]\n{text_content}\n..."
+    """
+    if not exhibit_data or not exhibit_data.get("pages"):
+        return ""
+
+    # Expand page set to include adjacent pages for context
+    expanded_pages = set()
+    for p in page_numbers:
+        expanded_pages.add(max(1, p - 1))
+        expanded_pages.add(p)
+        expanded_pages.add(p + 1)
+
+    page_texts = []
+    for page in exhibit_data.get("pages", []):
+        pn = page.get("page_number", 0)
+        if pn not in expanded_pages:
+            continue
+
+        # Collect text from all text blocks on this page
+        blocks = page.get("text_blocks", [])
+        block_texts = []
+        for block in blocks:
+            text = block.get("text_content", "").strip()
+            if text and block.get("block_type") != "image":
+                block_texts.append(text)
+
+        if block_texts:
+            page_text = "\n".join(block_texts)
+            page_texts.append(f"[Page {pn}]\n{page_text}")
+
+    return "\n\n".join(page_texts)
+
+
+def load_exhibit_pages_for_argument(
+    project_id: str,
+    argument: Dict,
+    all_snippets: Dict
+) -> Dict[str, str]:
+    """
+    收集 argument 引用的所有 exhibit 的 OCR 页面原文。
+
+    Args:
+        project_id: 项目 ID
+        argument: argument dict with sub_arguments, each with snippets
+        all_snippets: snippet_id → snippet dict (from load_subargument_context output)
+
+    Returns:
+        {exhibit_id: formatted_text}  按 exhibit 分组的完整页面文本
+    """
+    # Step 1: Collect all referenced exhibit_ids and their page numbers
+    exhibit_pages: Dict[str, set] = defaultdict(set)
+
+    for subarg in argument.get("sub_arguments", []):
+        for snip in subarg.get("snippets", []):
+            exhibit_id = snip.get("exhibit", "")
+            page = snip.get("page", 0)
+            if exhibit_id and page > 0:
+                exhibit_pages[exhibit_id].add(page)
+
+    # Step 2: Load exhibit JSONs and extract page text
+    exhibit_texts: Dict[str, str] = {}
+    for exhibit_id, pages in exhibit_pages.items():
+        exhibit_data = _load_exhibit_json(project_id, exhibit_id)
+        if not exhibit_data:
+            continue
+
+        text = _extract_page_text(exhibit_data, pages)
+        if text:
+            exhibit_texts[exhibit_id] = text
+            logger.info(
+                f"Loaded OCR for Exhibit {exhibit_id}: "
+                f"{len(pages)} referenced pages, {len(text)} chars"
+            )
+
+    return exhibit_texts
 
 
 # ============================================
@@ -470,6 +591,178 @@ Return ONLY valid JSON, no markdown."""
         sent["exhibit_refs"] = sent.get("exhibit_refs", [])
 
     return sentences
+
+
+async def _step1_generate_argument_body(
+    standard: Dict,
+    argument: Dict,
+    exhibit_texts: Dict[str, str],
+    additional_instructions: str = None
+) -> List[Dict]:
+    """
+    Step 1 (v3.1): 为整个 Argument 生成 body，LLM 看到完整 OCR 原文。
+
+    写作粒度从 per-SubArgument 提升到 per-Argument：
+    - SubArgument 结构作为论证大纲
+    - snippet 摘要作为"重点标记"
+    - 完整 OCR 页面作为原始素材
+
+    Args:
+        standard: {key, name, legal_ref}
+        argument: argument dict with sub_arguments (each with snippets)
+        exhibit_texts: {exhibit_id: formatted OCR text} from load_exhibit_pages_for_argument
+        additional_instructions: optional extra instructions
+
+    Returns:
+        [{"subargument_id": str, "sentences": [{"text", "snippet_ids", "exhibit_refs"}]}]
+    """
+    sub_arguments = argument.get("sub_arguments", [])
+    if not sub_arguments:
+        return []
+
+    # Build sub-argument outline with snippet pointers
+    outline_parts = []
+    all_snippet_ids = set()
+    for i, subarg in enumerate(sub_arguments, 1):
+        lines = [
+            f"  {i}. [{subarg['id']}] {subarg.get('title', '')}",
+            f"     Purpose: {subarg.get('purpose', '')}",
+            f"     Key evidence pointers:"
+        ]
+        for snip in subarg.get("snippets", []):
+            text_preview = snip["text"][:200] + "..." if len(snip["text"]) > 200 else snip["text"]
+            lines.append(
+                f'       - [{snip["id"]}] Exhibit {snip["exhibit"]}, p.{snip["page"]}: "{text_preview}"'
+            )
+            all_snippet_ids.add(snip["id"])
+        outline_parts.append("\n".join(lines))
+
+    outline_text = "\n\n".join(outline_parts)
+
+    # Build source materials section
+    source_parts = []
+    for exhibit_id, text in sorted(exhibit_texts.items()):
+        source_parts.append(f"--- Exhibit {exhibit_id} ---\n{text}")
+    source_text = "\n\n".join(source_parts)
+
+    # Build subargument_id list for JSON example
+    subarg_ids = [sa["id"] for sa in sub_arguments]
+    subarg_json_example = ",\n    ".join(
+        f'{{"subargument_id": "{sid}", "sentences": [{{"text": "...", "snippet_ids": ["..."], "exhibit_refs": ["..."]}}]}}'
+        for sid in subarg_ids[:2]
+    )
+    if len(subarg_ids) > 2:
+        subarg_json_example += ",\n    ..."
+
+    system_prompt = """You are a Senior Immigration Attorney at a top-tier law firm drafting an EB-1A petition letter.
+
+ARGUMENTATION METHOD — For each piece of evidence, build a COMPLETE argument chain:
+1. FACT: State what the applicant did / what happened (cite Exhibit)
+2. AUTHORITY: Prove the organization/award/journal is prestigious (cite Exhibit)
+3. RIGOR: Describe the evaluation/selection process and its strictness (cite Exhibit)
+4. SCALE/RARITY: Provide numbers — how many competed, how few won, what percentages (cite Exhibit)
+5. PEER COMPARISON: Who else has this distinction? What caliber of peers? (cite Exhibit)
+
+Not every evidence needs all 5 layers, but the strongest arguments have most of them.
+
+ABSOLUTE RULES:
+1. Every fact MUST come from the SOURCE MATERIALS below. NEVER invent facts.
+2. Extract ALL relevant numbers, dates, names, and statistics from the source materials.
+3. Write in THIRD PERSON about "the Beneficiary".
+4. Each sentence must cite [Exhibit X, p.Y].
+5. Professional legal argumentative tone, 100% English."""
+
+    user_prompt = f"""Draft the body paragraphs for this argument in a petition letter.
+
+STANDARD: {standard.get('name', '')} ({standard.get('legal_ref', '')})
+ARGUMENT: {argument.get('title', '')}
+
+SUB-ARGUMENTS (use as structural outline — write one paragraph per sub-argument):
+{outline_text}
+
+=== SOURCE MATERIALS (full text — extract ALL relevant details) ===
+
+{source_text}
+
+=== END SOURCE MATERIALS ===
+
+{f"ADDITIONAL INSTRUCTIONS: {additional_instructions}" if additional_instructions else ""}
+
+INSTRUCTIONS:
+- Write one paragraph (3-6 sentences) per Sub-Argument listed above
+- The "Key evidence pointers" highlight the most important evidence, but you SHOULD
+  also extract additional supporting details from the source materials (numbers,
+  evaluation criteria, peer names, organization credentials, etc.)
+- Build argument chains: fact → authority → rigor → scale → peer comparison
+- Every sentence must cite [Exhibit X, p.Y]
+- Use exact numbers and names from the source materials
+- Professional legal tone, 100% English (translate any non-English source text)
+- Do NOT copy source text verbatim — ARGUE: state a legal point, then cite supporting evidence
+
+Return JSON:
+{{
+  "sub_argument_paragraphs": [
+    {subarg_json_example}
+  ]
+}}
+
+CRITICAL: Return ALL {len(subarg_ids)} sub-argument paragraphs. subargument_id values MUST be exactly: {subarg_ids}
+Return ONLY valid JSON, no markdown."""
+
+    # Token budget: system ~800 + outline ~1500 + source ~15000-20000 + output ~8000 = well within 128K
+    result = await call_llm(
+        prompt=user_prompt,
+        system_prompt=system_prompt,
+        json_schema={},
+        temperature=0.3,
+        max_tokens=8000
+    )
+
+    if "error" in result:
+        logger.error(f"Step1 (argument-level) LLM error: {result['error']}")
+        return []
+
+    paragraphs = result.get("sub_argument_paragraphs", [])
+
+    # Validate and normalize output
+    valid_subarg_ids = {sa["id"] for sa in sub_arguments}
+    # Build per-subarg snippet id sets for validation
+    subarg_snippet_map = {}
+    for sa in sub_arguments:
+        sa_snip_ids = {s["id"] for s in sa.get("snippets", [])}
+        subarg_snippet_map[sa["id"]] = sa_snip_ids
+
+    validated_paragraphs = []
+    for para in paragraphs:
+        subarg_id = para.get("subargument_id", "")
+        if subarg_id not in valid_subarg_ids:
+            logger.warning(f"Step1 returned unknown subargument_id: {subarg_id}")
+            continue
+
+        sentences = para.get("sentences", [])
+        for sent in sentences:
+            # Keep all snippet_ids from this argument (not just this subargument)
+            # since the LLM has visibility of all evidence now
+            raw_ids = sent.get("snippet_ids", [])
+            sent["snippet_ids"] = [sid for sid in raw_ids if sid in all_snippet_ids]
+            sent["exhibit_refs"] = sent.get("exhibit_refs", [])
+
+        validated_paragraphs.append({
+            "subargument_id": subarg_id,
+            "title": next(
+                (sa.get("title", "") for sa in sub_arguments if sa["id"] == subarg_id),
+                ""
+            ),
+            "sentences": sentences
+        })
+
+    # Check for missing subarguments — warn but don't fail
+    returned_ids = {p["subargument_id"] for p in validated_paragraphs}
+    missing = valid_subarg_ids - returned_ids
+    if missing:
+        logger.warning(f"Step1 missing subarguments: {missing}")
+
+    return validated_paragraphs
 
 
 async def _step2_polish_argument(
@@ -1016,9 +1309,9 @@ async def write_petition_section_v3(
     additional_instructions: str = None
 ) -> Dict:
     """
-    V3 版本的写作入口 — 三步流水线
+    V3.1 版本的写作入口 — OCR 回溯三步流水线
 
-    Step 1: 逐 SubArgument 生成正文（3-5 句/SubArgument，保证 100% 覆盖）
+    Step 1: 逐 Argument 生成正文（LLM 看到完整 OCR 原文 + SubArgument 大纲）
     Step 2: 逐 Argument 润色整合（加过渡句，保持连贯性）
     Step 3: 生成全局 Opening/Closing（引用法规 + 总结）
 
@@ -1029,9 +1322,6 @@ async def write_petition_section_v3(
         subargument_ids: 可选，指定要生成的 SubArgument IDs（用于局部重新生成）
         additional_instructions: 可选，额外指令
     """
-    import logging
-    logger = logging.getLogger(__name__)
-
     # 0. 加载上下文
     context = load_subargument_context(project_id, standard_key, argument_ids, subargument_ids)
 
@@ -1048,51 +1338,54 @@ async def write_petition_section_v3(
     standard = context["standard"]
     all_warnings = []
 
-    # ========== Step 1: 逐 SubArgument 生成正文 ==========
-    # 按 Argument 分组收集，同时记录对应的原始 argument
+    # Build snippet map for OCR loading
+    snippet_map = {}
+    for arg in all_arguments:
+        for sa in arg.get("sub_arguments", []):
+            for snip in sa.get("snippets", []):
+                snippet_map[snip["id"]] = snip
+
+    # ========== Step 1: 逐 Argument 生成正文（OCR 回溯） ==========
     per_argument_bodies: List[List[Dict]] = []  # [[{subargument_id, title, sentences}]]
-    per_argument_refs: List[Dict] = []  # 与 per_argument_bodies 一一对应的原始 argument
+    per_argument_refs: List[Dict] = []
 
     for argument in all_arguments:
         arg_id = argument.get("id", "")
-        arg_title = argument.get("title", "")
         sub_arguments = argument.get("sub_arguments", [])
 
         if not sub_arguments:
             all_warnings.append(f"Skipped argument {arg_id}: no sub_arguments")
             continue
 
-        arg_bodies = []
-        for subarg in sub_arguments:
-            logger.info(f"Step1: Generating body for {subarg['id']} ({subarg.get('title', '')})")
+        # Load OCR pages for all exhibits referenced by this argument
+        exhibit_texts = load_exhibit_pages_for_argument(project_id, argument, snippet_map)
+        logger.info(
+            f"Step1: Generating body for argument {arg_id} "
+            f"({len(sub_arguments)} subargs, {len(exhibit_texts)} exhibits loaded)"
+        )
 
-            raw_sentences = await _step1_generate_subargument_body(
-                standard=standard,
-                argument_title=arg_title,
-                subargument=subarg,
-                additional_instructions=additional_instructions
-            )
+        # Generate body at argument level with full OCR context
+        arg_bodies = await _step1_generate_argument_body(
+            standard=standard,
+            argument=argument,
+            exhibit_texts=exhibit_texts,
+            additional_instructions=additional_instructions
+        )
 
-            if not raw_sentences:
-                all_warnings.append(f"No sentences generated for SubArgument {subarg['id']}")
-                continue
+        if not arg_bodies:
+            all_warnings.append(f"No content generated for argument {arg_id}")
+            continue
 
-            # 确保英文
-            for sent in raw_sentences:
+        # 确保英文
+        for body in arg_bodies:
+            for sent in body.get("sentences", []):
                 if _contains_non_ascii(sent.get("text", "")):
                     sent["text"] = await _translate_to_english(sent["text"])
                     if _contains_non_ascii(sent["text"]):
                         sent["text"] = _remove_remaining_chinese(sent["text"])
 
-            arg_bodies.append({
-                "subargument_id": subarg["id"],
-                "title": subarg.get("title", ""),
-                "sentences": raw_sentences
-            })
-
-        if arg_bodies:
-            per_argument_bodies.append(arg_bodies)
-            per_argument_refs.append(argument)
+        per_argument_bodies.append(arg_bodies)
+        per_argument_refs.append(argument)
 
     if not per_argument_bodies:
         return {
