@@ -317,6 +317,57 @@ async def recommend_snippets(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class CreateArgumentRequest(BaseModel):
+    """创建 Argument 请求"""
+    standard_key: str
+    title: str = ""
+
+
+@router.post("/{project_id}/arguments")
+async def create_argument_endpoint(
+    project_id: str,
+    request: CreateArgumentRequest
+):
+    """手动创建新的 Argument"""
+    try:
+        from ..services.snippet_recommender import create_argument
+        result = create_argument(
+            project_id=project_id,
+            standard_key=request.standard_key,
+            title=request.title,
+        )
+        return {"success": True, "argument": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class MoveSubArgumentsRequest(BaseModel):
+    """转移 SubArguments 请求"""
+    subargument_ids: List[str]
+    target_argument_id: str
+
+
+@router.post("/{project_id}/subarguments/move")
+async def move_subarguments_endpoint(
+    project_id: str,
+    request: MoveSubArgumentsRequest
+):
+    """将 SubArguments 转移到已有的 Argument 下"""
+    try:
+        from ..services.snippet_recommender import move_subarguments
+        result = move_subarguments(
+            project_id=project_id,
+            subargument_ids=request.subargument_ids,
+            target_argument_id=request.target_argument_id,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Move sub-arguments failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class MergeSubArgumentsRequest(BaseModel):
     """合并 SubArguments 请求"""
     subargument_ids: List[str]  # min 2

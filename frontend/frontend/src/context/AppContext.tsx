@@ -99,6 +99,19 @@ export function useApp() {
     return args.mergeSubArguments(subArgumentIds, title, purpose, relationship, project.projectId);
   }, [args.mergeSubArguments, project.projectId]);
 
+  // moveSubArguments: facade binds projectId
+  const moveSubArguments = useCallback(async (
+    subArgumentIds: string[],
+    targetArgumentId: string
+  ) => {
+    return args.moveSubArguments(subArgumentIds, targetArgumentId, project.projectId);
+  }, [args.moveSubArguments, project.projectId]);
+
+  // createArgument: facade binds projectId
+  const createArgument = useCallback(async (standardKey: string) => {
+    return args.createArgument(standardKey, project.projectId);
+  }, [args.createArgument, project.projectId]);
+
   // rewriteStandard: re-generate letter section for a single standard
   const rewriteStandard = useCallback(async (standardKey: string) => {
     return writing.rewriteStandard(standardKey, project.projectId, project.llmProvider);
@@ -216,6 +229,8 @@ export function useApp() {
     removeSubArgument,
     regenerateSubArgument,
     mergeSubArguments,
+    moveSubArguments,
+    createArgument,
     isGeneratingArguments: args.isGeneratingArguments,
     generateArguments,
     generatedMainSubject: args.generatedMainSubject,
@@ -292,7 +307,7 @@ export function useApp() {
     extractionProgress: writing.extractionProgress,
   }), [
     project, snippets, args, ui, writing,
-    generateArguments, addSubArgument, removeSubArgument, regenerateSubArgument, mergeSubArguments,
+    generateArguments, addSubArgument, removeSubArgument, regenerateSubArgument, mergeSubArguments, moveSubArguments, createArgument,
     rewriteStandard, removeStandard,
     removeArgument, commitChanges, extractSnippets, confirmAllMappings, generatePetition,
     reloadSnippets, unifiedExtract, generateMergeSuggestions, confirmMerges,

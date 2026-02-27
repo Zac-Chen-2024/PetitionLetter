@@ -107,6 +107,9 @@ function ArgumentNodeComponent({
   transformVersion,
   onAddSubArgument,
   onDelete,
+  isMoveTarget,
+  isMoveMode,
+  onMoveTarget,
 }: DraggableNodeProps & {
   node: ArgumentNode;
   onPositionReport?: (id: string, rect: DOMRect) => void;
@@ -114,6 +117,9 @@ function ArgumentNodeComponent({
   transformVersion?: number;  // Triggers position update when canvas transforms
   onAddSubArgument?: (argumentId: string) => void;
   onDelete?: (argumentId: string) => void;
+  isMoveTarget?: boolean;
+  isMoveMode?: boolean;
+  onMoveTarget?: (argumentId: string) => void;
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef<Position | null>(null);
@@ -187,25 +193,45 @@ function ArgumentNodeComponent({
     return 'bg-red-400';
   };
 
+  const handleNodeMouseDown = (e: React.MouseEvent) => {
+    if (isMoveMode && isMoveTarget && onMoveTarget) {
+      e.stopPropagation();
+      onMoveTarget(node.id);
+      return;
+    }
+    handleMouseDown(e);
+  };
+
   return (
     <div
       ref={nodeRef}
       className={`
-        absolute cursor-grab active:cursor-grabbing select-none
-        ${isDragging ? 'z-50' : 'z-20'}
+        absolute select-none
+        ${isMoveMode
+          ? (isMoveTarget ? 'cursor-pointer z-40' : 'cursor-not-allowed z-20')
+          : `cursor-grab active:cursor-grabbing ${isDragging ? 'z-50' : 'z-20'}`
+        }
       `}
       style={{
         left: node.position.x,
         top: node.position.y,
         transform: 'translate(-50%, -50%)',
         pointerEvents: 'auto',
+        opacity: isMoveMode && !isMoveTarget ? 0.4 : 1,
       }}
-      onMouseDown={handleMouseDown}
+      onMouseDown={handleNodeMouseDown}
     >
       <div
         className={`
-          w-[320px] p-4 rounded-xl border-2 border-purple-400 bg-purple-50 shadow-md transition-all
-          ${isSelected ? 'ring-2 ring-offset-2 ring-purple-500 shadow-lg border-purple-500' : 'hover:shadow-lg hover:border-purple-500'}
+          w-[320px] p-4 rounded-xl border-2 shadow-md transition-all
+          ${isMoveMode && isMoveTarget
+            ? 'border-purple-500 bg-purple-100 ring-2 ring-purple-400 ring-offset-2 shadow-lg'
+            : isMoveMode && !isMoveTarget
+              ? 'border-slate-300 bg-slate-100'
+              : isSelected
+                ? 'ring-2 ring-offset-2 ring-purple-500 shadow-lg border-purple-500 bg-purple-50'
+                : 'border-purple-400 bg-purple-50 hover:shadow-lg hover:border-purple-500'
+          }
         `}
       >
         {/* Header */}
@@ -271,12 +297,13 @@ function ArgumentNodeComponent({
 
 function StandardNodeComponent({
   node, isSelected, onSelect, onDrag, scale, t,
-  onRewrite, onRemove, isRewriting, hasLetterContent,
+  onRewrite, onRemove, onAddArgument, isRewriting, hasLetterContent,
 }: DraggableNodeProps & {
   node: StandardNode;
   t: (key: string, options?: Record<string, unknown>) => string;
   onRewrite?: (standardKey: string) => void;
   onRemove?: (standardKey: string) => void;
+  onAddArgument?: (standardKey: string) => void;
   isRewriting?: boolean;
   hasLetterContent?: boolean;
 }) {
@@ -354,6 +381,18 @@ function StandardNodeComponent({
             <span className="text-base font-bold text-slate-800">{node.data.shortName}</span>
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0 -mt-1 -mr-1">
+            {/* Add Argument button */}
+            {onAddArgument && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onAddArgument(node.id); }}
+                className="p-1 rounded hover:bg-purple-100 transition-colors"
+                title={t('graph.standard.addArgument', 'Add Argument')}
+              >
+                <svg className="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            )}
             {/* Rewrite button */}
             {onRewrite && (
               <button
@@ -1099,6 +1138,8 @@ export function ArgumentGraph() {
     removeSubArgument,
     addSubArgument,
     mergeSubArguments,
+    moveSubArguments,
+    createArgument,
     rewriteStandard,
     removeStandard,
     removeArgument,
@@ -1126,6 +1167,9 @@ export function ArgumentGraph() {
   const [isMergeMode, setIsMergeMode] = useState(false);
   const [mergeSelectedIds, setMergeSelectedIds] = useState<Set<string>>(new Set());
   const [isMerging, setIsMerging] = useState(false);
+  // Move mode state (within merge mode)
+  const [isMoveMode, setIsMoveMode] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
   const panStartPos = useRef<Position | null>(null);
   const offsetStartPos = useRef<Position | null>(null);
 
@@ -1419,6 +1463,7 @@ export function ArgumentGraph() {
     setIsMergeMode(false);
     setMergeSelectedIds(new Set());
     setBatchDeleteConfirm(false);
+    setIsMoveMode(false);
   }, []);
 
   // Batch delete selected sub-arguments
@@ -1471,6 +1516,57 @@ export function ArgumentGraph() {
       setIsMerging(false);
     }
   }, [mergeSubArguments, mergeSelectedIds, contextSubArguments, setFocusState]);
+
+  // Handle move: move selected sub-args to an existing argument
+  const handleMoveConfirm = useCallback(async (targetArgumentId: string) => {
+    if (!moveSubArguments || mergeSelectedIds.size < 1) return;
+    setIsMoving(true);
+    try {
+      const count = mergeSelectedIds.size;
+      await moveSubArguments(Array.from(mergeSelectedIds), targetArgumentId);
+      setSelectedNodeId(targetArgumentId);
+      setFocusState({ type: 'argument', id: targetArgumentId });
+      setIsMergeMode(false);
+      setMergeSelectedIds(new Set());
+      setIsMoveMode(false);
+      toast.success(`Moved ${count} sub-argument${count > 1 ? 's' : ''}`);
+    } catch (error) {
+      toast.error('Move failed');
+    } finally {
+      setIsMoving(false);
+    }
+  }, [moveSubArguments, mergeSelectedIds, setFocusState]);
+
+  // Handle add Argument under a Standard
+  const handleAddArgument = useCallback(async (standardKey: string) => {
+    if (!createArgument) return;
+    try {
+      const newArg = await createArgument(standardKey);
+      if (newArg) {
+        setSelectedNodeId(newArg.id);
+        setFocusState({ type: 'argument', id: newArg.id });
+        toast.success('Added new argument');
+      }
+    } catch (error) {
+      toast.error('Failed to add argument');
+    }
+  }, [createArgument, setFocusState]);
+
+  // Compute valid move targets (same standard, not source parents of selected sub-args)
+  const moveTargetArgumentIds = useMemo(() => {
+    if (!isMoveMode || mergeSelectedIds.size === 0) return new Set<string>();
+    // Get the locked standard key
+    const firstId = mergeSelectedIds.values().next().value;
+    const sa = contextSubArguments.find(s => s.id === firstId);
+    if (!sa) return new Set<string>();
+    const parentArg = contextArguments.find(a => a.id === sa.argumentId);
+    const lockedStandard = parentArg?.standardKey;
+    if (!lockedStandard) return new Set<string>();
+    // All arguments with same standard are valid targets
+    return new Set(
+      contextArguments.filter(a => a.standardKey === lockedStandard).map(a => a.id)
+    );
+  }, [isMoveMode, mergeSelectedIds, contextSubArguments, contextArguments]);
 
   // Handle standard selection
   const handleStandardSelect = useCallback((standardId: string) => {
@@ -1604,7 +1700,9 @@ export function ArgumentGraph() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isMergeMode) {
+        if (isMoveMode) {
+          setIsMoveMode(false);
+        } else if (isMergeMode) {
           exitMergeMode();
         } else {
           setSelectedNodeId(null);
@@ -1614,7 +1712,7 @@ export function ArgumentGraph() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMergeMode, exitMergeMode]);
+  }, [isMergeMode, isMoveMode, exitMergeMode]);
 
   // Get generateArguments from context
   const { generateArguments, isGeneratingArguments, workMode, setWorkMode } = useApp();
@@ -1851,6 +1949,9 @@ export function ArgumentGraph() {
                 transformVersion={transformVersion}
                 onAddSubArgument={handleAddSubArgument}
                 onDelete={handleArgumentDelete}
+                isMoveMode={isMoveMode}
+                isMoveTarget={moveTargetArgumentIds.has(node.id)}
+                onMoveTarget={handleMoveConfirm}
               />
             ))}
 
@@ -1866,6 +1967,7 @@ export function ArgumentGraph() {
                 t={t}
                 onRewrite={handleStandardRewrite}
                 onRemove={(key) => setRemoveModalStandardKey(key)}
+                onAddArgument={handleAddArgument}
                 isRewriting={rewritingStandardKey === node.id}
                 hasLetterContent={generatedStandardIds.has(node.id)}
               />
@@ -1885,20 +1987,35 @@ export function ArgumentGraph() {
             >
               Cancel
             </button>
-            <button
-              onClick={() => setBatchDeleteConfirm(true)}
-              disabled={mergeSelectedIds.size < 1}
-              className="px-4 py-1.5 text-xs text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
-              Delete {mergeSelectedIds.size}
-            </button>
-            <button
-              onClick={handleMergeConfirm}
-              disabled={mergeSelectedIds.size < 2 || isMerging}
-              className="px-4 py-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
-              {isMerging ? 'Merging...' : `Merge ${mergeSelectedIds.size}`}
-            </button>
+            {!isMoveMode ? (
+              <>
+                <button
+                  onClick={() => setBatchDeleteConfirm(true)}
+                  disabled={mergeSelectedIds.size < 1}
+                  className="px-4 py-1.5 text-xs text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  Delete {mergeSelectedIds.size}
+                </button>
+                <button
+                  onClick={() => setIsMoveMode(true)}
+                  disabled={mergeSelectedIds.size < 1 || isMoving}
+                  className="px-4 py-1.5 text-xs text-white bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {`Move ${mergeSelectedIds.size} →`}
+                </button>
+                <button
+                  onClick={handleMergeConfirm}
+                  disabled={mergeSelectedIds.size < 2 || isMerging}
+                  className="px-4 py-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {isMerging ? 'Merging...' : `Merge ${mergeSelectedIds.size}`}
+                </button>
+              </>
+            ) : (
+              <span className="text-xs text-purple-700 font-medium">
+                {isMoving ? 'Moving...' : 'Click a target argument to move selected sub-arguments'}
+              </span>
+            )}
           </div>
         )}
       </div>

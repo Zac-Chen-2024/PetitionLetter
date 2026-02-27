@@ -329,6 +329,39 @@ Consider how well each snippet supports or provides evidence for this specific s
         ]
 
 
+# ==================== Argument 创建 ====================
+
+def create_argument(
+    project_id: str,
+    standard_key: str,
+    title: str = "",
+) -> Dict:
+    """手动创建 Argument 并持久化到 legal_arguments.json"""
+    import uuid
+
+    legal_args = load_legal_arguments(project_id)
+
+    new_arg = {
+        "id": f"arg-{uuid.uuid4().hex[:8]}",
+        "standard": standard_key,
+        "standard_key": standard_key,
+        "title": title,
+        "rationale": "",
+        "snippet_ids": [],
+        "evidence_strength": "moderate",
+        "sub_argument_ids": [],
+        "subject": "",
+        "confidence": 0.5,
+        "is_ai_generated": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    legal_args.setdefault("arguments", []).append(new_arg)
+    save_legal_arguments(project_id, legal_args)
+
+    return new_arg
+
+
 # ==================== SubArgument 创建 ====================
 
 def create_subargument(
@@ -498,6 +531,72 @@ def merge_subarguments(
         "success": True,
         "new_argument": new_arg,
         "moved_subargument_ids": subargument_ids,
+    }
+
+
+# ==================== SubArgument 转移 ====================
+
+def move_subarguments(
+    project_id: str,
+    subargument_ids: List[str],
+    target_argument_id: str,
+) -> Dict:
+    """
+    将 SubArguments 转移到已有的 target Argument 下
+
+    约束：
+    1. target argument 必须存在
+    2. 所有 sub-args 必须与 target 属于同一个 standard_key
+    """
+    legal_args = load_legal_arguments(project_id)
+    sub_arguments = legal_args.get("sub_arguments", [])
+    arguments = legal_args.get("arguments", [])
+    arg_map = {a["id"]: a for a in arguments}
+
+    # 验证 target argument 存在
+    target_arg = arg_map.get(target_argument_id)
+    if not target_arg:
+        raise ValueError(f"Target argument not found: {target_argument_id}")
+
+    target_standard = target_arg.get("standard_key")
+
+    # 找到所有源 sub-args 并验证 standard_key
+    moved_set = set(subargument_ids)
+    old_argument_ids: Set[str] = set()
+    for sa in sub_arguments:
+        if sa["id"] in moved_set:
+            parent = arg_map.get(sa.get("argument_id"))
+            if parent and parent.get("standard_key") != target_standard:
+                raise ValueError(
+                    f"SubArgument {sa['id']} belongs to standard "
+                    f"'{parent.get('standard_key')}', cannot move to '{target_standard}'"
+                )
+            old_argument_ids.add(sa.get("argument_id", ""))
+
+    # 更新 sub-args 的 argument_id
+    for sa in sub_arguments:
+        if sa["id"] in moved_set:
+            sa["argument_id"] = target_argument_id
+
+    # 从旧 parent arguments 移除
+    for arg in arguments:
+        if arg["id"] in old_argument_ids:
+            old_ids = arg.get("sub_argument_ids", [])
+            arg["sub_argument_ids"] = [sid for sid in old_ids if sid not in moved_set]
+
+    # 添加到 target argument
+    existing_ids = set(target_arg.get("sub_argument_ids", []))
+    target_arg.setdefault("sub_argument_ids", [])
+    for sid in subargument_ids:
+        if sid not in existing_ids:
+            target_arg["sub_argument_ids"].append(sid)
+
+    save_legal_arguments(project_id, legal_args)
+
+    return {
+        "success": True,
+        "moved_subargument_ids": subargument_ids,
+        "target_argument_id": target_argument_id,
     }
 
 
