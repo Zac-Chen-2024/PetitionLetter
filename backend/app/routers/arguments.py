@@ -532,6 +532,30 @@ async def delete_subargument(
     }
 
 
+@router.delete("/{project_id}/standards/{standard_key}")
+async def remove_standard_endpoint(
+    project_id: str,
+    standard_key: str
+):
+    """
+    移除一个 Standard 下的所有 Arguments、SubArguments，
+    同时清理对应的 writing_v3 文件。
+    """
+    logger.debug(f"DELETE Standard: project_id={project_id}, standard_key={standard_key}")
+
+    from ..services.snippet_recommender import remove_standard
+
+    result = remove_standard(project_id, standard_key)
+
+    logger.debug(
+        f"DELETE Standard: removed {len(result['deleted_argument_ids'])} arguments, "
+        f"{len(result['deleted_subargument_ids'])} sub-arguments, "
+        f"{len(result['deleted_writing_files'])} writing files"
+    )
+
+    return result
+
+
 @router.post("/{project_id}/infer-relationship")
 async def infer_subargument_relationship(
     project_id: str,

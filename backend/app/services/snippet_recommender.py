@@ -63,6 +63,51 @@ def get_assigned_snippet_ids(project_id: str) -> Set[str]:
     return assigned
 
 
+def remove_standard(project_id: str, standard_key: str) -> Dict:
+    """移除一个 Standard 下的所有 Arguments 和 SubArguments，清理 writing_v3 文件"""
+    import glob as glob_mod
+    import os
+
+    legal_args = load_legal_arguments(project_id)
+    arguments = legal_args.get("arguments", [])
+    sub_arguments = legal_args.get("sub_arguments", [])
+
+    # Find arguments belonging to this standard
+    matched_arg_ids = set()
+    matched_subarg_ids = set()
+    for arg in arguments:
+        if arg.get("standard_key") == standard_key:
+            matched_arg_ids.add(arg["id"])
+            for sa_id in arg.get("sub_argument_ids", []):
+                matched_subarg_ids.add(sa_id)
+
+    # Also collect sub_arguments whose argument_id matches
+    for sa in sub_arguments:
+        if sa.get("argument_id") in matched_arg_ids:
+            matched_subarg_ids.add(sa["id"])
+
+    # Filter out
+    legal_args["arguments"] = [a for a in arguments if a["id"] not in matched_arg_ids]
+    legal_args["sub_arguments"] = [sa for sa in sub_arguments if sa["id"] not in matched_subarg_ids]
+
+    save_legal_arguments(project_id, legal_args)
+
+    # Delete writing_v3 files for this standard
+    writing_dir = PROJECTS_DIR / project_id / "writing_v3"
+    deleted_files = []
+    if writing_dir.exists():
+        for f in writing_dir.glob(f"writing_{standard_key}_*.json"):
+            f.unlink()
+            deleted_files.append(f.name)
+
+    return {
+        "success": True,
+        "deleted_argument_ids": list(matched_arg_ids),
+        "deleted_subargument_ids": list(matched_subarg_ids),
+        "deleted_writing_files": deleted_files,
+    }
+
+
 def get_argument_snippet_ids(project_id: str, argument_id: str) -> Set[str]:
     """获取某个 Argument 下的所有 snippet_ids（父论点范围）"""
     legal_args = load_legal_arguments(project_id)

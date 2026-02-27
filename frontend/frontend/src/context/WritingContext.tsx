@@ -122,6 +122,8 @@ export interface WritingContextType {
     projectId?: string,
     subArgTitle?: string
   ) => void;
+  // Rewrite a single standard's letter section
+  rewriteStandard: (standardKey: string, projectId: string, llmProvider: string) => Promise<void>;
   // Change cascade: accept/reject/commit
   acceptSuggestion: (sectionId: string, sentenceIndex: number) => void;
   rejectSuggestion: (sectionId: string, sentenceIndex: number) => void;
@@ -346,6 +348,56 @@ export function WritingProvider({ children }: { children: ReactNode }) {
         stage: 'mapping_confirmed',
         error: err instanceof Error ? err.message : 'Generation failed',
       }));
+    }
+  }, []);
+
+  const rewriteStandard = useCallback(async (
+    standardKey: string,
+    projectId: string,
+    llmProvider: string
+  ) => {
+    const response = await apiClient.post<{
+      success: boolean;
+      section: string;
+      paragraph_text: string;
+      sentences: Array<{
+        text: string;
+        snippet_ids: string[];
+        subargument_id?: string | null;
+        argument_id?: string | null;
+        exhibit_refs?: string[];
+        sentence_type?: 'opening' | 'body' | 'closing';
+      }>;
+      provenance_index?: {
+        by_subargument: Record<string, number[]>;
+        by_argument: Record<string, number[]>;
+        by_snippet: Record<string, number[]>;
+      };
+    }>(`/write/v3/${projectId}/${standardKey}`, { provider: llmProvider });
+
+    if (response.success && response.paragraph_text) {
+      const newSection: LetterSection = {
+        id: `section-${standardKey}`,
+        title: standardKey.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+        standardId: standardKey,
+        content: response.paragraph_text,
+        isGenerated: true,
+        order: 0,
+        sentences: response.sentences,
+        provenanceIndex: response.provenance_index,
+      };
+
+      setLetterSections(prev => {
+        const idx = prev.findIndex(s => s.standardId === standardKey);
+        if (idx >= 0) {
+          // Replace existing section, preserve order
+          const updated = [...prev];
+          updated[idx] = { ...newSection, order: updated[idx].order };
+          return updated;
+        }
+        // Append if new
+        return [...prev, { ...newSection, order: prev.length }];
+      });
     }
   }, []);
 
@@ -963,11 +1015,12 @@ export function WritingProvider({ children }: { children: ReactNode }) {
     extractionProgress,
     regenerateSubArgumentInLetter,
     removeSubArgumentFromLetter,
+    rewriteStandard,
     acceptSuggestion,
     rejectSuggestion,
     commitChanges,
     dismissChanges,
-  }), [writingEdges, letterSections, writingNodePositions, mergeSuggestions, isExtracting, isMerging, extractionProgress, addWritingEdge, removeWritingEdge, confirmWritingEdge, updateLetterSection, updateWritingNodePosition, extractSnippets, confirmAllMappings, generatePetition, reloadSnippets, unifiedExtract, generateMergeSuggestions, confirmMerges, applyMerges, loadMergeSuggestions, regenerateSubArgumentInLetter, removeSubArgumentFromLetter, acceptSuggestion, rejectSuggestion, commitChanges, dismissChanges]);
+  }), [writingEdges, letterSections, writingNodePositions, mergeSuggestions, isExtracting, isMerging, extractionProgress, addWritingEdge, removeWritingEdge, confirmWritingEdge, updateLetterSection, updateWritingNodePosition, extractSnippets, confirmAllMappings, generatePetition, reloadSnippets, unifiedExtract, generateMergeSuggestions, confirmMerges, applyMerges, loadMergeSuggestions, regenerateSubArgumentInLetter, removeSubArgumentFromLetter, rewriteStandard, acceptSuggestion, rejectSuggestion, commitChanges, dismissChanges]);
 
   return <WritingContext.Provider value={value}>{children}</WritingContext.Provider>;
 }

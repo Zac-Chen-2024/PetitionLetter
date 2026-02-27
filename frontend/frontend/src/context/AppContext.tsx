@@ -99,6 +99,17 @@ export function useApp() {
     return args.mergeSubArguments(subArgumentIds, title, purpose, relationship, project.projectId);
   }, [args.mergeSubArguments, project.projectId]);
 
+  // rewriteStandard: re-generate letter section for a single standard
+  const rewriteStandard = useCallback(async (standardKey: string) => {
+    return writing.rewriteStandard(standardKey, project.projectId, project.llmProvider);
+  }, [writing.rewriteStandard, project.projectId, project.llmProvider]);
+
+  // removeStandard: delete all arguments/sub-args under a standard + remove letter section
+  const removeStandard = useCallback(async (standardKey: string) => {
+    await args.removeStandard(standardKey, project.projectId);
+    writing.setLetterSections(prev => prev.filter(s => s.standardId !== standardKey));
+  }, [args.removeStandard, project.projectId, writing.setLetterSections]);
+
   // removeArgument: original removes from arguments + writingEdges + argumentMappings
   // ArgumentsContext only removes from arguments + argumentMappings
   // We also need to remove from writingEdges
@@ -208,6 +219,8 @@ export function useApp() {
     isGeneratingArguments: args.isGeneratingArguments,
     generateArguments,
     generatedMainSubject: args.generatedMainSubject,
+    rewriteStandard,
+    removeStandard,
 
     // UIContext
     focusState: ui.focusState,
@@ -280,6 +293,7 @@ export function useApp() {
   }), [
     project, snippets, args, ui, writing,
     generateArguments, addSubArgument, removeSubArgument, regenerateSubArgument, mergeSubArguments,
+    rewriteStandard, removeStandard,
     removeArgument, commitChanges, extractSnippets, confirmAllMappings, generatePetition,
     reloadSnippets, unifiedExtract, generateMergeSuggestions, confirmMerges,
     applyMerges, loadMergeSuggestions, isElementHighlighted,

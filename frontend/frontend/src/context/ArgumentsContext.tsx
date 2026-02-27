@@ -95,6 +95,7 @@ export interface ArgumentsContextType {
   removeSubArgument: (id: string, projectId: string) => void;
   regenerateSubArgument: (subArgumentId: string, projectId: string) => Promise<void>;
   mergeSubArguments: (subArgumentIds: string[], title: string, purpose: string, relationship: string, projectId: string) => Promise<{ newArgument: Argument; movedSubArgumentIds: string[] }>;
+  removeStandard: (standardKey: string, projectId: string) => Promise<void>;
   isGeneratingArguments: boolean;
   generateArguments: (projectId: string, llmProvider: string, forceReanalyze?: boolean, applicantName?: string) => Promise<void>;
   generatedMainSubject: string | null;
@@ -302,12 +303,24 @@ export function ArgumentsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const regenerateSubArgument = useCallback(async (subArgumentId: string, projectId: string) => {
-    // Note: This function needs letterSections from WritingContext.
-    // The actual regeneration logic that updates letterSections is handled
-    // by the facade in AppContext.tsx which has access to both contexts.
-    // This is a placeholder that just logs - the real implementation
-    // is in the WritingContext or the combined facade.
     console.warn('regenerateSubArgument should be called via useApp() facade which has access to WritingContext');
+  }, []);
+
+  const removeStandard = useCallback(async (standardKey: string, projectId: string) => {
+    const response = await apiClient.delete<{
+      success: boolean;
+      deleted_argument_ids: string[];
+      deleted_subargument_ids: string[];
+    }>(`/arguments/${projectId}/standards/${standardKey}`);
+
+    if (response.success) {
+      const deletedArgIds = new Set(response.deleted_argument_ids);
+      const deletedSubArgIds = new Set(response.deleted_subargument_ids);
+      setArguments(prev => prev.filter(a => !deletedArgIds.has(a.id)));
+      setSubArguments(prev => prev.filter(sa => !deletedSubArgIds.has(sa.id)));
+      // Also clean argument mappings
+      setArgumentMappings(prev => prev.filter(e => !deletedArgIds.has(e.source)));
+    }
   }, []);
 
   // Merge SubArguments → move them under a new Argument (regroup, not fuse)
@@ -486,11 +499,12 @@ export function ArgumentsProvider({ children }: { children: ReactNode }) {
     updateSubArgument,
     removeSubArgument,
     regenerateSubArgument,
+    removeStandard,
     mergeSubArguments,
     isGeneratingArguments,
     generateArguments,
     generatedMainSubject,
-  }), [arguments_, argumentMappings, subArguments, isGeneratingArguments, generatedMainSubject, addArgument, updateArgument, removeArgument, updateArgumentPosition, addSnippetToArgument, removeSnippetFromArgument, addArgumentMapping, removeArgumentMapping, addSubArgument, updateSubArgument, removeSubArgument, regenerateSubArgument, mergeSubArguments, generateArguments]);
+  }), [arguments_, argumentMappings, subArguments, isGeneratingArguments, generatedMainSubject, addArgument, updateArgument, removeArgument, updateArgumentPosition, addSnippetToArgument, removeSnippetFromArgument, addArgumentMapping, removeArgumentMapping, addSubArgument, updateSubArgument, removeSubArgument, regenerateSubArgument, removeStandard, mergeSubArguments, generateArguments]);
 
   return <ArgumentsContext.Provider value={value}>{children}</ArgumentsContext.Provider>;
 }

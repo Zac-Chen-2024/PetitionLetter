@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useLegalStandards } from '../hooks/useLegalStandards';
 import { STANDARD_KEY_TO_ID } from '../constants/colors';
 import { apiClient } from '../services/api';
+import StandardActionModal from './StandardActionModal';
 import type { Position, Argument, SubArgument } from '../types';
 
 // ============================================
@@ -104,12 +105,14 @@ function ArgumentNodeComponent({
   t,
   transformVersion,
   onAddSubArgument,
+  onDelete,
 }: DraggableNodeProps & {
   node: ArgumentNode;
   onPositionReport?: (id: string, rect: DOMRect) => void;
   t: (key: string, options?: Record<string, unknown>) => string;
   transformVersion?: number;  // Triggers position update when canvas transforms
   onAddSubArgument?: (argumentId: string) => void;
+  onDelete?: (argumentId: string) => void;
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef<Position | null>(null);
@@ -207,7 +210,7 @@ function ArgumentNodeComponent({
         {/* Header */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <span className="text-base font-bold text-purple-800 line-clamp-2">{node.data.title}</span>
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-0.5 flex-shrink-0 -mt-1 -mr-1">
             {/* Add SubArgument button */}
             {onAddSubArgument && (
               <button
@@ -225,6 +228,18 @@ function ArgumentNodeComponent({
             )}
             {node.data.isAIGenerated && (
               <span className="text-[10px] px-2 py-0.5 bg-purple-200 text-purple-700 rounded">AI</span>
+            )}
+            {/* Delete button */}
+            {onDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
+                className="p-1 rounded hover:bg-red-100 transition-colors"
+                title="Delete this argument"
+              >
+                <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
             )}
           </div>
         </div>
@@ -253,7 +268,16 @@ function ArgumentNodeComponent({
   );
 }
 
-function StandardNodeComponent({ node, isSelected, onSelect, onDrag, scale, t }: DraggableNodeProps & { node: StandardNode; t: (key: string, options?: Record<string, unknown>) => string }) {
+function StandardNodeComponent({
+  node, isSelected, onSelect, onDrag, scale, t,
+  onRewrite, onRemove, isRewriting,
+}: DraggableNodeProps & {
+  node: StandardNode;
+  t: (key: string, options?: Record<string, unknown>) => string;
+  onRewrite?: (standardKey: string) => void;
+  onRemove?: (standardKey: string) => void;
+  isRewriting?: boolean;
+}) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef<Position | null>(null);
   const nodeStartPos = useRef<Position | null>(null);
@@ -309,7 +333,7 @@ function StandardNodeComponent({ node, isSelected, onSelect, onDrag, scale, t }:
     >
       <div
         className={`
-          w-[180px] p-4 rounded-xl bg-white shadow-lg transition-all
+          w-[240px] p-4 rounded-xl bg-white shadow-lg transition-all
           ${isSelected ? 'ring-2 ring-offset-2 shadow-xl scale-105' : 'hover:shadow-xl'}
         `}
         style={{
@@ -318,12 +342,49 @@ function StandardNodeComponent({ node, isSelected, onSelect, onDrag, scale, t }:
           borderStyle: 'solid',
         }}
       >
-        <div className="flex items-center gap-2">
-          <div
-            className="w-5 h-5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: node.data.color }}
-          />
-          <span className="text-base font-bold text-slate-800">{node.data.shortName}</span>
+        {/* Top-right action buttons */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-5 h-5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: node.data.color }}
+            />
+            <span className="text-base font-bold text-slate-800">{node.data.shortName}</span>
+          </div>
+          <div className="flex items-center gap-0.5 flex-shrink-0 -mt-1 -mr-1">
+            {/* Rewrite button */}
+            {onRewrite && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRewrite(node.id); }}
+                disabled={isRewriting}
+                className="p-1 rounded hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                title={t('graph.standard.rewrite', 'Rewrite')}
+              >
+                {isRewriting ? (
+                  <svg className="w-3.5 h-3.5 text-emerald-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
+              </button>
+            )}
+            {/* Remove button */}
+            {onRemove && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemove(node.id); }}
+                className="p-1 rounded hover:bg-red-100 transition-colors"
+                title={t('graph.standard.remove', 'Remove')}
+              >
+                <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
         <div className="mt-2 flex items-center justify-between">
           <span className="text-xs text-slate-400">{t('graph.legend.standard')}</span>
@@ -437,13 +498,10 @@ function SubArgumentNodeComponent({
     }
   };
 
-  // Handle delete click
+  // Handle delete click — delegate to parent (modal confirmation)
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Simple confirmation
-    if (window.confirm(`Delete sub-argument "${node.data.title}"? This will also remove its content from the Letter.`)) {
-      onDelete?.(node.id);
-    }
+    onDelete?.(node.id);
   };
 
   // Handle AI title generation
@@ -599,7 +657,7 @@ function SubArgumentNodeComponent({
             </span>
           )}
           {!mergeMode && (
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-0.5 flex-shrink-0 -mt-0.5 -mr-0.5">
             {/* Red dot indicator for pending snippet confirmation */}
             {node.data.needsSnippetConfirmation && (
               <span
@@ -646,7 +704,10 @@ function SubArgumentNodeComponent({
                 </svg>
               )}
             </button>
-            {/* Delete button */}
+            {node.data.isAIGenerated && (
+              <span className="text-[9px] px-1.5 py-0.5 bg-emerald-200 text-emerald-700 rounded">AI</span>
+            )}
+            {/* Delete button — rightmost */}
             <button
               onClick={handleDeleteClick}
               className="p-1 rounded hover:bg-red-100 transition-colors"
@@ -656,9 +717,6 @@ function SubArgumentNodeComponent({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
-            {node.data.isAIGenerated && (
-              <span className="text-[9px] px-1.5 py-0.5 bg-emerald-200 text-emerald-700 rounded">AI</span>
-            )}
           </div>
           )}
         </div>
@@ -766,7 +824,7 @@ function InternalConnectionLines({ argumentNodes, standardNodes, subArgumentNode
 
         const x1 = argNode.position.x + 160; // Right edge of argument node (320px / 2)
         const y1 = argNode.position.y;
-        const x2 = standardPos.x - 90; // Left edge of standard node (180px / 2)
+        const x2 = standardPos.x - 120; // Left edge of standard node (240px / 2)
         const y2 = standardPos.y;
 
         const midX = (x1 + x2) / 2;
@@ -1027,6 +1085,9 @@ export function ArgumentGraph() {
     removeSubArgument,
     addSubArgument,
     mergeSubArguments,
+    rewriteStandard,
+    removeStandard,
+    removeArgument,
     projectId,
   } = useApp();
 
@@ -1036,6 +1097,14 @@ export function ArgumentGraph() {
   const [isPanning, setIsPanning] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [newlyCreatedSubArgId, setNewlyCreatedSubArgId] = useState<string | null>(null);
+  // Standard action state
+  const [rewritingStandardKey, setRewritingStandardKey] = useState<string | null>(null);
+  const [removeModalStandardKey, setRemoveModalStandardKey] = useState<string | null>(null);
+  const [isRemovingStandard, setIsRemovingStandard] = useState(false);
+  // SubArgument delete modal state
+  const [deleteSubArgModalId, setDeleteSubArgModalId] = useState<string | null>(null);
+  // Argument delete modal state
+  const [deleteArgModalId, setDeleteArgModalId] = useState<string | null>(null);
   // Merge mode state
   const [isMergeMode, setIsMergeMode] = useState(false);
   const [mergeSelectedIds, setMergeSelectedIds] = useState<Set<string>>(new Set());
@@ -1209,16 +1278,63 @@ export function ArgumentGraph() {
     }
   }, [addSubArgument, setFocusState]);
 
-  // Handle delete SubArgument
+  // Handle delete SubArgument — open modal
   const handleSubArgumentDelete = useCallback((subArgumentId: string) => {
-    if (!removeSubArgument) return;
-    removeSubArgument(subArgumentId);
-    // Clear focus if deleted node was focused
-    if (focusState.type === 'subargument' && focusState.id === subArgumentId) {
+    setDeleteSubArgModalId(subArgumentId);
+  }, []);
+
+  // Confirm delete SubArgument from modal
+  const handleSubArgumentDeleteConfirm = useCallback(() => {
+    if (!deleteSubArgModalId || !removeSubArgument) return;
+    removeSubArgument(deleteSubArgModalId);
+    if (focusState.type === 'subargument' && focusState.id === deleteSubArgModalId) {
       setFocusState({ type: 'none', id: null });
     }
     setSelectedNodeId(null);
-  }, [removeSubArgument, focusState, setFocusState]);
+    setDeleteSubArgModalId(null);
+  }, [deleteSubArgModalId, removeSubArgument, focusState, setFocusState]);
+
+  // Handle delete Argument — open modal
+  const handleArgumentDelete = useCallback((argumentId: string) => {
+    setDeleteArgModalId(argumentId);
+  }, []);
+
+  // Confirm delete Argument from modal
+  const handleArgumentDeleteConfirm = useCallback(() => {
+    if (!deleteArgModalId || !removeArgument) return;
+    removeArgument(deleteArgModalId);
+    if (focusState.type === 'argument' && focusState.id === deleteArgModalId) {
+      setFocusState({ type: 'none', id: null });
+    }
+    setSelectedNodeId(null);
+    setDeleteArgModalId(null);
+  }, [deleteArgModalId, removeArgument, focusState, setFocusState]);
+
+  // ==================== Standard Action Handlers ====================
+
+  const handleStandardRewrite = useCallback(async (standardKey: string) => {
+    setRewritingStandardKey(standardKey);
+    try {
+      await rewriteStandard(standardKey);
+    } catch (err) {
+      console.error('Failed to rewrite standard:', err);
+    } finally {
+      setRewritingStandardKey(null);
+    }
+  }, [rewriteStandard]);
+
+  const handleStandardRemoveConfirm = useCallback(async () => {
+    if (!removeModalStandardKey) return;
+    setIsRemovingStandard(true);
+    try {
+      await removeStandard(removeModalStandardKey);
+      setRemoveModalStandardKey(null);
+    } catch (err) {
+      console.error('Failed to remove standard:', err);
+    } finally {
+      setIsRemovingStandard(false);
+    }
+  }, [removeModalStandardKey, removeStandard]);
 
   // ==================== Merge Mode Logic ====================
 
@@ -1665,6 +1781,7 @@ export function ArgumentGraph() {
                 t={t}
                 transformVersion={transformVersion}
                 onAddSubArgument={handleAddSubArgument}
+                onDelete={handleArgumentDelete}
               />
             ))}
 
@@ -1678,6 +1795,9 @@ export function ArgumentGraph() {
                 onDrag={handleNodeDrag}
                 scale={scale}
                 t={t}
+                onRewrite={handleStandardRewrite}
+                onRemove={(key) => setRemoveModalStandardKey(key)}
+                isRewriting={rewritingStandardKey === node.id}
               />
             ))}
           </div>
@@ -1706,6 +1826,122 @@ export function ArgumentGraph() {
         )}
       </div>
 
+      {/* Standard remove confirmation modal */}
+      {removeModalStandardKey && (() => {
+        const stdNode = standardNodes.find(n => n.id === removeModalStandardKey);
+        const argCount = contextArguments.filter(a => a.standardKey === removeModalStandardKey).length;
+        const subArgCount = contextSubArguments.filter(sa => {
+          const parentArg = contextArguments.find(a => a.id === sa.argumentId);
+          return parentArg?.standardKey === removeModalStandardKey;
+        }).length;
+        return (
+          <StandardActionModal
+            standardName={stdNode?.data.name || removeModalStandardKey}
+            standardColor={stdNode?.data.color || '#94a3b8'}
+            argumentCount={argCount}
+            subArgumentCount={subArgCount}
+            onConfirm={handleStandardRemoveConfirm}
+            onCancel={() => setRemoveModalStandardKey(null)}
+            isRemoving={isRemovingStandard}
+          />
+        );
+      })()}
+
+      {/* SubArgument delete confirmation modal */}
+      {deleteSubArgModalId && (() => {
+        const sa = contextSubArguments.find(s => s.id === deleteSubArgModalId);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteSubArgModalId(null)} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <h3 className="text-sm font-semibold text-slate-800">{t('graph.removeSubArg.title', 'Remove Sub-Argument')}</h3>
+                </div>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-slate-700 line-clamp-2">{sa?.title || deleteSubArgModalId}</span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  {t('graph.removeSubArg.description', 'This will permanently remove this sub-argument and its associated letter content.')}
+                </p>
+                <p className="text-xs text-red-600 font-medium">
+                  {t('graph.removeStandard.warning', 'This action cannot be undone.')}
+                </p>
+              </div>
+              <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setDeleteSubArgModalId(null)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+                >
+                  {t('common.cancel', 'Cancel')}
+                </button>
+                <button
+                  onClick={handleSubArgumentDeleteConfirm}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  {t('graph.removeStandard.confirm', 'Remove')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Argument delete confirmation modal */}
+      {deleteArgModalId && (() => {
+        const arg = contextArguments.find(a => a.id === deleteArgModalId);
+        const childCount = contextSubArguments.filter(sa => sa.argumentId === deleteArgModalId).length;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteArgModalId(null)} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <h3 className="text-sm font-semibold text-slate-800">{t('graph.removeArg.title', 'Remove Argument')}</h3>
+                </div>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-slate-700 line-clamp-2">{arg?.title || deleteArgModalId}</span>
+                </div>
+                <p className="text-sm text-slate-600">
+                  {t('graph.removeArg.description', {
+                    defaultValue: 'This will permanently remove this argument and its {{count}} sub-argument(s).',
+                    count: childCount,
+                  })}
+                </p>
+                <p className="text-xs text-red-600 font-medium">
+                  {t('graph.removeStandard.warning', 'This action cannot be undone.')}
+                </p>
+              </div>
+              <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setDeleteArgModalId(null)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+                >
+                  {t('common.cancel', 'Cancel')}
+                </button>
+                <button
+                  onClick={handleArgumentDeleteConfirm}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  {t('graph.removeStandard.confirm', 'Remove')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
