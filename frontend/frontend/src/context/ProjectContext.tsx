@@ -11,6 +11,7 @@ import { legalStandards as defaultEB1AStandards } from '../data/legalStandards';
 // ============================================
 
 const STORAGE_KEY_LLM_PROVIDER = 'evidence-system-llm-provider';
+const STORAGE_KEY_PROJECT_ID = 'evidence-system-project-id';
 const DEFAULT_PROJECT_ID = 'yaruo_qu';
 
 export interface ProjectContextType {
@@ -32,7 +33,14 @@ export interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  const [projectId, setProjectId] = useState<string>(DEFAULT_PROJECT_ID);
+  const [projectId, setProjectIdState] = useState<string>(() => {
+    return localStorage.getItem(STORAGE_KEY_PROJECT_ID) || DEFAULT_PROJECT_ID;
+  });
+
+  const setProjectId = useCallback((id: string) => {
+    setProjectIdState(id);
+    localStorage.setItem(STORAGE_KEY_PROJECT_ID, id);
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -138,7 +146,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     projectType,
     projectNumber,
     legalStandards,
-  }), [projectId, isLoading, loadError, llmProvider, pipelineState, setLlmProvider, projectType, projectNumber, legalStandards]);
+  }), [projectId, setProjectId, isLoading, loadError, llmProvider, pipelineState, setLlmProvider, projectType, projectNumber, legalStandards]);
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }
