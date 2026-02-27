@@ -94,7 +94,8 @@ async def recommend_snippets_for_subargument(
     description: str = None,
     exclude_snippet_ids: List[str] = None,
     max_candidates: int = 20,
-    max_results: int = 5
+    max_results: int = 5,
+    provider: str = "deepseek"
 ) -> List[Dict]:
     """
     为新 SubArgument 推荐相关 Snippets
@@ -166,7 +167,8 @@ async def recommend_snippets_for_subargument(
         standard_key=standard_key,
         argument_title=argument_title,
         candidates=candidates,
-        max_results=max_results
+        max_results=max_results,
+        provider=provider
     )
 
     return ranked_snippets
@@ -178,7 +180,8 @@ async def llm_rank_snippets(
     standard_key: str,
     argument_title: str,
     candidates: List[Dict],
-    max_results: int = 5
+    max_results: int = 5,
+    provider: str = "deepseek"
 ) -> List[Dict]:
     """
     使用 LLM 对候选 Snippets 进行语义相关性排序
@@ -240,7 +243,8 @@ Consider how well each snippet supports or provides evidence for this specific s
             prompt=user_prompt,
             system_prompt=system_prompt,
             temperature=0.2,
-            max_tokens=1500
+            max_tokens=1500,
+            provider=provider
         )
 
         ranked = result.get("ranked_snippets", [])
@@ -338,7 +342,8 @@ def create_subargument(
 async def infer_relationship(
     project_id: str,
     argument_id: str,
-    subargument_title: str
+    subargument_title: str,
+    provider: str = "deepseek"
 ) -> str:
     """
     根据子论点标题推断与父论点的关系
@@ -379,12 +384,12 @@ Sub-Argument Title: {subargument_title}
 What is the relationship? (2-5 words)"""
 
     try:
-        # 使用 call_deepseek_text 获取纯文本响应
         result = await call_llm_text(
             prompt=user_prompt,
             system_prompt=system_prompt,
             temperature=0.2,
-            max_tokens=30
+            max_tokens=30,
+            provider=provider
         )
 
         # 清理：移除引号和多余空格

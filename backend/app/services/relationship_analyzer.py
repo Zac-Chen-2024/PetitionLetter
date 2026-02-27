@@ -99,8 +99,8 @@ class RelationshipAnalyzer:
     3. 判断每个 snippet 的成就归属
     """
 
-    def __init__(self, model: str = "gpt-4o-mini"):
-        self.model = model
+    def __init__(self, provider: str = "deepseek"):
+        self.provider = provider
         self.entities: Dict[str, Entity] = {}
         self.relations: List[Relation] = []
 
@@ -277,7 +277,7 @@ Important:
         try:
             result = await call_llm(
                 prompt=prompt,
-                model=self.model,
+                provider=self.provider,
                 system_prompt="You are an expert at analyzing visa petition evidence. Extract entities and relationships precisely.",
                 temperature=0.1
             )
@@ -498,7 +498,7 @@ The applicant is typically:
         try:
             result = await call_llm(
                 prompt=prompt,
-                model=self.model,
+                provider=self.provider,
                 system_prompt="Identify the main applicant in a visa petition.",
                 temperature=0.1
             )
@@ -580,7 +580,7 @@ Rules:
         try:
             result = await call_llm(
                 prompt=prompt,
-                model=self.model,
+                provider=self.provider,
                 system_prompt="Determine who each piece of evidence describes.",
                 temperature=0.1
             )
@@ -623,7 +623,7 @@ Rules:
 
 async def analyze_relationships(
     snippets: List[Dict],
-    model: str = "gpt-4o-mini",
+    provider: str = "deepseek",
     applicant_name: Optional[str] = None,
     progress_callback=None
 ) -> Dict:
@@ -632,14 +632,14 @@ async def analyze_relationships(
 
     Args:
         snippets: snippet 列表
-        model: 使用的模型
+        provider: LLM provider ("deepseek" or "openai")
         applicant_name: 已知的申请人姓名（用于精确归属判断）
         progress_callback: 进度回调
 
     Returns:
         分析结果
     """
-    analyzer = RelationshipAnalyzer(model=model)
+    analyzer = RelationshipAnalyzer(provider=provider)
     return await analyzer.analyze_snippets(snippets, applicant_name, progress_callback)
 
 

@@ -95,7 +95,7 @@ export interface WritingContextType {
   // Pipeline operations take projectId & llmProvider as parameters
   extractSnippets: (projectId: string, setSnippets: React.Dispatch<React.SetStateAction<Snippet[]>>, setPipelineState: React.Dispatch<React.SetStateAction<PipelineState>>) => Promise<void>;
   confirmAllMappings: (projectId: string, setPipelineState: React.Dispatch<React.SetStateAction<PipelineState>>) => Promise<void>;
-  generatePetition: (projectId: string, setPipelineState: React.Dispatch<React.SetStateAction<PipelineState>>) => Promise<void>;
+  generatePetition: (projectId: string, llmProvider: string, setPipelineState: React.Dispatch<React.SetStateAction<PipelineState>>) => Promise<void>;
   reloadSnippets: (projectId: string, setSnippets: React.Dispatch<React.SetStateAction<Snippet[]>>) => Promise<void>;
   // Unified extraction
   unifiedExtract: (projectId: string, llmProvider: string, applicantName: string, setSnippets: React.Dispatch<React.SetStateAction<Snippet[]>>, setPipelineState: React.Dispatch<React.SetStateAction<PipelineState>>) => Promise<void>;
@@ -111,6 +111,7 @@ export interface WritingContextType {
   regenerateSubArgumentInLetter: (
     subArgumentId: string,
     projectId: string,
+    llmProvider: string,
     subArguments: SubArgument[],
     arguments_: Argument[]
   ) => Promise<void>;
@@ -269,6 +270,7 @@ export function WritingProvider({ children }: { children: ReactNode }) {
 
   const generatePetition = useCallback(async (
     projectId: string,
+    llmProvider: string,
     setPipelineState: React.Dispatch<React.SetStateAction<PipelineState>>
   ) => {
     setPipelineState(prev => ({ ...prev, stage: 'generating', progress: 0 }));
@@ -310,7 +312,7 @@ export function WritingProvider({ children }: { children: ReactNode }) {
               traced_sentences: number;
               warnings: string[];
             };
-          }>(`/write/v3/${projectId}/${section}`, {});
+          }>(`/write/v3/${projectId}/${section}`, { provider: llmProvider });
 
           if (response.success && response.paragraph_text) {
             generatedSections.push({
@@ -544,6 +546,7 @@ export function WritingProvider({ children }: { children: ReactNode }) {
   const regenerateSubArgumentInLetter = useCallback(async (
     subArgumentId: string,
     projectId: string,
+    llmProvider: string,
     subArguments: SubArgument[],
     arguments_: Argument[]
   ) => {
@@ -580,6 +583,7 @@ export function WritingProvider({ children }: { children: ReactNode }) {
         };
       }>(`/write/v3/${projectId}/${standardKey}`, {
         subargument_ids: [subArgumentId],
+        provider: llmProvider,
       });
 
       if (!response.success || !response.sentences) {

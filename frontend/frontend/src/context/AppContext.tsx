@@ -85,8 +85,8 @@ export function useApp() {
 
   // regenerateSubArgument: original signature takes (subArgumentId) => Promise<void>
   const regenerateSubArgument = useCallback(async (subArgumentId: string) => {
-    return writing.regenerateSubArgumentInLetter(subArgumentId, project.projectId, args.subArguments, args.arguments);
-  }, [writing.regenerateSubArgumentInLetter, project.projectId, args.subArguments, args.arguments]);
+    return writing.regenerateSubArgumentInLetter(subArgumentId, project.projectId, project.llmProvider, args.subArguments, args.arguments);
+  }, [writing.regenerateSubArgumentInLetter, project.projectId, project.llmProvider, args.subArguments, args.arguments]);
 
   // removeArgument: original removes from arguments + writingEdges + argumentMappings
   // ArgumentsContext only removes from arguments + argumentMappings
@@ -107,8 +107,8 @@ export function useApp() {
   }, [writing.confirmAllMappings, project.projectId, project.setPipelineState]);
 
   const generatePetition = useCallback(async () => {
-    return writing.generatePetition(project.projectId, project.setPipelineState);
-  }, [writing.generatePetition, project.projectId, project.setPipelineState]);
+    return writing.generatePetition(project.projectId, project.llmProvider, project.setPipelineState);
+  }, [writing.generatePetition, project.projectId, project.llmProvider, project.setPipelineState]);
 
   const reloadSnippets = useCallback(async () => {
     return writing.reloadSnippets(project.projectId, snippets.setSnippets);

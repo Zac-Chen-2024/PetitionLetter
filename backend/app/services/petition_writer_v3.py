@@ -497,7 +497,8 @@ async def _step1_generate_subargument_body(
     standard: Dict,
     argument_title: str,
     subargument: Dict,
-    additional_instructions: str = None
+    additional_instructions: str = None,
+    provider: str = "deepseek"
 ) -> List[Dict]:
     """
     Step 1: 为单个 SubArgument 生成 3-5 句正文。
@@ -571,7 +572,8 @@ Return ONLY valid JSON, no markdown."""
         system_prompt=system_prompt,
         json_schema={},
         temperature=0.3,
-        max_tokens=4000
+        max_tokens=4000,
+        provider=provider
     )
 
     if "error" in result:
@@ -581,7 +583,6 @@ Return ONLY valid JSON, no markdown."""
 
     # 校验 snippet_ids：只保留该 SubArgument 实际有的 snippet
     valid_ids = {s["id"] for s in subargument.get("snippets", [])}
-    import logging
     _logger = logging.getLogger(__name__)
     for sent in sentences:
         raw_ids = sent.get("snippet_ids", [])
@@ -597,7 +598,8 @@ async def _step1_generate_argument_body(
     standard: Dict,
     argument: Dict,
     exhibit_texts: Dict[str, str],
-    additional_instructions: str = None
+    additional_instructions: str = None,
+    provider: str = "deepseek"
 ) -> List[Dict]:
     """
     Step 1 (v3.1): 为整个 Argument 生成 body，LLM 看到完整 OCR 原文。
@@ -717,7 +719,8 @@ Return ONLY valid JSON, no markdown."""
         system_prompt=system_prompt,
         json_schema={},
         temperature=0.3,
-        max_tokens=8000
+        max_tokens=8000,
+        provider=provider
     )
 
     if "error" in result:
@@ -770,7 +773,8 @@ Return ONLY valid JSON, no markdown."""
 async def _step2_polish_argument(
     standard: Dict,
     argument: Dict,
-    subargument_bodies: List[Dict]
+    subargument_bodies: List[Dict],
+    provider: str = "deepseek"
 ) -> List[Dict]:
     """
     Step 2: 将同一 Argument 下多个 SubArgument 的段落润色整合。
@@ -845,7 +849,8 @@ Return ONLY valid JSON."""
             system_prompt=system_prompt,
             json_schema={},
             temperature=0.3,
-            max_tokens=8192
+            max_tokens=8192,
+            provider=provider
         )
 
         polished = result.get("subargument_paragraphs", [])
@@ -880,7 +885,8 @@ Return ONLY valid JSON."""
 
 async def _step3_generate_section_frame(
     standard: Dict,
-    arguments: List[Dict]
+    arguments: List[Dict],
+    provider: str = "deepseek"
 ) -> Dict:
     """
     Step 3: 生成段落的 opening 和 closing 句子。
@@ -929,15 +935,15 @@ Return JSON:
             system_prompt=system_prompt,
             json_schema={},
             temperature=0.4,
-            max_tokens=1000
+            max_tokens=1000,
+            provider=provider
         )
         return {
             "opening_text": result.get("opening_text", ""),
             "closing_text": result.get("closing_text", "")
         }
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Section frame generation failed: {e}")
+        logger.warning(f"Section frame generation failed: {e}")
         legal_ref = standard.get('legal_ref', '')
         name = standard.get('name', '')
         return {
@@ -976,7 +982,7 @@ def _remove_remaining_chinese(text: str) -> str:
     return cleaned.strip()
 
 
-async def _translate_to_english(text: str) -> str:
+async def _translate_to_english(text: str, provider: str = "deepseek") -> str:
     """
     Translate non-English text to English using LLM.
     Generic solution - no hardcoded mappings.
@@ -1000,7 +1006,8 @@ Text to translate:
             prompt=prompt,
             system_prompt="You are a professional translator. Translate to English while preserving legal document formatting.",
             temperature=0.3,
-            max_tokens=2000
+            max_tokens=2000,
+            provider=provider
         )
 
         if llm_result and not _contains_non_ascii(llm_result):
@@ -1386,7 +1393,8 @@ async def write_petition_section_v3(
     standard_key: str,
     argument_ids: List[str] = None,
     subargument_ids: List[str] = None,
-    additional_instructions: str = None
+    additional_instructions: str = None,
+    provider: str = "deepseek"
 ) -> Dict:
     """
     V3.1 版本的写作入口 — OCR 回溯三步流水线
@@ -1449,7 +1457,8 @@ async def write_petition_section_v3(
             standard=standard,
             argument=argument,
             exhibit_texts=exhibit_texts,
-            additional_instructions=additional_instructions
+            additional_instructions=additional_instructions,
+            provider=provider
         )
 
         if not arg_bodies:
@@ -1460,7 +1469,7 @@ async def write_petition_section_v3(
         for body in arg_bodies:
             for sent in body.get("sentences", []):
                 if _contains_non_ascii(sent.get("text", "")):
-                    sent["text"] = await _translate_to_english(sent["text"])
+                    sent["text"] = await _translate_to_english(sent["text"], provider=provider)
                     if _contains_non_ascii(sent["text"]):
                         sent["text"] = _remove_remaining_chinese(sent["text"])
 
@@ -1486,7 +1495,8 @@ async def write_petition_section_v3(
         polished = await _step2_polish_argument(
             standard=standard,
             argument=argument_ref,
-            subargument_bodies=arg_bodies
+            subargument_bodies=arg_bodies,
+            provider=provider
         )
 
         # 确保润色后的文本也是英文
@@ -1501,7 +1511,8 @@ async def write_petition_section_v3(
     logger.info("Step3: Generating opening/closing")
     frame = await _step3_generate_section_frame(
         standard=standard,
-        arguments=all_arguments
+        arguments=all_arguments,
+        provider=provider
     )
 
     # 确保英文
@@ -1733,7 +1744,8 @@ async def analyze_change_impact(
     project_id: str, standard_key: str,
     change_type: str,  # "deletion" | "addition"
     affected_subargument_id: str,
-    affected_title: str = ""
+    affected_title: str = "",
+    provider: str = "deepseek"
 ) -> Dict:
     """
     分析 SubArgument 变更对整段文章的间接影响。
@@ -1807,7 +1819,8 @@ Only return suggestions where changes are actually needed. Return empty array if
             system_prompt=system_prompt,
             json_schema={},
             temperature=0.3,
-            max_tokens=2000
+            max_tokens=2000,
+            provider=provider
         )
 
         suggestions = result.get("suggestions", [])
@@ -1822,8 +1835,7 @@ Only return suggestions where changes are actually needed. Return empty array if
         return {"suggestions": valid_suggestions}
 
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"analyze_change_impact failed: {e}")
+        logger.warning(f"analyze_change_impact failed: {e}")
         return {"suggestions": []}
 
 
@@ -1835,7 +1847,8 @@ async def edit_text_with_instruction(
     project_id: str,
     original_text: str,
     instruction: str,
-    conversation_history: List[Dict] = None
+    conversation_history: List[Dict] = None,
+    provider: str = "deepseek"
 ) -> Dict:
     """
     使用 AI 根据指令编辑文本
@@ -1888,7 +1901,8 @@ Return ONLY valid JSON, no markdown or extra text."""
         system_prompt=system_prompt,
         json_schema={},
         temperature=0.3,
-        max_tokens=2000
+        max_tokens=2000,
+        provider=provider
     )
 
     if "error" in result:

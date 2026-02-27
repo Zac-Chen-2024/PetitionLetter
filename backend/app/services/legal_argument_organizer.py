@@ -33,10 +33,13 @@ Legal requirements:
 2. Awards must be for excellence in the field (not participation awards)
 3. Must demonstrate the prestige and selectivity of the award
 
-Argumentation structure (combine into ONE argument):
-- Award description and recipient identity
-- Awarding body's authority and reputation
-- Selection criteria and competitiveness
+Argumentation structure (combine into ONE argument; sub-divide by individual award):
+- Each distinct award → one sub-argument with its own evidence chain:
+  1. Award name, year, and the applicant's specific honor
+  2. Awarding body's authority and reputation
+  3. Selection process rigor (jury composition, review methodology, duration)
+  4. Competitiveness (number of nominees vs. winners, acceptance rate)
+  5. Peer comparison (other distinguished recipients to show caliber)
 """,
     },
     "membership": {
@@ -49,11 +52,12 @@ Legal requirements:
 3. Must show other distinguished members for peer comparison
 4. Ordinary industry certifications or licenses do NOT qualify
 
-Argumentation structure:
-- Association introduction (proves distinguished reputation)
-- Membership criteria (proves outstanding achievements required)
-- Review process (proves rigorous selection)
-- Other distinguished members (proves selectivity through peer comparison)
+Argumentation structure (one sub-argument per qualifying association):
+- Each association → its own evidence chain:
+  1. Association introduction (founding, mission, distinguished reputation)
+  2. Membership criteria (what outstanding achievements are required for admission)
+  3. Review/admission process (how rigorous the selection is)
+  4. Notable members (peer comparison to demonstrate selectivity)
 """,
     },
     "published_material": {
@@ -68,9 +72,11 @@ Legal requirements:
 IMPORTANT: This is media coverage ABOUT the applicant, NOT articles written BY the applicant.
 Articles authored by the applicant belong under Scholarly Articles (vi).
 
-Argumentation structure (one sub-argument per media outlet):
-- Article title and summary
-- Media outlet introduction (proves major media: circulation, awards, history)
+Argumentation structure (one sub-argument per media coverage):
+- Each media report → its own evidence chain:
+  1. Article title, publication date, and summary of coverage about the applicant
+  2. Media outlet's authority and reach (circulation, awards, history, intended audience)
+  3. Scope of the coverage (national/international reach, depth of reporting)
 """,
     },
     "judging": {
@@ -82,11 +88,13 @@ Legal requirements:
 2. Judging role must be based on professional expertise (invited, not obligatory)
 3. Must demonstrate the authority of the judging activity (journal peer review, grant review, competition judging, etc.)
 
-Argumentation structure (combine into ONE argument):
-- Description of judging roles (journal names, conference names, funding agencies)
-- Prestige of the reviewing institution/journal
-- Frequency and consistency (proves ongoing invitations, not one-time)
-- Invitation letters or acknowledgment as evidence
+Argumentation structure (combine into ONE argument; sub-divide by judging role):
+- Each judging appointment → its own evidence chain:
+  1. Official role/title and appointing organization
+  2. Organization's prestige and authority in the field
+  3. Scope and scale of the judging process (submission count, jury size, review rounds)
+  4. The applicant's decision-making weight or influence
+  5. Other distinguished co-judges or panelists (peer comparison)
 """,
     },
     "original_contribution": {
@@ -99,11 +107,12 @@ Legal requirements:
 3. Requires quantified impact evidence (data, adoption rate, commercial success)
 4. Requires independent expert recommendation letters
 
-Argumentation structure (combine into ONE comprehensive argument):
-- Description of original contribution (invention/innovation/methodology)
-- Quantified impact (data, user count, revenue, coverage)
-- Expert recommendation letters (independent third-party endorsement)
-- Institutional adoption (schools, organizations, government recognition)
+Argumentation structure (combine into ONE comprehensive argument; sub-divide by distinct contribution):
+- Each original contribution → its own evidence chain:
+  1. Description of the original work (invention, methodology, framework, product)
+  2. Quantified impact (adoption metrics, user count, revenue, citations)
+  3. Independent expert endorsements (recommendation letters with specific praise)
+  4. Institutional or industry adoption (organizations, government programs using the work)
 """,
     },
     "scholarly_articles": {
@@ -118,11 +127,12 @@ Legal requirements:
 IMPORTANT: This is articles/books authored BY the applicant.
 This is DIFFERENT from Published Material (iii), which is media coverage ABOUT the applicant.
 
-Argumentation structure:
-- Journal/publication introduction (impact factor, ranking, field standing)
-- Article content and contribution summary
-- Citation data and scholarly impact metrics
-- Comparison with other authoritative publications
+Argumentation structure (combine into ONE argument; sub-divide by publication):
+- Each publication → its own evidence chain:
+  1. Article/book title, year, and authorship role
+  2. Publication venue prestige (impact factor, ranking, editorial standards)
+  3. Research contribution (what is novel or significant)
+  4. Citation data and impact metrics (total citations, field percentile, cross-disciplinary influence)
 """,
     },
     "display": {
@@ -150,9 +160,14 @@ Legal requirements:
 3. Must demonstrate the applicant's decision-making authority and influence
 
 Argumentation structure (one sub-argument per organization, select top 2-3):
-- Position and responsibilities (proves leading/critical role)
-- Organization's reputation (proves distinguished reputation: awards, scale, recognition)
-- Specific achievements (proves actual contribution and impact)
+- Each organization → two-tier evidence chain:
+  Tier 1 — Organization's distinguished reputation (argued independently):
+    1. History, scale, rankings, and industry recognition
+    2. Notable achievements, partnerships, or awards
+  Tier 2 — Applicant's leading/critical role within it:
+    1. Title, appointment, scope of responsibilities
+    2. Decision-making authority and specific achievements
+    3. Testimonials or endorsements from colleagues/superiors
 """,
     },
     "high_salary": {
@@ -164,11 +179,11 @@ Legal requirements:
 2. Must provide industry salary comparison data
 3. Can include wages, bonuses, royalties, consulting fees, or any form of remuneration
 
-Argumentation structure:
-- Applicant's compensation data
-- Industry average salary benchmark data (from authoritative statistical sources)
-- Comparative analysis (proves significantly above average)
-- If multiple income sources, argue each separately
+Argumentation structure (single unified argument, typically no sub-division needed):
+  1. Applicant's compensation data (base salary, bonuses, other remuneration) with official documentation
+  2. Industry benchmark from authoritative third-party source (government statistics, salary surveys)
+  3. Comparative ratio analysis (how many times above the average)
+  4. Additional income streams if applicable (consulting, royalties, speaking fees)
 """,
     },
     "commercial_success": {
@@ -276,14 +291,14 @@ You MUST create at least one argument for EACH of them:
 Create arguments for ALL {standards_with_evidence_count} standards listed above. Do NOT skip any.
 
 Per-standard rules:
-- Awards (i): Combine into ONE argument
-- Membership (ii): Only include associations requiring outstanding achievements (filter ordinary certifications)
+- Awards (i): Combine into ONE argument containing all awards
+- Membership (ii): One argument per qualifying association (filter ordinary certifications)
 - Published Material (iii): Media ABOUT the alien — one argument per major media outlet
-- Judging (iv): Peer review, grant review, competition judging — combine into ONE argument
+- Judging (iv): Combine all judging roles into ONE argument
 - Original Contribution (v): Combine ALL into ONE comprehensive argument
-- Scholarly Articles (vi): Articles authored BY the alien — focus on journal prestige and citation impact
-- Leading Role (viii): Select top 2-3 most distinguished organizations
-- High Salary (ix): Only if significantly above field average
+- Scholarly Articles (vi): Combine into ONE argument — articles authored BY the alien
+- Leading Role (viii): One argument per distinguished organization (select top 2-3)
+- High Salary (ix): ONE argument — only if significantly above field average
 
 The "standard" field MUST exactly match one of: {valid_standard_keys}
 
@@ -505,7 +520,7 @@ async def organize_arguments_with_legal_framework(
         arguments = []
         for raw_arg in raw_arguments:
             arg = LegalArgument(
-                id=raw_arg.get('id', f"arg-{uuid.uuid4().hex[:8]}"),
+                id=f"arg-{uuid.uuid4().hex[:8]}",  # Always use UUID to prevent ID collisions across standards
                 standard=raw_arg.get('standard', ''),
                 title=raw_arg.get('title', ''),
                 rationale=raw_arg.get('rationale', ''),
@@ -828,3 +843,158 @@ async def full_legal_pipeline(
     print(f"\n[LegalPipeline] Results saved to {output_file}")
 
     return result
+
+
+async def regenerate_standard_pipeline(
+    project_id: str,
+    standard_key: str,
+    applicant_name: str = "the Applicant",
+    provider: str = "deepseek",
+    project_type: str = "EB-1A"
+) -> Dict[str, Any]:
+    """
+    按单个 standard 重新生成 Arguments + SubArguments，
+    只替换该 standard 下的数据，其余保持不动。
+    """
+    from .snippet_recommender import load_legal_arguments, save_legal_arguments
+    from .subargument_generator import subdivide_argument
+
+    # --- 加载 snippets (复用 full_legal_pipeline 的逻辑) ---
+    projects_dir = Path(__file__).parent.parent.parent / "data" / "projects"
+    project_dir = projects_dir / project_id
+
+    enriched_file = project_dir / "enriched" / "enriched_snippets.json"
+    combined_file = project_dir / "extraction" / "combined_extraction.json"
+    if enriched_file.exists():
+        with open(enriched_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        snippets = data.get('snippets', [])
+    elif combined_file.exists():
+        with open(combined_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        snippets = data.get('snippets', [])
+    else:
+        snippets = []
+        extraction_dir = project_dir / "extraction"
+        if extraction_dir.exists():
+            for f in extraction_dir.glob("*_extraction.json"):
+                if f.name == "combined_extraction.json":
+                    continue
+                with open(f, 'r', encoding='utf-8') as fp:
+                    d = json.load(fp)
+                    snippets.extend(d.get("snippets", []))
+
+    print(f"[RegenerateStandard] Loaded {len(snippets)} snippets, target standard: {standard_key}")
+
+    # --- Resolve project_type ---
+    if not project_type or project_type == "EB-1A":
+        try:
+            from .storage import get_project_type
+            project_type = get_project_type(project_id)
+        except Exception:
+            project_type = "EB-1A"
+
+    # --- 选择法律标准 ---
+    if project_type == "NIW":
+        legal_stds = NIW_LEGAL_STANDARDS
+        evidence_mapping = NIW_EVIDENCE_TYPE_MAPPING
+    else:
+        legal_stds = LEGAL_STANDARDS
+        evidence_mapping = None
+
+    if standard_key not in legal_stds:
+        return {
+            "success": False,
+            "error": f"Unknown standard_key '{standard_key}' for project_type '{project_type}'. "
+                     f"Valid keys: {list(legal_stds.keys())}"
+        }
+
+    # --- 按 standard 分组，只取目标 standard ---
+    snippets_by_std = _group_snippets_by_standard(snippets, legal_stds, evidence_mapping)
+    target_snippets = snippets_by_std.get(standard_key, [])
+
+    if not target_snippets:
+        return {
+            "success": False,
+            "error": f"No snippets found for standard '{standard_key}'. "
+                     f"Check that snippets have matching evidence_type."
+        }
+
+    print(f"[RegenerateStandard] Found {len(target_snippets)} snippets for '{standard_key}'")
+
+    # --- Step 1: organize arguments (仅含该 standard 的 snippets) ---
+    arguments, filtered = await organize_arguments_with_legal_framework(
+        target_snippets, applicant_name, provider, project_type
+    )
+    print(f"[RegenerateStandard] Step 1: generated {len(arguments)} arguments")
+
+    # --- Step 2: subdivide into sub-arguments ---
+    snippet_map = {s.get('snippet_id', s.get('id', '')): s for s in snippets}
+    all_sub_arguments = []
+
+    for arg in arguments:
+        arg_snippets = [snippet_map[sid] for sid in arg.snippet_ids if sid in snippet_map]
+        if not arg_snippets:
+            continue
+
+        sub_args = await subdivide_argument(
+            argument={'id': arg.id, 'title': arg.title, 'standard': arg.standard},
+            snippets=arg_snippets,
+            provider=provider
+        )
+
+        arg.sub_argument_ids = [sa.id for sa in sub_args]
+        all_sub_arguments.extend([asdict(sa) for sa in sub_args])
+        await asyncio.sleep(0.2)
+
+    print(f"[RegenerateStandard] Step 2: generated {len(all_sub_arguments)} sub-arguments")
+
+    new_arguments = [a.to_dict() for a in arguments]
+
+    # --- 合并到现有 legal_arguments.json ---
+    existing = load_legal_arguments(project_id)
+
+    # 删除旧的该 standard 下的 arguments 和关联的 sub_arguments
+    old_arg_ids = {
+        a["id"] for a in existing.get("arguments", [])
+        if (a.get("standard_key") or a.get("standard")) == standard_key
+    }
+    existing["arguments"] = [
+        a for a in existing.get("arguments", [])
+        if a["id"] not in old_arg_ids
+    ]
+    existing["sub_arguments"] = [
+        sa for sa in existing.get("sub_arguments", [])
+        if sa.get("argument_id") not in old_arg_ids
+    ]
+
+    # 插入新的
+    existing["arguments"].extend(new_arguments)
+    existing["sub_arguments"].extend(all_sub_arguments)
+
+    # 更新 stats
+    by_standard = {}
+    for a in existing["arguments"]:
+        std = a.get("standard_key") or a.get("standard", "")
+        by_standard[std] = by_standard.get(std, 0) + 1
+    existing.setdefault("stats", {})["by_standard"] = by_standard
+    existing["stats"]["argument_count"] = len(existing["arguments"])
+    existing["stats"]["sub_argument_count"] = len(existing["sub_arguments"])
+
+    save_legal_arguments(project_id, existing)
+    print(f"[RegenerateStandard] Merged and saved. Removed {len(old_arg_ids)} old args, added {len(new_arguments)} new args.")
+
+    return {
+        "success": True,
+        "standard_key": standard_key,
+        "old_argument_ids": list(old_arg_ids),
+        "new_arguments": new_arguments,
+        "new_sub_arguments": all_sub_arguments,
+        "stats": {
+            "old_count": len(old_arg_ids),
+            "new_argument_count": len(new_arguments),
+            "new_sub_argument_count": len(all_sub_arguments),
+            "total_arguments": len(existing["arguments"]),
+            "by_standard": by_standard,
+        }
+    }

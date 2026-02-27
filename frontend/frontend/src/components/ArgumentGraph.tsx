@@ -721,14 +721,16 @@ function calculateTreeLayout(
   legalStandards: import('../types').LegalStandard[]
 ): { argumentNodes: ArgumentNode[]; standardNodes: StandardNode[]; subArgumentNodes: SubArgumentNode[] } {
   // Position layout with sub-arguments on the left
-  const SUBARG_X = 200;          // Base X for sub-arguments (reduced from 500)
+  const SUBARG_X = 200;          // Base X for sub-arguments
   const SUBARG_X_OFFSET = 80;    // Horizontal offset for staggered layout
-  const ARGUMENT_X = 800;        // Reduced from 1100
-  const STANDARD_X = 1200;       // Reduced from 1500
+  const ARGUMENT_X = 800;
+  const STANDARD_X = 1200;
   const START_Y = 100;
-  const MIN_ARGUMENT_SPACING = 280;  // Minimum spacing between arguments (increased)
-  const SUBARG_SPACING = 140;    // Vertical spacing between sub-arguments (visual spacing within same argument)
-  const SUBARG_CARD_HEIGHT = 200; // Approximate height of sub-argument card (increased)
+  const MIN_ARGUMENT_SPACING = 280;  // Minimum spacing between argument centers
+  const SUBARG_SPACING = 140;    // Vertical spacing between sub-argument centers
+  const SUBARG_CARD_HEIGHT = 200; // Conservative max height of sub-argument card
+  const BETWEEN_GROUP_GAP = 120; // Visual gap between standard groups
+  const WITHIN_GROUP_GAP = 60;   // Visual gap between arguments within same standard
 
   // Pre-calculate sub-argument counts per argument
   const subArgCountByArgument = new Map<string, number>();
@@ -737,14 +739,12 @@ function calculateTreeLayout(
     subArgCountByArgument.set(sa.argumentId, count + 1);
   });
 
-  // Helper: calculate vertical space needed for an argument based on its sub-arguments
+  // Helper: calculate full visual height of an argument's sub-arg group
+  // (from top edge of first card to bottom edge of last card)
   const getArgumentHeight = (argId: string): number => {
     const subArgCount = subArgCountByArgument.get(argId) || 0;
-    if (subArgCount <= 1) return MIN_ARGUMENT_SPACING;
-    // Height = (subArgCount - 1) * spacing + card height + buffer
-    // Add extra buffer for arguments with many sub-arguments
-    const extraBuffer = subArgCount >= 4 ? 380 : 0;
-    return (subArgCount - 1) * SUBARG_SPACING + SUBARG_CARD_HEIGHT + 80 + extraBuffer;
+    if (subArgCount <= 1) return SUBARG_CARD_HEIGHT;
+    return (subArgCount - 1) * SUBARG_SPACING + SUBARG_CARD_HEIGHT;
   };
 
   // Group arguments by standardKey
@@ -799,18 +799,20 @@ function calculateTreeLayout(
 
     if (standardArgs.length === 0) return;
 
-    // Calculate Y positions for this group of arguments with dynamic spacing
-    const groupStartY = currentY;
+    // Calculate how far the first arg's sub-args extend above its center
+    const firstArgTopExtent = getArgumentHeight(standardArgs[0].id) / 2;
+    // Place first argument so its top sub-arg card starts at currentY
+    const groupStartY = currentY + firstArgTopExtent;
     const argPositions: number[] = [];
     let argY = groupStartY;
 
     standardArgs.forEach((arg, idx) => {
       argPositions.push(argY);
       if (idx < standardArgs.length - 1) {
-        // Calculate spacing based on current and next argument's sub-argument count
+        // Spacing = half-heights of adjacent args + visual gap
         const currentHeight = getArgumentHeight(arg.id);
         const nextHeight = getArgumentHeight(standardArgs[idx + 1].id);
-        const spacing = Math.max(currentHeight / 2 + nextHeight / 2, MIN_ARGUMENT_SPACING);
+        const spacing = Math.max(currentHeight / 2 + nextHeight / 2 + WITHIN_GROUP_GAP, MIN_ARGUMENT_SPACING);
         argY += spacing;
       }
     });
@@ -850,19 +852,21 @@ function calculateTreeLayout(
       },
     });
 
-    // Move currentY to after this group (with extra spacing between groups)
-    const lastArgHeight = getArgumentHeight(standardArgs[standardArgs.length - 1].id);
-    currentY = groupEndY + lastArgHeight / 2 + MIN_ARGUMENT_SPACING;
+    // Move currentY to the bottom edge of this group + gap
+    const lastArgBottomExtent = getArgumentHeight(standardArgs[standardArgs.length - 1].id) / 2;
+    currentY = groupEndY + lastArgBottomExtent + BETWEEN_GROUP_GAP;
   });
 
   // Add unmapped arguments at the end
   unmappedArguments.forEach(arg => {
     const savedPos = savedPositions.get(arg.id);
     const argHeight = getArgumentHeight(arg.id);
+    const topExtent = argHeight / 2;
+    const argY = currentY + topExtent;
     argumentNodes.push({
       id: arg.id,
       type: 'argument' as const,
-      position: savedPos || { x: ARGUMENT_X, y: currentY },
+      position: savedPos || { x: ARGUMENT_X, y: argY },
       data: {
         title: arg.title,
         subject: arg.subject,
@@ -872,7 +876,7 @@ function calculateTreeLayout(
         completenessScore: arg.completeness?.score,
       },
     });
-    currentY += Math.max(argHeight, MIN_ARGUMENT_SPACING);
+    currentY = argY + argHeight / 2 + BETWEEN_GROUP_GAP;
   });
 
   // Build sub-argument nodes

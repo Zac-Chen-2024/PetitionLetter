@@ -11,7 +11,6 @@ import { toLLMProvider } from '../types';
 const LLM_PROVIDERS: { id: LLMProvider; name: string }[] = [
   { id: 'deepseek', name: 'DeepSeek' },
   { id: 'openai', name: 'OpenAI' },
-  { id: 'ollama', name: 'Ollama' },
 ];
 
 const LogoIcon = () => (

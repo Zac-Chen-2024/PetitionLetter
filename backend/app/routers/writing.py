@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/write/v2", tags=["Writing V2"])
 
 class WriteRequest(BaseModel):
     """写作请求"""
-    # 可选参数，用于自定义写作
+    provider: str = "deepseek"
     style_template_id: Optional[str] = None
     additional_instructions: Optional[str] = None
 
@@ -81,8 +81,9 @@ async def write_petition_v2(
         section: 标准 key (如 "scholarly_articles", "qualifying_relationship")
     """
     try:
+        req = request or WriteRequest()
         # 执行两步写作
-        result = await write_petition_section(project_id, section)
+        result = await write_petition_section(project_id, section, provider=req.provider)
 
         # 保存结果
         version_id = save_constrained_writing(
@@ -272,6 +273,7 @@ router_v3 = APIRouter(prefix="/api/write/v3", tags=["Writing V3"])
 
 class WriteV3Request(BaseModel):
     """V3 写作请求"""
+    provider: str = "deepseek"
     argument_ids: Optional[List[str]] = None  # 可选，指定要生成的 Argument IDs
     subargument_ids: Optional[List[str]] = None  # 可选，指定要生成的 SubArgument IDs（用于局部重新生成）
     style: str = "legal"
@@ -398,7 +400,8 @@ async def write_petition_v3(
             standard_key=standard_key,
             argument_ids=req.argument_ids,
             subargument_ids=req.subargument_ids,
-            additional_instructions=req.additional_instructions
+            additional_instructions=req.additional_instructions,
+            provider=req.provider
         )
 
         if not result.get("success"):

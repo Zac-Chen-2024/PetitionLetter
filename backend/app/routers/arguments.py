@@ -23,7 +23,8 @@ from ..services.argument_qualifier import (
     get_qualification_summary
 )
 from ..services.legal_argument_organizer import (
-    full_legal_pipeline
+    full_legal_pipeline,
+    regenerate_standard_pipeline,
 )
 import json
 import logging
@@ -109,6 +110,33 @@ async def generate_arguments(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class RegenerateStandardRequest(BaseModel):
+    standard_key: str
+    applicant_name: Optional[str] = None
+    provider: str = "deepseek"
+
+
+@router.post("/{project_id}/regenerate-standard")
+async def regenerate_standard(project_id: str, request: RegenerateStandardRequest):
+    """
+    按单个 standard 重新生成 Arguments + SubArguments。
+
+    只替换该 standard_key 下的 arguments 和 sub_arguments，
+    其余标准的数据保持不动。省去重跑全部标准的时间和 API credits。
+    """
+    result = await regenerate_standard_pipeline(
+        project_id=project_id,
+        standard_key=request.standard_key,
+        applicant_name=request.applicant_name or "the applicant",
+        provider=request.provider
+    )
+
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Unknown error"))
+
+    return result
+
+
 # ============================================
 # Arguments CRUD
 # ============================================
@@ -192,6 +220,7 @@ class SnippetRecommendRequest(BaseModel):
     title: str
     description: Optional[str] = None
     exclude_snippet_ids: List[str] = []
+    provider: str = "deepseek"
 
 
 class RecommendedSnippet(BaseModel):
@@ -263,7 +292,8 @@ async def recommend_snippets(
             argument_id=request.argument_id,
             title=request.title,
             description=request.description,
-            exclude_snippet_ids=exclude_ids
+            exclude_snippet_ids=exclude_ids,
+            provider=request.provider
         )
 
         return SnippetRecommendResponse(
@@ -327,6 +357,7 @@ class InferRelationshipRequest(BaseModel):
     """推断 Relationship 请求"""
     argument_id: str
     subargument_title: str
+    provider: str = "deepseek"
 
 
 class UpdateSubArgumentRequest(BaseModel):
@@ -483,7 +514,8 @@ async def infer_subargument_relationship(
         relationship = await infer_relationship(
             project_id=project_id,
             argument_id=request.argument_id,
-            subargument_title=request.subargument_title
+            subargument_title=request.subargument_title,
+            provider=request.provider
         )
 
         return {

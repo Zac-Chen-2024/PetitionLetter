@@ -711,7 +711,7 @@ class ArgumentGenerator:
 
             graph_data = await analyze_relationships(
                 snippets=snippets,
-                model="gpt-4o-mini",
+                provider="deepseek",
                 applicant_name=applicant_name,  # Pass known applicant name
                 progress_callback=lambda c, t, m: progress_callback(
                     int(c * 0.6), 100, m

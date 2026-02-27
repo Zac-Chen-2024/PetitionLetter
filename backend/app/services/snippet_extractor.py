@@ -17,7 +17,6 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from .llm_client import call_llm
-from ..core.config import settings
 
 # ==================== LLM Prompts ====================
 
@@ -173,7 +172,8 @@ def format_blocks_for_llm(pages: List[Dict]) -> tuple:
 
 async def extract_snippets_for_exhibit(
     project_id: str,
-    exhibit_id: str
+    exhibit_id: str,
+    provider: str = "deepseek"
 ) -> List[Dict]:
     """
     从单个 exhibit 提取所有证据 snippets（一次性发送整个文档）
@@ -215,16 +215,15 @@ async def extract_snippets_for_exhibit(
     )
 
     try:
-        model = getattr(settings, 'openai_model', 'gpt-4o')
-        print(f"[LLM] Extracting from {exhibit_id} ({len(pages)} pages) using {model}...")
+        print(f"[LLM] Extracting from {exhibit_id} ({len(pages)} pages) using provider={provider}...")
 
         result = await call_llm(
             prompt=prompt,
-            model=model,
             system_prompt=EXTRACTION_SYSTEM_PROMPT,
             json_schema=EXTRACTION_SCHEMA,
             temperature=0.1,
-            max_tokens=4000
+            max_tokens=4000,
+            provider=provider
         )
 
         raw_snippets = result.get("snippets", [])
@@ -273,7 +272,8 @@ async def extract_snippets_for_exhibit(
 async def extract_all_snippets(
     project_id: str,
     progress_callback=None,
-    skip_existing: bool = True  # 默认跳过已提取的文档
+    skip_existing: bool = True,  # 默认跳过已提取的文档
+    provider: str = "deepseek"
 ) -> Dict:
     """
     提取项目中所有 exhibit 的 snippets
@@ -317,7 +317,7 @@ async def extract_all_snippets(
                 progress_callback(idx + 1, total_exhibits)
             continue
 
-        snippets = await extract_snippets_for_exhibit(project_id, exhibit_id)
+        snippets = await extract_snippets_for_exhibit(project_id, exhibit_id, provider=provider)
         extracted += 1
 
         for s in snippets:
@@ -355,8 +355,7 @@ def save_extracted_snippets(project_id: str, snippets: List[Dict]):
         "version": "3.0",  # 升级版本号，标识新的精确定位格式
         "extracted_at": datetime.now(timezone.utc).isoformat(),
         "snippet_count": len(snippets),
-        "extraction_method": "llm_openai_block_level",
-        "model": getattr(settings, 'openai_model', 'gpt-4o'),
+        "extraction_method": "llm_block_level",
         "snippets": snippets
     }
 

@@ -48,7 +48,8 @@ async def generate_petition_prose(
     project_id: str,
     section: str,
     snippet_registry: List[Dict] = None,
-    snippet_links: List[Dict] = None
+    snippet_links: List[Dict] = None,
+    provider: str = "deepseek"
 ) -> str:
     """
     Step 3a: 自由写作
@@ -110,7 +111,8 @@ You focus on demonstrating how the evidence meets USCIS requirements."""
     result = await call_llm_text(
         prompt=prompt,
         system_prompt=system_prompt,
-        temperature=0.7
+        temperature=0.7,
+        provider=provider
     )
 
     return result
@@ -119,7 +121,8 @@ You focus on demonstrating how the evidence meets USCIS requirements."""
 async def annotate_sentences(
     paragraph_text: str,
     snippet_registry: List[Dict],
-    section: str
+    section: str,
+    provider: str = "deepseek"
 ) -> List[Dict]:
     """
     Step 3b: 句子级标注
@@ -198,7 +201,8 @@ Rules:
     result = await call_llm(
         prompt=prompt,
         json_schema=schema,
-        temperature=0.1
+        temperature=0.1,
+        provider=provider
     )
 
     sentences = result.get("sentences", [])
@@ -286,7 +290,8 @@ def _build_structured_context(
 
 async def write_petition_section(
     project_id: str,
-    section: str
+    section: str,
+    provider: str = "deepseek"
 ) -> Dict:
     """
     完整的两步写作流程
@@ -305,12 +310,12 @@ async def write_petition_section(
 
     # 3a: 自由写作
     paragraph = await generate_petition_prose(
-        project_id, section, snippet_registry, snippet_links
+        project_id, section, snippet_registry, snippet_links, provider=provider
     )
 
     # 3b: 句子级标注
     sentences = await annotate_sentences(
-        paragraph, snippet_registry, section
+        paragraph, snippet_registry, section, provider=provider
     )
 
     # 统计

@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 # ============================================
 
 class ExtractionRequest(BaseModel):
-    pass  # 现在默认使用 OpenAI LLM 提取
+    provider: str = "deepseek"
 
 
 class ExtractionResult(BaseModel):
@@ -57,6 +57,7 @@ class PipelineStage(BaseModel):
 @router.post("/extract/{project_id}", response_model=ExtractionResult)
 async def extract_project_snippets(
     project_id: str,
+    request: ExtractionRequest = None,
     skip_existing: bool = True  # 是否跳过已提取的文档（节省 API credits）
 ):
     """
@@ -70,7 +71,8 @@ async def extract_project_snippets(
         skip_existing: 是否跳过已提取的文档（默认 True，节省 API credits）
     """
     try:
-        result = await extract_all_snippets(project_id, skip_existing=skip_existing)
+        req = request or ExtractionRequest()
+        result = await extract_all_snippets(project_id, skip_existing=skip_existing, provider=req.provider)
 
         if not result.get("success"):
             raise HTTPException(status_code=500, detail=result.get("error", "Extraction failed"))

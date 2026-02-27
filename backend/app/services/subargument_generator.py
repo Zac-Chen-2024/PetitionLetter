@@ -33,39 +33,82 @@ Each sub-group should:
 
 Output in English for all titles and relationship labels."""
 
+# ==================== Standard-specific subdivision guidance ====================
+
+STANDARD_SUBDIVISION_GUIDANCE = {
+    "awards": (
+        "Split by INDIVIDUAL AWARD. Each sub-argument = one distinct award. "
+        "Within each: award description → awarding body prestige → selection rigor → competitiveness → peer comparison."
+    ),
+    "membership": (
+        "Split by INDIVIDUAL ASSOCIATION. Each sub-argument = one qualifying association. "
+        "Within each: association intro → membership criteria → review process → notable members."
+    ),
+    "published_material": (
+        "Split by INDIVIDUAL MEDIA COVERAGE. Each sub-argument = one media report about the applicant. "
+        "Within each: article summary → media outlet authority → coverage scope."
+    ),
+    "judging": (
+        "Split by INDIVIDUAL JUDGING ROLE. Each sub-argument = one judging appointment or event. "
+        "Within each: role/title → organization prestige → judging scope → applicant's influence → co-judges."
+    ),
+    "original_contribution": (
+        "Split by INDIVIDUAL CONTRIBUTION. Each sub-argument = one distinct original work or methodology. "
+        "Within each: contribution description → quantified impact → expert endorsements → adoption."
+    ),
+    "scholarly_articles": (
+        "Split by INDIVIDUAL PUBLICATION. Each sub-argument = one article or book. "
+        "Within each: title + venue → journal prestige → research novelty → citation impact."
+    ),
+    "leading_role": (
+        "Split by INDIVIDUAL ORGANIZATION. Each sub-argument = one organization. "
+        "Two-tier structure: (1) organization's distinguished reputation, then (2) applicant's role and achievements."
+    ),
+    "high_salary": (
+        "Typically NO sub-division. Keep as single unified argument. "
+        "If multiple income sources exist, may split by income type (salary, consulting, royalties)."
+    ),
+    "display": (
+        "Split by INDIVIDUAL EXHIBITION or SHOWCASE. Each sub-argument = one exhibition event. "
+        "Within each: exhibition intro → prestige → applicant's work and reception."
+    ),
+    "commercial_success": (
+        "Split by INDIVIDUAL COMMERCIAL ACHIEVEMENT. Each sub-argument = one product or commercial metric. "
+        "Within each: commercial data → industry benchmark → media recognition."
+    ),
+}
+
 SUBDIVIDE_USER_PROMPT = """Main Argument: {argument_title}
 Standard: {standard}
 Total Snippets: {snippet_count}
 
+## How to Split Sub-Arguments for This Standard
+{subdivision_guidance}
+
 ## Snippets
 {snippets_formatted}
 
-Organize these snippets into 2-4 logical sub-groups. Each sub-group should represent a distinct angle or aspect of the evidence.
+Organize these snippets into logical sub-groups following the guidance above.
 
 Return JSON:
 {{
   "sub_arguments": [
     {{
-      "title": "Scope of Responsibilities",
-      "purpose": "Demonstrates the applicant's core management duties in the organization",
-      "relationship": "Proves leadership role",
+      "title": "...",
+      "purpose": "...",
+      "relationship": "...",
       "snippet_ids": ["S1", "S3"]
-    }},
-    {{
-      "title": "Performance Achievements",
-      "purpose": "Shows specific accomplishments during tenure",
-      "relationship": "Quantifies contributions",
-      "snippet_ids": ["S2", "S4", "S5"]
     }}
   ]
 }}
 
 RULES:
-1. Create 2-4 sub-groups (not more, not less)
+1. Follow the standard-specific splitting unit above (per-award, per-publication, per-role, etc.)
 2. Each snippet must be assigned to exactly ONE sub-group
 3. Use English for all title, purpose, and relationship fields
 4. Relationship should be 2-5 words explaining how this supports the main argument
-5. If snippets are too few (<=3), create 2 sub-groups"""
+5. If snippets are too few (<=3), create 2 sub-groups
+6. Create at least 2 sub-groups"""
 
 
 @dataclass
@@ -125,11 +168,18 @@ async def subdivide_argument(
 
     snippets_formatted = "\n".join(snippets_lines)
 
+    # Get standard-specific subdivision guidance
+    guidance = STANDARD_SUBDIVISION_GUIDANCE.get(
+        standard,
+        "Split by distinct evidence themes or aspects."
+    )
+
     # Build prompt
     user_prompt = SUBDIVIDE_USER_PROMPT.format(
         argument_title=argument_title,
         standard=standard,
         snippet_count=len(snippets),
+        subdivision_guidance=guidance,
         snippets_formatted=snippets_formatted
     )
 
