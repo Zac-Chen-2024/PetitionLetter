@@ -1175,13 +1175,15 @@ export function ArgumentGraph() {
 
   // ==================== Merge Mode Logic ====================
 
-  // Determine which argument_id the first selected sub-arg belongs to (for cross-argument constraint)
-  const mergeLockedArgumentId = useMemo(() => {
+  // Determine which standard_key the first selected sub-arg belongs to (for same-standard constraint)
+  const mergeLockedStandardKey = useMemo(() => {
     if (mergeSelectedIds.size === 0) return null;
     const firstId = mergeSelectedIds.values().next().value;
     const sa = contextSubArguments.find(s => s.id === firstId);
-    return sa?.argumentId || null;
-  }, [mergeSelectedIds, contextSubArguments]);
+    if (!sa) return null;
+    const parentArg = contextArguments.find(a => a.id === sa.argumentId);
+    return parentArg?.standardKey || null;
+  }, [mergeSelectedIds, contextSubArguments, contextArguments]);
 
   // Toggle merge selection for a sub-argument
   const handleMergeToggle = useCallback((subArgId: string) => {
@@ -1464,7 +1466,7 @@ export function ArgumentGraph() {
       {/* Merge mode banner */}
       {isMergeMode && (
         <div className="flex-shrink-0 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-700">
-          Click sub-argument cards to select them for merging. All selected must be under the same argument. Press Escape to cancel.
+          Click sub-argument cards to select them for merging. All selected must be under the same standard (can be from different arguments). Press Escape to cancel.
         </div>
       )}
 
@@ -1557,7 +1559,10 @@ export function ArgumentGraph() {
 
             {/* Sub-argument nodes */}
             {subArgumentNodes.map(node => {
-              const isMergeDisabled = isMergeMode && mergeLockedArgumentId !== null && node.data.argumentId !== mergeLockedArgumentId;
+              // Find this sub-arg's standard_key via its parent argument
+              const parentArg = contextArguments.find(a => a.id === node.data.argumentId);
+              const nodeStandardKey = parentArg?.standardKey || null;
+              const isMergeDisabled = isMergeMode && mergeLockedStandardKey !== null && nodeStandardKey !== mergeLockedStandardKey;
               const isMergeChecked = mergeSelectedIds.has(node.id);
               return (
                 <SubArgumentNodeComponent
@@ -1646,6 +1651,7 @@ export function ArgumentGraph() {
       {showMergeModal && mergeSelectedSubArgs.length >= 2 && (
         <MergeSubArgumentsModal
           selectedSubArguments={mergeSelectedSubArgs}
+          projectId={projectId}
           onConfirm={handleMergeConfirm}
           onCancel={() => setShowMergeModal(false)}
         />

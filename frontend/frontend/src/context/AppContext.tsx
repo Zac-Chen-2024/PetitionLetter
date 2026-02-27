@@ -88,9 +88,8 @@ export function useApp() {
     return writing.regenerateSubArgumentInLetter(subArgumentId, project.projectId, project.llmProvider, args.subArguments, args.arguments);
   }, [writing.regenerateSubArgumentInLetter, project.projectId, project.llmProvider, args.subArguments, args.arguments]);
 
-  // mergeSubArguments: original signature takes (subArgumentIds, title, purpose, relationship) => Promise<SubArgument>
-  // ArgumentsContext signature takes (subArgumentIds, title, purpose, relationship, projectId) => Promise<SubArgument>
-  // Also cascade: remove each deleted sub-arg from letter
+  // mergeSubArguments: facade binds projectId, cascades letter removal
+  // Returns { newArgument, newSubArgument }
   const mergeSubArguments = useCallback(async (
     subArgumentIds: string[],
     title: string,

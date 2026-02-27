@@ -344,19 +344,26 @@ def merge_subarguments(
     subargument_ids: List[str],
     merged_title: str,
     merged_purpose: str = "",
-    merged_relationship: str = ""
+    merged_relationship: str = "",
 ) -> Dict:
     """
-    合并多个 SubArguments 为一个新的 SubArgument
+    合并多个 SubArguments → 创建新 Argument + 新 SubArgument
 
-    要求：
+    约束：
     1. subargument_ids >= 2
-    2. 所有 sub-args 必须属于同一个 argument_id
+    2. 所有 sub-args 必须属于同一个 standard_key（可跨 Argument）
     3. snippet_ids 去重合并，保持顺序
+
+    流程：
+    - 创建新 Argument（standard_key 同源）
+    - 创建新 SubArgument 挂在新 Argument 下
+    - 删除旧 sub-args，清理旧 parent arguments 的 sub_argument_ids
+    - 级联清理 writing
 
     Returns:
         {
           "success": True,
+          "new_argument": {...},
           "merged_subargument": {...},
           "deleted_subargument_ids": [...],
           "writing_changes": [...]
@@ -381,82 +388,103 @@ def merge_subarguments(
             raise ValueError(f"SubArgument not found: {sa_id}")
         source_subargs.append(found)
 
-    # 验证全部属于同一个 argument_id
+    # 收集涉及的 argument_ids → 找到 standard_key
     argument_ids = set(sa.get("argument_id") for sa in source_subargs)
-    if len(argument_ids) != 1:
-        raise ValueError("All sub-arguments must belong to the same argument")
-    argument_id = argument_ids.pop()
+    arg_map = {a["id"]: a for a in arguments}
+
+    standard_keys = set()
+    for aid in argument_ids:
+        arg = arg_map.get(aid)
+        if arg:
+            standard_keys.add(arg.get("standard_key"))
+
+    if len(standard_keys) != 1:
+        raise ValueError("All sub-arguments must belong to the same standard")
+    standard_key = standard_keys.pop()
+
+    # 获取 subject（从第一个 argument 拿）
+    first_arg = arg_map.get(next(iter(argument_ids)))
+    subject = first_arg.get("subject", "") if first_arg else ""
 
     # 合并 snippet_ids（去重，保持顺序）
-    seen = set()
-    merged_snippet_ids = []
+    seen: Set[str] = set()
+    merged_snippet_ids: List[str] = []
     for sa in source_subargs:
         for snip_id in sa.get("snippet_ids", []):
             if snip_id not in seen:
                 seen.add(snip_id)
                 merged_snippet_ids.append(snip_id)
 
-    # 创建新 sub-arg
+    now_str = datetime.now(timezone.utc).isoformat()
+
+    # 创建新 Argument
+    new_arg = {
+        "id": f"arg-{uuid.uuid4().hex[:8]}",
+        "standard": standard_key,
+        "standard_key": standard_key,
+        "title": merged_title,
+        "rationale": merged_purpose or f"Merged from {len(subargument_ids)} sub-arguments",
+        "snippet_ids": merged_snippet_ids,
+        "evidence_strength": "moderate",
+        "sub_argument_ids": [],  # 下面会填
+        "subject": subject,
+        "confidence": 0.8,
+        "is_ai_generated": False,
+        "created_at": now_str,
+    }
+
+    # 创建新 SubArgument 挂在新 Argument 下
     new_subarg = {
         "id": f"subarg-{uuid.uuid4().hex[:8]}",
-        "argument_id": argument_id,
+        "argument_id": new_arg["id"],
         "title": merged_title,
         "purpose": merged_purpose,
-        "relationship": merged_relationship,
+        "relationship": merged_relationship or "Combined evidence",
         "snippet_ids": merged_snippet_ids,
         "is_ai_generated": False,
         "status": "draft",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "merged_from": subargument_ids,  # 溯源
+        "created_at": now_str,
+        "merged_from": subargument_ids,
     }
+    new_arg["sub_argument_ids"] = [new_subarg["id"]]
 
-    # 找到 parent argument 的 standard_key（用于 writing 级联）
-    parent_standard_key = None
-    for arg in arguments:
-        if arg.get("id") == argument_id:
-            parent_standard_key = arg.get("standard_key")
-            break
-
-    # 从 sub_arguments 列表移除旧的，添加新的
+    # 从 sub_arguments 列表移除旧的
+    deleted_set = set(subargument_ids)
     legal_args["sub_arguments"] = [
-        sa for sa in sub_arguments if sa.get("id") not in subargument_ids
+        sa for sa in sub_arguments if sa.get("id") not in deleted_set
     ]
+    # 添加新的
     legal_args["sub_arguments"].append(new_subarg)
 
-    # 更新 parent argument 的 sub_argument_ids
+    # 从旧 parent arguments 移除 sub_argument_ids 引用
     for arg in arguments:
-        if arg.get("id") == argument_id:
+        if arg["id"] in argument_ids:
             old_ids = arg.get("sub_argument_ids", [])
-            # 移除旧的，在第一个旧 ID 的位置插入新的
-            first_old_index = len(old_ids)  # default: append
-            for i, sid in enumerate(old_ids):
-                if sid in subargument_ids:
-                    first_old_index = min(first_old_index, i)
-            new_ids = [sid for sid in old_ids if sid not in subargument_ids]
-            new_ids.insert(first_old_index, new_subarg["id"])
-            arg["sub_argument_ids"] = new_ids
-            break
+            arg["sub_argument_ids"] = [sid for sid in old_ids if sid not in deleted_set]
+
+    # 添加新 Argument
+    legal_args["arguments"].append(new_arg)
 
     # 保存
     save_legal_arguments(project_id, legal_args)
 
     # 级联清理 writing
     writing_changes = []
-    if parent_standard_key:
-        for old_id in subargument_ids:
-            try:
-                result = remove_subargument_from_writing(project_id, old_id, parent_standard_key)
-                if result.get("changed"):
-                    writing_changes.append({
-                        "subargument_id": old_id,
-                        "section": parent_standard_key,
-                        "removed_indices": result["removed_indices"],
-                    })
-            except Exception:
-                pass  # best-effort
+    for old_id in subargument_ids:
+        try:
+            result = remove_subargument_from_writing(project_id, old_id, standard_key)
+            if result.get("changed"):
+                writing_changes.append({
+                    "subargument_id": old_id,
+                    "section": standard_key,
+                    "removed_indices": result["removed_indices"],
+                })
+        except Exception:
+            pass  # best-effort
 
     return {
         "success": True,
+        "new_argument": new_arg,
         "merged_subargument": new_subarg,
         "deleted_subargument_ids": subargument_ids,
         "writing_changes": writing_changes,

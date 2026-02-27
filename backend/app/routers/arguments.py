@@ -507,15 +507,14 @@ async def merge_subarguments_endpoint(
     request: MergeSubArgumentsRequest
 ):
     """
-    合并多个 SubArguments 为一个
+    合并多个 SubArguments → 新建 Argument + SubArgument
 
     要求：
     - subargument_ids 至少 2 个
-    - 所有 sub-args 必须属于同一个 argument
-    - snippet_ids 去重合并
+    - 所有 sub-args 必须属于同一个 standard（可跨 Argument）
 
     Returns:
-        {success, merged_subargument, deleted_subargument_ids, writing_changes}
+        {success, new_argument, merged_subargument, deleted_subargument_ids, writing_changes}
     """
     try:
         result = merge_subarguments(
