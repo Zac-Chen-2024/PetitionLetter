@@ -210,7 +210,8 @@ from ..services.snippet_recommender import (
     recommend_snippets_for_subargument,
     create_subargument,
     get_assigned_snippet_ids,
-    infer_relationship
+    infer_relationship,
+    merge_subarguments,
 )
 
 
@@ -490,6 +491,46 @@ async def delete_subargument(
         "message": "SubArgument deleted",
         "writing_changes": writing_changes
     }
+
+
+class MergeSubArgumentsRequest(BaseModel):
+    """合并 SubArguments 请求"""
+    subargument_ids: List[str]  # min 2
+    merged_title: str
+    merged_purpose: str = ""
+    merged_relationship: str = ""
+
+
+@router.post("/{project_id}/subarguments/merge")
+async def merge_subarguments_endpoint(
+    project_id: str,
+    request: MergeSubArgumentsRequest
+):
+    """
+    合并多个 SubArguments 为一个
+
+    要求：
+    - subargument_ids 至少 2 个
+    - 所有 sub-args 必须属于同一个 argument
+    - snippet_ids 去重合并
+
+    Returns:
+        {success, merged_subargument, deleted_subargument_ids, writing_changes}
+    """
+    try:
+        result = merge_subarguments(
+            project_id=project_id,
+            subargument_ids=request.subargument_ids,
+            merged_title=request.merged_title,
+            merged_purpose=request.merged_purpose,
+            merged_relationship=request.merged_relationship,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Merge sub-arguments failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/{project_id}/infer-relationship")

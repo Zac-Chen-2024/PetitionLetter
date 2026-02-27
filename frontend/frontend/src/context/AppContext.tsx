@@ -88,6 +88,24 @@ export function useApp() {
     return writing.regenerateSubArgumentInLetter(subArgumentId, project.projectId, project.llmProvider, args.subArguments, args.arguments);
   }, [writing.regenerateSubArgumentInLetter, project.projectId, project.llmProvider, args.subArguments, args.arguments]);
 
+  // mergeSubArguments: original signature takes (subArgumentIds, title, purpose, relationship) => Promise<SubArgument>
+  // ArgumentsContext signature takes (subArgumentIds, title, purpose, relationship, projectId) => Promise<SubArgument>
+  // Also cascade: remove each deleted sub-arg from letter
+  const mergeSubArguments = useCallback(async (
+    subArgumentIds: string[],
+    title: string,
+    purpose: string,
+    relationship: string
+  ) => {
+    // Before merge, cascade remove each sub-arg from letter
+    for (const id of subArgumentIds) {
+      const subArg = args.subArguments.find(sa => sa.id === id);
+      const subArgTitle = subArg?.title || '';
+      writing.removeSubArgumentFromLetter(id, args.arguments, project.projectId, subArgTitle);
+    }
+    return args.mergeSubArguments(subArgumentIds, title, purpose, relationship, project.projectId);
+  }, [args.mergeSubArguments, args.subArguments, args.arguments, writing.removeSubArgumentFromLetter, project.projectId]);
+
   // removeArgument: original removes from arguments + writingEdges + argumentMappings
   // ArgumentsContext only removes from arguments + argumentMappings
   // We also need to remove from writingEdges
@@ -193,6 +211,7 @@ export function useApp() {
     updateSubArgument: args.updateSubArgument,
     removeSubArgument,
     regenerateSubArgument,
+    mergeSubArguments,
     isGeneratingArguments: args.isGeneratingArguments,
     generateArguments,
     generatedMainSubject: args.generatedMainSubject,
@@ -267,7 +286,7 @@ export function useApp() {
     extractionProgress: writing.extractionProgress,
   }), [
     project, snippets, args, ui, writing,
-    generateArguments, addSubArgument, removeSubArgument, regenerateSubArgument,
+    generateArguments, addSubArgument, removeSubArgument, regenerateSubArgument, mergeSubArguments,
     removeArgument, commitChanges, extractSnippets, confirmAllMappings, generatePetition,
     reloadSnippets, unifiedExtract, generateMergeSuggestions, confirmMerges,
     applyMerges, loadMergeSuggestions, isElementHighlighted,

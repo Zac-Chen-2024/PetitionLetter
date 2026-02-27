@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { useLegalStandards } from '../hooks/useLegalStandards';
 import { STANDARD_KEY_TO_ID } from '../constants/colors';
 import { apiClient } from '../services/api';
+import { MergeSubArgumentsModal } from './MergeSubArgumentsModal';
 import type { Position, Argument, SubArgument } from '../types';
 
 // ============================================
@@ -352,6 +353,9 @@ function SubArgumentNodeComponent({
   onDelete,
   autoEdit,
   onAutoEditComplete,
+  mergeMode,
+  mergeChecked,
+  mergeDisabled,
 }: DraggableNodeProps & {
   node: SubArgumentNode;
   t: (key: string, options?: Record<string, unknown>) => string;
@@ -362,6 +366,9 @@ function SubArgumentNodeComponent({
   onDelete?: (subArgumentId: string) => void;  // Delete callback
   autoEdit?: boolean;  // Auto-enter edit mode for newly created nodes
   onAutoEditComplete?: () => void;  // Callback when auto-edit is acknowledged
+  mergeMode?: boolean;
+  mergeChecked?: boolean;
+  mergeDisabled?: boolean;
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -375,6 +382,11 @@ function SubArgumentNodeComponent({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isEditing) return; // Don't start drag when editing
     e.stopPropagation();
+    if (mergeMode) {
+      // In merge mode: just toggle selection, no drag
+      if (!mergeDisabled) onSelect();
+      return;
+    }
     setIsDragging(true);
     dragStartPos.current = { x: e.clientX, y: e.clientY };
     nodeStartPos.current = { ...node.position };
@@ -514,12 +526,28 @@ function SubArgumentNodeComponent({
     >
       <div
         className={`
-          w-[320px] p-3 rounded-lg border-2 border-emerald-400 bg-emerald-50 shadow-sm transition-all
-          ${isSelected ? 'ring-2 ring-offset-2 ring-emerald-500 shadow-md border-emerald-500' : 'hover:shadow-md hover:border-emerald-500'}
+          w-[320px] p-3 rounded-lg border-2 shadow-sm transition-all
+          ${mergeMode && mergeDisabled ? 'border-slate-300 bg-slate-100 opacity-40 cursor-not-allowed' : ''}
+          ${mergeMode && !mergeDisabled && mergeChecked ? 'border-amber-500 bg-amber-50 ring-2 ring-offset-2 ring-amber-400 shadow-md' : ''}
+          ${mergeMode && !mergeDisabled && !mergeChecked ? 'border-emerald-400 bg-emerald-50 hover:border-amber-400 cursor-pointer' : ''}
+          ${!mergeMode && isSelected ? 'border-emerald-500 ring-2 ring-offset-2 ring-emerald-500 shadow-md bg-emerald-50' : ''}
+          ${!mergeMode && !isSelected ? 'border-emerald-400 bg-emerald-50 hover:shadow-md hover:border-emerald-500' : ''}
         `}
       >
         {/* Header with title and actions */}
         <div className="flex items-start justify-between gap-2 mb-1">
+          {/* Merge checkbox */}
+          {mergeMode && !mergeDisabled && (
+            <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+              mergeChecked ? 'border-amber-500 bg-amber-500' : 'border-slate-300'
+            }`}>
+              {mergeChecked && (
+                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </div>
+          )}
           {isEditing ? (
             <input
               ref={inputRef}
@@ -540,6 +568,7 @@ function SubArgumentNodeComponent({
               {node.data.title}
             </span>
           )}
+          {!mergeMode && (
           <div className="flex items-center gap-1 flex-shrink-0">
             {/* Red dot indicator for pending snippet confirmation */}
             {node.data.needsSnippetConfirmation && (
@@ -583,6 +612,7 @@ function SubArgumentNodeComponent({
               <span className="text-[9px] px-1.5 py-0.5 bg-emerald-200 text-emerald-700 rounded">AI</span>
             )}
           </div>
+          )}
         </div>
 
         {/* Purpose */}
@@ -948,6 +978,7 @@ export function ArgumentGraph() {
     regenerateSubArgument,
     removeSubArgument,
     addSubArgument,
+    mergeSubArguments,
     projectId,
   } = useApp();
 
@@ -957,6 +988,11 @@ export function ArgumentGraph() {
   const [isPanning, setIsPanning] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [newlyCreatedSubArgId, setNewlyCreatedSubArgId] = useState<string | null>(null);
+  // Merge mode state
+  const [isMergeMode, setIsMergeMode] = useState(false);
+  const [mergeSelectedIds, setMergeSelectedIds] = useState<Set<string>>(new Set());
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
   const panStartPos = useRef<Position | null>(null);
   const offsetStartPos = useRef<Position | null>(null);
 
@@ -1137,6 +1173,60 @@ export function ArgumentGraph() {
     setSelectedNodeId(null);
   }, [removeSubArgument, focusState, setFocusState]);
 
+  // ==================== Merge Mode Logic ====================
+
+  // Determine which argument_id the first selected sub-arg belongs to (for cross-argument constraint)
+  const mergeLockedArgumentId = useMemo(() => {
+    if (mergeSelectedIds.size === 0) return null;
+    const firstId = mergeSelectedIds.values().next().value;
+    const sa = contextSubArguments.find(s => s.id === firstId);
+    return sa?.argumentId || null;
+  }, [mergeSelectedIds, contextSubArguments]);
+
+  // Toggle merge selection for a sub-argument
+  const handleMergeToggle = useCallback((subArgId: string) => {
+    setMergeSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(subArgId)) {
+        next.delete(subArgId);
+      } else {
+        next.add(subArgId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Exit merge mode
+  const exitMergeMode = useCallback(() => {
+    setIsMergeMode(false);
+    setMergeSelectedIds(new Set());
+    setShowMergeModal(false);
+  }, []);
+
+  // Get the selected SubArgument objects for the modal
+  const mergeSelectedSubArgs = useMemo(() => {
+    return contextSubArguments.filter(sa => mergeSelectedIds.has(sa.id));
+  }, [contextSubArguments, mergeSelectedIds]);
+
+  // Handle merge confirm from modal
+  const handleMergeConfirm = useCallback(async (data: { title: string; purpose: string; relationship: string }) => {
+    if (!mergeSubArguments) return;
+    setIsMerging(true);
+    try {
+      await mergeSubArguments(
+        Array.from(mergeSelectedIds),
+        data.title,
+        data.purpose,
+        data.relationship,
+      );
+      exitMergeMode();
+    } catch (error) {
+      console.error('Merge failed:', error);
+    } finally {
+      setIsMerging(false);
+    }
+  }, [mergeSubArguments, mergeSelectedIds, exitMergeMode]);
+
   // Handle standard selection
   const handleStandardSelect = useCallback((standardId: string) => {
     setSelectedNodeId(standardId);
@@ -1269,13 +1359,17 @@ export function ArgumentGraph() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setSelectedNodeId(null);
+        if (isMergeMode) {
+          exitMergeMode();
+        } else {
+          setSelectedNodeId(null);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isMergeMode, exitMergeMode]);
 
   // Get generateArguments from context
   const { generateArguments, isGeneratingArguments, workMode, setWorkMode } = useApp();
@@ -1317,7 +1411,28 @@ export function ArgumentGraph() {
             </button>
           </div>
 
-          {/* Right side: Write/Verify toggle button */}
+          {/* Right side: Merge button + Write/Verify toggle */}
+          <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (isMergeMode) {
+                exitMergeMode();
+              } else {
+                setIsMergeMode(true);
+                setMergeSelectedIds(new Set());
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              isMergeMode
+                ? 'text-white bg-amber-500 hover:bg-amber-600'
+                : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <span>{isMergeMode ? 'Exit Merge' : 'Merge'}</span>
+          </button>
           <button
             onClick={() => setWorkMode(workMode === 'verify' ? 'write' : 'verify')}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
@@ -1342,8 +1457,16 @@ export function ArgumentGraph() {
               </>
             )}
           </button>
+          </div>
         </div>
       </div>
+
+      {/* Merge mode banner */}
+      {isMergeMode && (
+        <div className="flex-shrink-0 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-700">
+          Click sub-argument cards to select them for merging. All selected must be under the same argument. Press Escape to cancel.
+        </div>
+      )}
 
       {/* Canvas area */}
       <div className="flex-1 relative overflow-hidden">
@@ -1433,24 +1556,37 @@ export function ArgumentGraph() {
             />
 
             {/* Sub-argument nodes */}
-            {subArgumentNodes.map(node => (
-              <SubArgumentNodeComponent
-                key={node.id}
-                node={node}
-                isSelected={isSubArgumentHighlighted(node)}
-                onSelect={() => handleSubArgumentSelect(node.id)}
-                onDrag={handleNodeDrag}
-                scale={scale}
-                t={t}
-                onPositionReport={handleSubArgumentPositionReport}
-                transformVersion={transformVersion}
-                onRegenerate={handleSubArgumentRegenerate}
-                onTitleChange={handleSubArgumentTitleChange}
-                onDelete={handleSubArgumentDelete}
-                autoEdit={node.id === newlyCreatedSubArgId}
-                onAutoEditComplete={() => setNewlyCreatedSubArgId(null)}
-              />
-            ))}
+            {subArgumentNodes.map(node => {
+              const isMergeDisabled = isMergeMode && mergeLockedArgumentId !== null && node.data.argumentId !== mergeLockedArgumentId;
+              const isMergeChecked = mergeSelectedIds.has(node.id);
+              return (
+                <SubArgumentNodeComponent
+                  key={node.id}
+                  node={node}
+                  isSelected={isMergeMode ? isMergeChecked : isSubArgumentHighlighted(node)}
+                  onSelect={() => {
+                    if (isMergeMode) {
+                      if (!isMergeDisabled) handleMergeToggle(node.id);
+                    } else {
+                      handleSubArgumentSelect(node.id);
+                    }
+                  }}
+                  onDrag={isMergeMode ? () => {} : handleNodeDrag}
+                  scale={scale}
+                  t={t}
+                  onPositionReport={handleSubArgumentPositionReport}
+                  transformVersion={transformVersion}
+                  onRegenerate={isMergeMode ? undefined : handleSubArgumentRegenerate}
+                  onTitleChange={isMergeMode ? undefined : handleSubArgumentTitleChange}
+                  onDelete={isMergeMode ? undefined : handleSubArgumentDelete}
+                  autoEdit={node.id === newlyCreatedSubArgId}
+                  onAutoEditComplete={() => setNewlyCreatedSubArgId(null)}
+                  mergeMode={isMergeMode}
+                  mergeChecked={isMergeChecked}
+                  mergeDisabled={isMergeDisabled}
+                />
+              );
+            })}
 
             {/* Argument nodes */}
             {argumentNodes.map(node => (
@@ -1482,8 +1618,38 @@ export function ArgumentGraph() {
             ))}
           </div>
         </div>
+
+        {/* Merge mode floating action bar */}
+        {isMergeMode && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white rounded-xl shadow-xl border border-amber-300 px-5 py-3 flex items-center gap-4">
+            <span className="text-sm text-slate-700 font-medium">
+              {mergeSelectedIds.size} selected
+            </span>
+            <button
+              onClick={exitMergeMode}
+              className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 border border-slate-300 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => setShowMergeModal(true)}
+              disabled={mergeSelectedIds.size < 2 || isMerging}
+              className="px-4 py-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              {isMerging ? 'Merging...' : `Merge ${mergeSelectedIds.size} Sub-Arguments`}
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Merge modal */}
+      {showMergeModal && mergeSelectedSubArgs.length >= 2 && (
+        <MergeSubArgumentsModal
+          selectedSubArguments={mergeSelectedSubArgs}
+          onConfirm={handleMergeConfirm}
+          onCancel={() => setShowMergeModal(false)}
+        />
+      )}
     </div>
   );
 }

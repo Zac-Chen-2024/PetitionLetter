@@ -94,6 +94,7 @@ export interface ArgumentsContextType {
   updateSubArgument: (id: string, updates: Partial<Omit<SubArgument, 'id' | 'createdAt'>>) => void;
   removeSubArgument: (id: string, projectId: string) => void;
   regenerateSubArgument: (subArgumentId: string, projectId: string) => Promise<void>;
+  mergeSubArguments: (subArgumentIds: string[], title: string, purpose: string, relationship: string, projectId: string) => Promise<SubArgument>;
   isGeneratingArguments: boolean;
   generateArguments: (projectId: string, llmProvider: string, forceReanalyze?: boolean, applicantName?: string) => Promise<void>;
   generatedMainSubject: string | null;
@@ -309,6 +310,79 @@ export function ArgumentsProvider({ children }: { children: ReactNode }) {
     console.warn('regenerateSubArgument should be called via useApp() facade which has access to WritingContext');
   }, []);
 
+  // Merge SubArguments
+  const mergeSubArguments = useCallback(async (
+    subArgumentIds: string[],
+    title: string,
+    purpose: string,
+    relationship: string,
+    projectId: string
+  ): Promise<SubArgument> => {
+    const response = await apiClient.post<{
+      success: boolean;
+      merged_subargument: {
+        id: string;
+        argument_id: string;
+        title: string;
+        purpose: string;
+        relationship: string;
+        snippet_ids: string[];
+        is_ai_generated: boolean;
+        status: string;
+        created_at: string;
+      };
+      deleted_subargument_ids: string[];
+      writing_changes: Array<{ subargument_id: string; section: string; removed_indices: number[] }>;
+    }>(`/arguments/${projectId}/subarguments/merge`, {
+      subargument_ids: subArgumentIds,
+      merged_title: title,
+      merged_purpose: purpose,
+      merged_relationship: relationship,
+    });
+
+    if (!response.success) {
+      throw new Error('Failed to merge sub-arguments');
+    }
+
+    const merged = response.merged_subargument;
+    const newSubArgument: SubArgument = {
+      id: merged.id,
+      argumentId: merged.argument_id,
+      title: merged.title,
+      purpose: merged.purpose,
+      relationship: merged.relationship,
+      snippetIds: merged.snippet_ids,
+      isAIGenerated: merged.is_ai_generated,
+      status: merged.status as 'draft' | 'verified',
+      createdAt: new Date(merged.created_at),
+      updatedAt: new Date(),
+    };
+
+    // Remove old sub-args and add new one
+    const deletedIds = new Set(response.deleted_subargument_ids);
+    setSubArguments(prev => [
+      ...prev.filter(sa => !deletedIds.has(sa.id)),
+      newSubArgument,
+    ]);
+
+    // Update parent argument's subArgumentIds
+    setArguments(prev => prev.map(arg => {
+      if (arg.id !== merged.argument_id) return arg;
+      const oldIds = arg.subArgumentIds || [];
+      // Insert new ID at position of first deleted ID
+      const firstOldIndex = oldIds.findIndex(id => deletedIds.has(id));
+      const newIds = oldIds.filter(id => !deletedIds.has(id));
+      if (firstOldIndex >= 0) {
+        newIds.splice(Math.min(firstOldIndex, newIds.length), 0, newSubArgument.id);
+      } else {
+        newIds.push(newSubArgument.id);
+      }
+      return { ...arg, subArgumentIds: newIds, updatedAt: new Date() };
+    }));
+
+    return newSubArgument;
+  }, []);
+
   // AI Argument Generation
   const generateArguments = useCallback(async (
     projectId: string,
@@ -410,10 +484,11 @@ export function ArgumentsProvider({ children }: { children: ReactNode }) {
     updateSubArgument,
     removeSubArgument,
     regenerateSubArgument,
+    mergeSubArguments,
     isGeneratingArguments,
     generateArguments,
     generatedMainSubject,
-  }), [arguments_, argumentMappings, subArguments, isGeneratingArguments, generatedMainSubject, addArgument, updateArgument, removeArgument, updateArgumentPosition, addSnippetToArgument, removeSnippetFromArgument, addArgumentMapping, removeArgumentMapping, addSubArgument, updateSubArgument, removeSubArgument, regenerateSubArgument, generateArguments]);
+  }), [arguments_, argumentMappings, subArguments, isGeneratingArguments, generatedMainSubject, addArgument, updateArgument, removeArgument, updateArgumentPosition, addSnippetToArgument, removeSnippetFromArgument, addArgumentMapping, removeArgumentMapping, addSubArgument, updateSubArgument, removeSubArgument, regenerateSubArgument, mergeSubArguments, generateArguments]);
 
   return <ArgumentsContext.Provider value={value}>{children}</ArgumentsContext.Provider>;
 }

@@ -337,6 +337,132 @@ def create_subargument(
     return new_subarg
 
 
+# ==================== SubArgument 合并 ====================
+
+def merge_subarguments(
+    project_id: str,
+    subargument_ids: List[str],
+    merged_title: str,
+    merged_purpose: str = "",
+    merged_relationship: str = ""
+) -> Dict:
+    """
+    合并多个 SubArguments 为一个新的 SubArgument
+
+    要求：
+    1. subargument_ids >= 2
+    2. 所有 sub-args 必须属于同一个 argument_id
+    3. snippet_ids 去重合并，保持顺序
+
+    Returns:
+        {
+          "success": True,
+          "merged_subargument": {...},
+          "deleted_subargument_ids": [...],
+          "writing_changes": [...]
+        }
+    """
+    import uuid
+    from .petition_writer_v3 import remove_subargument_from_writing
+
+    if len(subargument_ids) < 2:
+        raise ValueError("At least 2 sub-arguments are required for merging")
+
+    # 加载数据
+    legal_args = load_legal_arguments(project_id)
+    sub_arguments = legal_args.get("sub_arguments", [])
+    arguments = legal_args.get("arguments", [])
+
+    # 找到所有源 sub-args
+    source_subargs = []
+    for sa_id in subargument_ids:
+        found = next((sa for sa in sub_arguments if sa.get("id") == sa_id), None)
+        if not found:
+            raise ValueError(f"SubArgument not found: {sa_id}")
+        source_subargs.append(found)
+
+    # 验证全部属于同一个 argument_id
+    argument_ids = set(sa.get("argument_id") for sa in source_subargs)
+    if len(argument_ids) != 1:
+        raise ValueError("All sub-arguments must belong to the same argument")
+    argument_id = argument_ids.pop()
+
+    # 合并 snippet_ids（去重，保持顺序）
+    seen = set()
+    merged_snippet_ids = []
+    for sa in source_subargs:
+        for snip_id in sa.get("snippet_ids", []):
+            if snip_id not in seen:
+                seen.add(snip_id)
+                merged_snippet_ids.append(snip_id)
+
+    # 创建新 sub-arg
+    new_subarg = {
+        "id": f"subarg-{uuid.uuid4().hex[:8]}",
+        "argument_id": argument_id,
+        "title": merged_title,
+        "purpose": merged_purpose,
+        "relationship": merged_relationship,
+        "snippet_ids": merged_snippet_ids,
+        "is_ai_generated": False,
+        "status": "draft",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "merged_from": subargument_ids,  # 溯源
+    }
+
+    # 找到 parent argument 的 standard_key（用于 writing 级联）
+    parent_standard_key = None
+    for arg in arguments:
+        if arg.get("id") == argument_id:
+            parent_standard_key = arg.get("standard_key")
+            break
+
+    # 从 sub_arguments 列表移除旧的，添加新的
+    legal_args["sub_arguments"] = [
+        sa for sa in sub_arguments if sa.get("id") not in subargument_ids
+    ]
+    legal_args["sub_arguments"].append(new_subarg)
+
+    # 更新 parent argument 的 sub_argument_ids
+    for arg in arguments:
+        if arg.get("id") == argument_id:
+            old_ids = arg.get("sub_argument_ids", [])
+            # 移除旧的，在第一个旧 ID 的位置插入新的
+            first_old_index = len(old_ids)  # default: append
+            for i, sid in enumerate(old_ids):
+                if sid in subargument_ids:
+                    first_old_index = min(first_old_index, i)
+            new_ids = [sid for sid in old_ids if sid not in subargument_ids]
+            new_ids.insert(first_old_index, new_subarg["id"])
+            arg["sub_argument_ids"] = new_ids
+            break
+
+    # 保存
+    save_legal_arguments(project_id, legal_args)
+
+    # 级联清理 writing
+    writing_changes = []
+    if parent_standard_key:
+        for old_id in subargument_ids:
+            try:
+                result = remove_subargument_from_writing(project_id, old_id, parent_standard_key)
+                if result.get("changed"):
+                    writing_changes.append({
+                        "subargument_id": old_id,
+                        "section": parent_standard_key,
+                        "removed_indices": result["removed_indices"],
+                    })
+            except Exception:
+                pass  # best-effort
+
+    return {
+        "success": True,
+        "merged_subargument": new_subarg,
+        "deleted_subargument_ids": subargument_ids,
+        "writing_changes": writing_changes,
+    }
+
+
 # ==================== Relationship 推断 ====================
 
 async def infer_relationship(
