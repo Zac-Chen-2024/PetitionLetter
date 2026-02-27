@@ -4,7 +4,6 @@ import { useApp } from '../context/AppContext';
 import { useLegalStandards } from '../hooks/useLegalStandards';
 import { STANDARD_KEY_TO_ID } from '../constants/colors';
 import { apiClient } from '../services/api';
-import { MergeSubArgumentsModal } from './MergeSubArgumentsModal';
 import type { Position, Argument, SubArgument } from '../types';
 
 // ============================================
@@ -356,6 +355,7 @@ function SubArgumentNodeComponent({
   mergeMode,
   mergeChecked,
   mergeDisabled,
+  projectId,
 }: DraggableNodeProps & {
   node: SubArgumentNode;
   t: (key: string, options?: Record<string, unknown>) => string;
@@ -369,11 +369,13 @@ function SubArgumentNodeComponent({
   mergeMode?: boolean;
   mergeChecked?: boolean;
   mergeDisabled?: boolean;
+  projectId?: string;
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(node.data.title);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isGeneratingAITitle, setIsGeneratingAITitle] = useState(false);
   const dragStartPos = useRef<Position | null>(null);
   const nodeStartPos = useRef<Position | null>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -441,6 +443,34 @@ function SubArgumentNodeComponent({
     // Simple confirmation
     if (window.confirm(`Delete sub-argument "${node.data.title}"? This will also remove its content from the Letter.`)) {
       onDelete?.(node.id);
+    }
+  };
+
+  // Handle AI title generation
+  const handleAITitle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isGeneratingAITitle || !projectId) return;
+    setIsGeneratingAITitle(true);
+    try {
+      const response = await apiClient.post<{ success: boolean; relationship: string }>(
+        `/arguments/${projectId}/infer-relationship`,
+        {
+          argument_id: node.data.argumentId,
+          subargument_title: node.data.title || editTitle || 'merged sub-argument',
+        }
+      );
+      if (response.success && response.relationship) {
+        const newTitle = response.relationship;
+        setEditTitle(newTitle);
+        // If not in edit mode, save directly
+        if (!isEditing) {
+          onTitleChange?.(node.id, newTitle);
+        }
+      }
+    } catch (error) {
+      console.error('AI title generation failed:', error);
+    } finally {
+      setIsGeneratingAITitle(false);
     }
   };
 
@@ -580,6 +610,24 @@ function SubArgumentNodeComponent({
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
               </span>
             )}
+            {/* AI title button */}
+            <button
+              onClick={handleAITitle}
+              disabled={isGeneratingAITitle}
+              className="p-1 rounded hover:bg-purple-100 transition-colors disabled:opacity-50"
+              title="AI generate title"
+            >
+              {isGeneratingAITitle ? (
+                <svg className="w-3.5 h-3.5 animate-spin text-purple-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              )}
+            </button>
             {/* Regenerate button */}
             <button
               onClick={handleRegenerateClick}
@@ -991,7 +1039,6 @@ export function ArgumentGraph() {
   // Merge mode state
   const [isMergeMode, setIsMergeMode] = useState(false);
   const [mergeSelectedIds, setMergeSelectedIds] = useState<Set<string>>(new Set());
-  const [showMergeModal, setShowMergeModal] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const panStartPos = useRef<Position | null>(null);
   const offsetStartPos = useRef<Position | null>(null);
@@ -1202,32 +1249,44 @@ export function ArgumentGraph() {
   const exitMergeMode = useCallback(() => {
     setIsMergeMode(false);
     setMergeSelectedIds(new Set());
-    setShowMergeModal(false);
   }, []);
 
-  // Get the selected SubArgument objects for the modal
-  const mergeSelectedSubArgs = useMemo(() => {
-    return contextSubArguments.filter(sa => mergeSelectedIds.has(sa.id));
-  }, [contextSubArguments, mergeSelectedIds]);
-
-  // Handle merge confirm from modal
-  const handleMergeConfirm = useCallback(async (data: { title: string; purpose: string; relationship: string }) => {
-    if (!mergeSubArguments) return;
+  // Handle merge: directly merge with defaults, no modal
+  const handleMergeConfirm = useCallback(async () => {
+    if (!mergeSubArguments || mergeSelectedIds.size < 2) return;
     setIsMerging(true);
     try {
-      await mergeSubArguments(
+      // Pick defaults from the sub-arg with most snippets
+      const selectedSAs = contextSubArguments.filter(sa => mergeSelectedIds.has(sa.id));
+      const bestSA = [...selectedSAs].sort(
+        (a, b) => (b.snippetIds?.length || 0) - (a.snippetIds?.length || 0)
+      )[0];
+      const defaultTitle = bestSA?.title || 'Merged argument';
+      const purposes = selectedSAs.map(sa => sa.purpose?.trim()).filter(Boolean);
+      const defaultPurpose = [...new Set(purposes)].join('; ');
+      const defaultRelationship = bestSA?.relationship || 'Combined evidence';
+
+      const result = await mergeSubArguments(
         Array.from(mergeSelectedIds),
-        data.title,
-        data.purpose,
-        data.relationship,
+        defaultTitle,
+        defaultPurpose,
+        defaultRelationship,
       );
-      exitMergeMode();
+
+      // New card auto-enters edit mode on canvas
+      setNewlyCreatedSubArgId(result.newSubArgument.id);
+      setSelectedNodeId(result.newSubArgument.id);
+      setFocusState({ type: 'subargument', id: result.newSubArgument.id });
+
+      // Exit merge mode
+      setIsMergeMode(false);
+      setMergeSelectedIds(new Set());
     } catch (error) {
       console.error('Merge failed:', error);
     } finally {
       setIsMerging(false);
     }
-  }, [mergeSubArguments, mergeSelectedIds, exitMergeMode]);
+  }, [mergeSubArguments, mergeSelectedIds, contextSubArguments, setFocusState]);
 
   // Handle standard selection
   const handleStandardSelect = useCallback((standardId: string) => {
@@ -1589,6 +1648,7 @@ export function ArgumentGraph() {
                   mergeMode={isMergeMode}
                   mergeChecked={isMergeChecked}
                   mergeDisabled={isMergeDisabled}
+                  projectId={projectId}
                 />
               );
             })}
@@ -1637,7 +1697,7 @@ export function ArgumentGraph() {
               Cancel
             </button>
             <button
-              onClick={() => setShowMergeModal(true)}
+              onClick={handleMergeConfirm}
               disabled={mergeSelectedIds.size < 2 || isMerging}
               className="px-4 py-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
@@ -1647,15 +1707,6 @@ export function ArgumentGraph() {
         )}
       </div>
 
-      {/* Merge modal */}
-      {showMergeModal && mergeSelectedSubArgs.length >= 2 && (
-        <MergeSubArgumentsModal
-          selectedSubArguments={mergeSelectedSubArgs}
-          projectId={projectId}
-          onConfirm={handleMergeConfirm}
-          onCancel={() => setShowMergeModal(false)}
-        />
-      )}
     </div>
   );
 }
