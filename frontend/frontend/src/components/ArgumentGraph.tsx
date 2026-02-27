@@ -1150,7 +1150,8 @@ export function ArgumentGraph() {
     const ids = new Set<string>();
     for (const section of letterSections) {
       if (section.standardId && section.isGenerated) {
-        ids.add(`standard-${section.standardId}`);
+        const stdId = STANDARD_KEY_TO_ID[section.standardId];
+        if (stdId) ids.add(stdId);
       }
     }
     return ids;
