@@ -94,7 +94,7 @@ export interface ArgumentsContextType {
   updateSubArgument: (id: string, updates: Partial<Omit<SubArgument, 'id' | 'createdAt'>>) => void;
   removeSubArgument: (id: string, projectId: string) => void;
   regenerateSubArgument: (subArgumentId: string, projectId: string) => Promise<void>;
-  mergeSubArguments: (subArgumentIds: string[], title: string, purpose: string, relationship: string, projectId: string) => Promise<{ newArgument: Argument; newSubArgument: SubArgument }>;
+  mergeSubArguments: (subArgumentIds: string[], title: string, purpose: string, relationship: string, projectId: string) => Promise<{ newArgument: Argument; movedSubArgumentIds: string[] }>;
   isGeneratingArguments: boolean;
   generateArguments: (projectId: string, llmProvider: string, forceReanalyze?: boolean, applicantName?: string) => Promise<void>;
   generatedMainSubject: string | null;
@@ -310,14 +310,14 @@ export function ArgumentsProvider({ children }: { children: ReactNode }) {
     console.warn('regenerateSubArgument should be called via useApp() facade which has access to WritingContext');
   }, []);
 
-  // Merge SubArguments → new Argument + new SubArgument
+  // Merge SubArguments → move them under a new Argument (regroup, not fuse)
   const mergeSubArguments = useCallback(async (
     subArgumentIds: string[],
     title: string,
     purpose: string,
     relationship: string,
     projectId: string
-  ): Promise<{ newArgument: Argument; newSubArgument: SubArgument }> => {
+  ): Promise<{ newArgument: Argument; movedSubArgumentIds: string[] }> => {
     const response = await apiClient.post<{
       success: boolean;
       new_argument: {
@@ -331,19 +331,7 @@ export function ArgumentsProvider({ children }: { children: ReactNode }) {
         sub_argument_ids: string[];
         created_at: string;
       };
-      merged_subargument: {
-        id: string;
-        argument_id: string;
-        title: string;
-        purpose: string;
-        relationship: string;
-        snippet_ids: string[];
-        is_ai_generated: boolean;
-        status: string;
-        created_at: string;
-      };
-      deleted_subargument_ids: string[];
-      writing_changes: Array<{ subargument_id: string; section: string; removed_indices: number[] }>;
+      moved_subargument_ids: string[];
     }>(`/arguments/${projectId}/subarguments/merge`, {
       subargument_ids: subArgumentIds,
       merged_title: title,
@@ -370,44 +358,31 @@ export function ArgumentsProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date(),
     };
 
-    const merged = response.merged_subargument;
-    const newSubArgument: SubArgument = {
-      id: merged.id,
-      argumentId: merged.argument_id,
-      title: merged.title,
-      purpose: merged.purpose,
-      relationship: merged.relationship,
-      snippetIds: merged.snippet_ids,
-      isAIGenerated: merged.is_ai_generated,
-      status: merged.status as 'draft' | 'verified',
-      createdAt: new Date(merged.created_at),
-      updatedAt: new Date(),
-    };
+    const movedSet = new Set(response.moved_subargument_ids);
 
-    // Remove old sub-args, add new sub-arg
-    const deletedIds = new Set(response.deleted_subargument_ids);
-    setSubArguments(prev => [
-      ...prev.filter(sa => !deletedIds.has(sa.id)),
-      newSubArgument,
-    ]);
+    // Update moved sub-args: change their argumentId to the new Argument
+    setSubArguments(prev => prev.map(sa =>
+      movedSet.has(sa.id)
+        ? { ...sa, argumentId: newArgument.id, updatedAt: new Date() }
+        : sa
+    ));
 
-    // Update old parent arguments: remove deleted sub_argument_ids
-    // Then add the new Argument
+    // Remove moved sub-arg IDs from old parent arguments, then add the new Argument
     setArguments(prev => {
       const updated = prev.map(arg => {
         const oldIds = arg.subArgumentIds || [];
-        const hasDeleted = oldIds.some(id => deletedIds.has(id));
-        if (!hasDeleted) return arg;
+        const hasMoved = oldIds.some(id => movedSet.has(id));
+        if (!hasMoved) return arg;
         return {
           ...arg,
-          subArgumentIds: oldIds.filter(id => !deletedIds.has(id)),
+          subArgumentIds: oldIds.filter(id => !movedSet.has(id)),
           updatedAt: new Date(),
         };
       });
       return [...updated, newArgument];
     });
 
-    return { newArgument, newSubArgument };
+    return { newArgument, movedSubArgumentIds: response.moved_subargument_ids };
   }, []);
 
   // AI Argument Generation

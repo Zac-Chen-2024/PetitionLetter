@@ -1273,10 +1273,9 @@ export function ArgumentGraph() {
         defaultRelationship,
       );
 
-      // New card auto-enters edit mode on canvas
-      setNewlyCreatedSubArgId(result.newSubArgument.id);
-      setSelectedNodeId(result.newSubArgument.id);
-      setFocusState({ type: 'subargument', id: result.newSubArgument.id });
+      // Focus the new Argument node (sub-args are moved, not fused)
+      setSelectedNodeId(result.newArgument.id);
+      setFocusState({ type: 'argument', id: result.newArgument.id });
 
       // Exit merge mode
       setIsMergeMode(false);

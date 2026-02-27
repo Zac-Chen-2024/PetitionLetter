@@ -88,22 +88,16 @@ export function useApp() {
     return writing.regenerateSubArgumentInLetter(subArgumentId, project.projectId, project.llmProvider, args.subArguments, args.arguments);
   }, [writing.regenerateSubArgumentInLetter, project.projectId, project.llmProvider, args.subArguments, args.arguments]);
 
-  // mergeSubArguments: facade binds projectId, cascades letter removal
-  // Returns { newArgument, newSubArgument }
+  // mergeSubArguments: facade binds projectId
+  // Moves sub-args under a new Argument (regroup, no deletion)
   const mergeSubArguments = useCallback(async (
     subArgumentIds: string[],
     title: string,
     purpose: string,
     relationship: string
   ) => {
-    // Before merge, cascade remove each sub-arg from letter
-    for (const id of subArgumentIds) {
-      const subArg = args.subArguments.find(sa => sa.id === id);
-      const subArgTitle = subArg?.title || '';
-      writing.removeSubArgumentFromLetter(id, args.arguments, project.projectId, subArgTitle);
-    }
     return args.mergeSubArguments(subArgumentIds, title, purpose, relationship, project.projectId);
-  }, [args.mergeSubArguments, args.subArguments, args.arguments, writing.removeSubArgumentFromLetter, project.projectId]);
+  }, [args.mergeSubArguments, project.projectId]);
 
   // removeArgument: original removes from arguments + writingEdges + argumentMappings
   // ArgumentsContext only removes from arguments + argumentMappings
