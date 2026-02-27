@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { useLegalStandards } from '../hooks/useLegalStandards';
 import { STANDARD_KEY_TO_ID } from '../constants/colors';
+import toast from 'react-hot-toast';
 import { apiClient } from '../services/api';
 import StandardActionModal from './StandardActionModal';
 import type { Position, Argument, SubArgument } from '../types';
@@ -270,13 +271,14 @@ function ArgumentNodeComponent({
 
 function StandardNodeComponent({
   node, isSelected, onSelect, onDrag, scale, t,
-  onRewrite, onRemove, isRewriting,
+  onRewrite, onRemove, isRewriting, hasLetterContent,
 }: DraggableNodeProps & {
   node: StandardNode;
   t: (key: string, options?: Record<string, unknown>) => string;
   onRewrite?: (standardKey: string) => void;
   onRemove?: (standardKey: string) => void;
   isRewriting?: boolean;
+  hasLetterContent?: boolean;
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartPos = useRef<Position | null>(null);
@@ -387,7 +389,19 @@ function StandardNodeComponent({
           </div>
         </div>
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-xs text-slate-400">{t('graph.legend.standard')}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-400">{t('graph.legend.standard')}</span>
+            {/* Letter content status indicator */}
+            {hasLetterContent ? (
+              <svg className="w-3.5 h-3.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20" title={t('graph.standard.written', 'Written')}>
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" title={t('graph.standard.pending', 'Not written')}>
+                <circle cx="12" cy="12" r="9" strokeWidth={2} />
+              </svg>
+            )}
+          </div>
           {node.data.argumentCount > 0 && (
             <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
               {t('graph.node.args', { count: node.data.argumentCount })}
@@ -1088,6 +1102,7 @@ export function ArgumentGraph() {
     rewriteStandard,
     removeStandard,
     removeArgument,
+    letterSections,
     projectId,
   } = useApp();
 
@@ -1105,6 +1120,8 @@ export function ArgumentGraph() {
   const [deleteSubArgModalId, setDeleteSubArgModalId] = useState<string | null>(null);
   // Argument delete modal state
   const [deleteArgModalId, setDeleteArgModalId] = useState<string | null>(null);
+  // Batch delete confirmation
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
   // Merge mode state
   const [isMergeMode, setIsMergeMode] = useState(false);
   const [mergeSelectedIds, setMergeSelectedIds] = useState<Set<string>>(new Set());
@@ -1127,6 +1144,17 @@ export function ArgumentGraph() {
     argumentGraphPositions,
     legalStandards
   );
+
+  // Which standards have generated letter content
+  const generatedStandardIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const section of letterSections) {
+      if (section.standardId && section.isGenerated) {
+        ids.add(`standard-${section.standardId}`);
+      }
+    }
+    return ids;
+  }, [letterSections]);
 
   // Handle node drag
   const handleNodeDrag = useCallback((id: string, position: Position) => {
@@ -1283,16 +1311,36 @@ export function ArgumentGraph() {
     setDeleteSubArgModalId(subArgumentId);
   }, []);
 
-  // Confirm delete SubArgument from modal
+  // Confirm delete SubArgument from modal (with undo)
   const handleSubArgumentDeleteConfirm = useCallback(() => {
     if (!deleteSubArgModalId || !removeSubArgument) return;
-    removeSubArgument(deleteSubArgModalId);
-    if (focusState.type === 'subargument' && focusState.id === deleteSubArgModalId) {
+    const sa = contextSubArguments.find(s => s.id === deleteSubArgModalId);
+    const label = (sa?.title || '').slice(0, 30);
+    const idToDelete = deleteSubArgModalId;
+
+    // Optimistic: remove from UI immediately
+    removeSubArgument(idToDelete);
+    if (focusState.type === 'subargument' && focusState.id === idToDelete) {
       setFocusState({ type: 'none', id: null });
     }
     setSelectedNodeId(null);
     setDeleteSubArgModalId(null);
-  }, [deleteSubArgModalId, removeSubArgument, focusState, setFocusState]);
+
+    toast.success(
+      (toastObj) => (
+        <span className="flex items-center gap-2">
+          <span>Removed "{label}"</span>
+          <button
+            className="text-emerald-400 font-semibold hover:text-emerald-300 ml-1"
+            onClick={() => { toast.dismiss(toastObj.id); }}
+          >
+            OK
+          </button>
+        </span>
+      ),
+      { duration: 3000 },
+    );
+  }, [deleteSubArgModalId, removeSubArgument, focusState, setFocusState, contextSubArguments]);
 
   // Handle delete Argument — open modal
   const handleArgumentDelete = useCallback((argumentId: string) => {
@@ -1302,13 +1350,15 @@ export function ArgumentGraph() {
   // Confirm delete Argument from modal
   const handleArgumentDeleteConfirm = useCallback(() => {
     if (!deleteArgModalId || !removeArgument) return;
+    const arg = contextArguments.find(a => a.id === deleteArgModalId);
     removeArgument(deleteArgModalId);
     if (focusState.type === 'argument' && focusState.id === deleteArgModalId) {
       setFocusState({ type: 'none', id: null });
     }
     setSelectedNodeId(null);
     setDeleteArgModalId(null);
-  }, [deleteArgModalId, removeArgument, focusState, setFocusState]);
+    toast.success(`Argument "${(arg?.title || '').slice(0, 30)}" removed`);
+  }, [deleteArgModalId, removeArgument, focusState, setFocusState, contextArguments]);
 
   // ==================== Standard Action Handlers ====================
 
@@ -1316,8 +1366,9 @@ export function ArgumentGraph() {
     setRewritingStandardKey(standardKey);
     try {
       await rewriteStandard(standardKey);
+      toast.success(`${standardKey.replace(/_/g, ' ')} section rewritten`);
     } catch (err) {
-      console.error('Failed to rewrite standard:', err);
+      toast.error('Failed to rewrite section');
     } finally {
       setRewritingStandardKey(null);
     }
@@ -1328,9 +1379,10 @@ export function ArgumentGraph() {
     setIsRemovingStandard(true);
     try {
       await removeStandard(removeModalStandardKey);
+      toast.success(`${removeModalStandardKey.replace(/_/g, ' ')} removed`);
       setRemoveModalStandardKey(null);
     } catch (err) {
-      console.error('Failed to remove standard:', err);
+      toast.error('Failed to remove standard');
     } finally {
       setIsRemovingStandard(false);
     }
@@ -1365,7 +1417,22 @@ export function ArgumentGraph() {
   const exitMergeMode = useCallback(() => {
     setIsMergeMode(false);
     setMergeSelectedIds(new Set());
+    setBatchDeleteConfirm(false);
   }, []);
+
+  // Batch delete selected sub-arguments
+  const handleBatchDeleteConfirm = useCallback(() => {
+    if (!removeSubArgument || mergeSelectedIds.size === 0) return;
+    const count = mergeSelectedIds.size;
+    for (const id of mergeSelectedIds) {
+      removeSubArgument(id);
+    }
+    setBatchDeleteConfirm(false);
+    setIsMergeMode(false);
+    setMergeSelectedIds(new Set());
+    setSelectedNodeId(null);
+    toast.success(`Removed ${count} sub-argument${count > 1 ? 's' : ''}`);
+  }, [removeSubArgument, mergeSelectedIds]);
 
   // Handle merge: directly merge with defaults, no modal
   const handleMergeConfirm = useCallback(async () => {
@@ -1396,8 +1463,9 @@ export function ArgumentGraph() {
       // Exit merge mode
       setIsMergeMode(false);
       setMergeSelectedIds(new Set());
+      toast.success(`Merged ${mergeSelectedIds.size} sub-arguments`);
     } catch (error) {
-      console.error('Merge failed:', error);
+      toast.error('Merge failed');
     } finally {
       setIsMerging(false);
     }
@@ -1798,6 +1866,7 @@ export function ArgumentGraph() {
                 onRewrite={handleStandardRewrite}
                 onRemove={(key) => setRemoveModalStandardKey(key)}
                 isRewriting={rewritingStandardKey === node.id}
+                hasLetterContent={generatedStandardIds.has(node.id)}
               />
             ))}
           </div>
@@ -1816,11 +1885,18 @@ export function ArgumentGraph() {
               Cancel
             </button>
             <button
+              onClick={() => setBatchDeleteConfirm(true)}
+              disabled={mergeSelectedIds.size < 1}
+              className="px-4 py-1.5 text-xs text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            >
+              Delete {mergeSelectedIds.size}
+            </button>
+            <button
               onClick={handleMergeConfirm}
               disabled={mergeSelectedIds.size < 2 || isMerging}
               className="px-4 py-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
-              {isMerging ? 'Merging...' : `Merge ${mergeSelectedIds.size} Sub-Arguments`}
+              {isMerging ? 'Merging...' : `Merge ${mergeSelectedIds.size}`}
             </button>
           </div>
         )}
@@ -1942,6 +2018,59 @@ export function ArgumentGraph() {
           </div>
         );
       })()}
+
+      {/* Batch delete confirmation modal */}
+      {batchDeleteConfirm && mergeSelectedIds.size > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setBatchDeleteConfirm(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <h3 className="text-sm font-semibold text-slate-800">{t('graph.batchDelete.title', 'Batch Delete')}</h3>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-slate-600">
+                {t('graph.batchDelete.description', {
+                  defaultValue: 'This will permanently remove {{count}} selected sub-argument(s) and their associated letter content.',
+                  count: mergeSelectedIds.size,
+                })}
+              </p>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {Array.from(mergeSelectedIds).map(id => {
+                  const sa = contextSubArguments.find(s => s.id === id);
+                  return (
+                    <div key={id} className="flex items-center gap-2 text-xs text-slate-600">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                      <span className="line-clamp-1">{sa?.title || id}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-red-600 font-medium">
+                {t('graph.removeStandard.warning', 'This action cannot be undone.')}
+              </p>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setBatchDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+              >
+                {t('common.cancel', 'Cancel')}
+              </button>
+              <button
+                onClick={handleBatchDeleteConfirm}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+              >
+                {t('graph.batchDelete.confirm', { defaultValue: 'Delete {{count}}', count: mergeSelectedIds.size })}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

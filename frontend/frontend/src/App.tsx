@@ -1,6 +1,7 @@
 import { Component, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AppProvider, useApp } from './context/AppContext';
 import {
   Header,
@@ -204,6 +205,21 @@ function App() {
   return (
     <AppProvider>
       <AppContent />
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            borderRadius: '10px',
+            background: '#1e293b',
+            color: '#f1f5f9',
+            fontSize: '13px',
+            padding: '10px 16px',
+          },
+          success: { iconTheme: { primary: '#10b981', secondary: '#fff' } },
+          error: { iconTheme: { primary: '#ef4444', secondary: '#fff' }, duration: 4000 },
+        }}
+      />
     </AppProvider>
   );
 }
